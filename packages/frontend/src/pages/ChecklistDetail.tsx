@@ -124,7 +124,7 @@ export default function ChecklistDetail() {
 
           {currentMachine.categories.map((cat, catIdx) => {
             const isCollapsed = collapsed[collapseKey(catIdx)] ?? false;
-            const doneCount = cat.items.filter((i) => i.completed === true).length;
+            const doneCount = cat.items.filter((i) => i.completed !== null).length;
 
             return (
               <div key={catIdx} className={cl.fillCategory}>
@@ -149,7 +149,7 @@ export default function ChecklistDetail() {
                       <div className={cl.fillTaskLeft}>
                         <div className={cl.fillTaskContent}>
                           <span className={cl.fillTaskText}>{item.description}</span>
-                          {item.completed && item.completedBy && (
+                          {item.completed !== null && item.completedBy && (
                             <span className={cl.fillStamp}>
                               {item.completedBy}
                               {item.completedAt
@@ -202,7 +202,7 @@ export default function ChecklistDetail() {
                         </span>
                         <div className={s.printTaskInfo}>
                           <span className={s.printTaskText}>{item.description}</span>
-                          {item.completed && item.completedBy && (
+                          {item.completed !== null && item.completedBy && (
                             <span className={s.printTaskStamp}>
                               {item.completedBy}
                               {item.completedAt
