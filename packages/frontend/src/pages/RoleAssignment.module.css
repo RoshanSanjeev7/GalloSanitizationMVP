@@ -1,0 +1,52 @@
+.role-toggle {
+  display: flex;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.role-toggle button {
+  flex: 1;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--white);
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.role-toggle button.active {
+  background-color: var(--primary);
+  color: var(--white);
+}
+
+.user-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.user-row:last-child {
+  border-bottom: none;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-info h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 1px;
+}
+
+.user-info p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
