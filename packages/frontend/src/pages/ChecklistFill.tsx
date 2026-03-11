@@ -43,8 +43,8 @@ export default function ChecklistFill() {
                 return {
                   ...item,
                   completed: newStatus,
-                  completedBy: newStatus === true ? (currentUser?.name || 'Unknown') : null,
-                  completedAt: newStatus === true ? new Date().toISOString() : null,
+                  completedBy: newStatus !== null ? (currentUser?.name || 'Unknown') : null,
+                  completedAt: newStatus !== null ? new Date().toISOString() : null,
                 };
               }),
             };
@@ -139,7 +139,7 @@ export default function ChecklistFill() {
         >
           {machines.map((m, idx) => {
             const total = m.categories.reduce((sum, c) => sum + c.items.length, 0);
-            const done = m.categories.reduce((sum, c) => sum + c.items.filter(i => i.completed === true).length, 0);
+            const done = m.categories.reduce((sum, c) => sum + c.items.filter(i => i.completed !== null).length, 0);
             return (
               <option key={idx} value={idx}>
                 {m.name} ({done}/{total})
@@ -150,7 +150,7 @@ export default function ChecklistFill() {
 
         {currentMachine.categories.map((cat, catIdx) => {
           const isCollapsed = collapsed[collapseKey(catIdx)] ?? false;
-          const doneCount = cat.items.filter((i) => i.completed === true).length;
+          const doneCount = cat.items.filter((i) => i.completed !== null).length;
 
           return (
             <div key={catIdx} className={cl.fillCategory}>
@@ -191,7 +191,7 @@ export default function ChecklistFill() {
                           <button
                             className={`${s.fillBtn} ${item.completed === false ? s.fillBtnSkipActive : ''}`}
                             onClick={() => setItemStatus(catIdx, itemIdx, false)}
-                            title="Mark as skipped"
+                            title="Mark with issue"
                           >
                             &#10005;
                           </button>
@@ -199,7 +199,7 @@ export default function ChecklistFill() {
                       </div>
 
                       <div className={s.fillItemFooter}>
-                        {item.completed && item.completedBy && (
+                        {item.completed !== null && item.completedBy && (
                           <span className={cl.fillStamp}>
                             {item.completedBy}{item.completedAt ? ` at ${formatStamp(item.completedAt)}` : ''}
                           </span>
@@ -233,7 +233,29 @@ export default function ChecklistFill() {
           );
         })}
 
-        <div className="action-buttons" style={{ marginBottom: 40, marginTop: 24 }}>
+        {machines.length > 1 && (
+          <div className={s.machineNav}>
+            <button
+              className={s.machineNavBtn}
+              onClick={() => setActiveMachine((prev) => prev - 1)}
+              disabled={activeMachine === 0}
+            >
+              &larr; {activeMachine > 0 ? machines[activeMachine - 1].name : ''}
+            </button>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {activeMachine + 1} / {machines.length}
+            </span>
+            <button
+              className={s.machineNavBtn}
+              onClick={() => setActiveMachine((prev) => prev + 1)}
+              disabled={activeMachine === machines.length - 1}
+            >
+              {activeMachine < machines.length - 1 ? machines[activeMachine + 1].name : ''} &rarr;
+            </button>
+          </div>
+        )}
+
+        <div className="action-buttons" style={{ marginBottom: 40, marginTop: 16 }}>
           <button className="btn btn-primary" onClick={handleSubmit}>
             Submit Checklist
           </button>

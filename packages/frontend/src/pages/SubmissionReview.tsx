@@ -38,7 +38,7 @@ export default function SubmissionReview() {
   const allItems = checklist.machines.flatMap((m) =>
     m.categories.flatMap((c) => c.items)
   );
-  const completeCount = allItems.filter((i) => i.completed === true).length;
+  const completeCount = allItems.filter((i) => i.completed !== null).length;
   const incompleteCount = allItems.length - completeCount;
 
   const start = new Date(checklist.startTime);
@@ -56,6 +56,28 @@ export default function SubmissionReview() {
       day: 'numeric',
       year: 'numeric',
     });
+
+  const machineStats = checklist.machines.map((m) => {
+    const items = m.categories.flatMap((c) => c.items);
+    return {
+      name: m.name,
+      total: items.length,
+      done: items.filter((i) => i.completed !== null).length,
+    };
+  });
+
+  const allNotes = checklist.machines.flatMap((m) =>
+    m.categories.flatMap((c) =>
+      c.items
+        .filter((i) => i.issue)
+        .map((i) => ({
+          machine: m.name,
+          task: i.description,
+          note: i.issue!,
+          completedBy: i.completedBy,
+        }))
+    )
+  );
 
   const currentMachine = checklist.machines[activeMachine];
 
@@ -97,7 +119,7 @@ export default function SubmissionReview() {
           <div>
             {currentMachine.categories.map((cat, catIdx) => {
               const isCollapsed = collapsed[collapseKey(catIdx)] ?? false;
-              const doneCount = cat.items.filter((i) => i.completed === true).length;
+              const doneCount = cat.items.filter((i) => i.completed !== null).length;
 
               return (
                 <div key={catIdx} className={cl.fillCategory}>
@@ -122,7 +144,7 @@ export default function SubmissionReview() {
                         <div className={cl.fillTaskLeft}>
                           <div className={cl.fillTaskContent}>
                             <span className={cl.fillTaskText}>{item.description}</span>
-                            {item.completed && item.completedBy && (
+                            {item.completed !== null && item.completedBy && (
                               <span className={cl.fillStamp}>
                                 {item.completedBy}
                                 {item.completedAt
@@ -192,14 +214,47 @@ export default function SubmissionReview() {
             <div className={s.completionPanel}>
               <h3>Completion</h3>
               <div className={s.completionStat}>
-                <span className={s.statComplete}>&#10003; Complete</span>
+                <span className={s.statComplete}>&#10003; Filled</span>
                 <span className={s.statComplete}>{completeCount}</span>
               </div>
               <div className={s.completionStat}>
-                <span className={s.statIncomplete}>&#10005; Incomplete</span>
+                <span className={s.statIncomplete}>&#10005; Unfilled</span>
                 <span className={s.statIncomplete}>{incompleteCount}</span>
               </div>
             </div>
+
+            <div className={s.machinePanel}>
+              <h3>Machine Progress</h3>
+              {machineStats.map((ms, idx) => (
+                <div key={idx} className={s.machineRow}>
+                  <div className={s.machineRowTop}>
+                    <span className={s.machineName}>{ms.name}</span>
+                    <span className={s.machineCount}>{ms.done}/{ms.total}</span>
+                  </div>
+                  <div className={s.progressBar}>
+                    <div
+                      className={s.progressFill}
+                      style={{ width: `${ms.total > 0 ? (ms.done / ms.total) * 100 : 0}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {allNotes.length > 0 && (
+              <div className={s.notesPanel}>
+                <h3>Notes &amp; Issues ({allNotes.length})</h3>
+                {allNotes.map((n, idx) => (
+                  <div key={idx} className={s.noteItem}>
+                    <div className={s.noteMeta}>
+                      {n.machine} {n.completedBy && <span>&middot; {n.completedBy}</span>}
+                    </div>
+                    <div className={s.noteTask}>{n.task}</div>
+                    <div className={s.noteText}>{n.note}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>

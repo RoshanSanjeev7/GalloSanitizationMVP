@@ -28,12 +28,16 @@ export default function AdminDashboard() {
   }, [user]);
 
   const loadData = async () => {
-    const [cls, lns] = await Promise.all([
-      api.getChecklists(),
-      api.getLines(),
-    ]);
-    setChecklists(cls);
-    setLines(lns);
+    try {
+      const [cls, lns] = await Promise.all([
+        api.getChecklists(),
+        api.getLines(),
+      ]);
+      setChecklists(cls);
+      setLines(lns);
+    } catch {
+      // 401 handled by api interceptor
+    }
   };
 
   let filtered = checklists.filter((c) => {

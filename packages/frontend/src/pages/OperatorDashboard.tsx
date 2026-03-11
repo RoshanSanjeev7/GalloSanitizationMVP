@@ -9,14 +9,14 @@ import Footer from '../components/Footer';
 import Modal from '../components/Modal';
 import d from '../styles/dashboard.module.css';
 
-type Tab = 'all' | 'in_progress' | 'completed';
+type Tab = 'all' | 'in_progress' | 'submitted' | 'completed';
 
 export default function OperatorDashboard() {
   const user = useSelector((s: RootState) => s.auth.user);
   const navigate = useNavigate();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<Tab>('in_progress');
   const [showModal, setShowModal] = useState(false);
   const [selectedLine, setSelectedLine] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -27,16 +27,21 @@ export default function OperatorDashboard() {
   }, [user]);
 
   const loadData = async () => {
-    const [cls, lns] = await Promise.all([
-      api.getChecklists({ operatorId: user!.id }),
-      api.getLines(),
-    ]);
-    setChecklists(cls);
-    setLines(lns);
+    try {
+      const [cls, lns] = await Promise.all([
+        api.getChecklists({ operatorId: user!.id }),
+        api.getLines(),
+      ]);
+      setChecklists(cls);
+      setLines(lns);
+    } catch {
+      // 401 handled by api interceptor
+    }
   };
 
   const filtered = checklists.filter((c) => {
     if (tab === 'in_progress') return c.status === 'in_progress';
+    if (tab === 'submitted') return c.status === 'submitted';
     if (tab === 'completed') return c.status === 'approved' || c.status === 'denied';
     return true;
   });
@@ -44,6 +49,7 @@ export default function OperatorDashboard() {
   const counts = {
     all: checklists.length,
     in_progress: checklists.filter((c) => c.status === 'in_progress').length,
+    submitted: checklists.filter((c) => c.status === 'submitted').length,
     completed: checklists.filter((c) => c.status === 'approved' || c.status === 'denied').length,
   };
 
@@ -108,9 +114,10 @@ export default function OperatorDashboard() {
 
         <div className={d.dashTabs}>
           {([
-            { key: 'all' as Tab, label: 'All', count: counts.all },
             { key: 'in_progress' as Tab, label: 'In Progress', count: counts.in_progress },
+            { key: 'submitted' as Tab, label: 'Pending Review', count: counts.submitted },
             { key: 'completed' as Tab, label: 'Completed', count: counts.completed },
+            { key: 'all' as Tab, label: 'All', count: counts.all },
           ]).map((t) => (
             <button
               key={t.key}

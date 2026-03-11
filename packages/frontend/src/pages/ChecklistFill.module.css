@@ -132,3 +132,36 @@
   color: var(--amber);
   margin-right: 4px;
 }
+
+.machine-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-light);
+}
+
+.machine-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: opacity 0.15s;
+}
+
+.machine-nav-btn:hover {
+  opacity: 0.7;
+}
+
+.machine-nav-btn:disabled {
+  color: var(--text-muted);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
