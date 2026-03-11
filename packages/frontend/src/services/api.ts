@@ -38,6 +38,13 @@ async function request<T = unknown>(endpoint: string, options: RequestInit = {})
   }
 
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('user');
+      localStorage.removeItem('token');
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
+    }
     const msg = typeof data === 'object' && data !== null
       ? (data as Record<string, string>).message || (data as Record<string, string>).error || 'Request failed'
       : String(data);
