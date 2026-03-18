@@ -1,0 +1,67 @@
+.profile-card {
+  text-align: center;
+  padding: 36px 20px;
+}
+
+.profile-card .avatar {
+  margin: 0 auto 16px;
+}
+
+.profile-card h2 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.email {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  background-color: var(--green-light);
+  color: var(--green);
+  border: 1px solid var(--green-border);
+}
+
+.centered-card {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.nav-card {
+  margin-top: 16px;
+}
+
+.nav-card a,
+.nav-card button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 14px;
+  color: var(--text);
+  border-bottom: 1px solid var(--border-light);
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  transition: background-color 0.1s;
+}
+
+.nav-card a:last-child,
+.nav-card button:last-child {
+  border-bottom: none;
+}
+
+.nav-card a:hover,
+.nav-card button:hover {
+  background-color: var(--bg);
+}

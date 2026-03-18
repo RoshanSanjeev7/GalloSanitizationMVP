@@ -1,0 +1,38 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 14px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.badge-approved,
+.badge-complete {
+  background-color: var(--green-light);
+  color: var(--green);
+  border-color: var(--green-border);
+}
+
+.badge-pending,
+.badge-submitted {
+  background-color: var(--amber-light);
+  color: var(--amber);
+  border-color: var(--amber-border);
+}
+
+.badge-denied,
+.badge-incomplete {
+  background-color: var(--red-light);
+  color: var(--red);
+  border-color: var(--red-border);
+}
+
+.badge-in-progress,
+.badge-in_progress {
+  background-color: var(--blue-light);
+  color: var(--blue);
+  border-color: var(--blue-border);
+}
