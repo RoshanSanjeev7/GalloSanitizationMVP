@@ -293,6 +293,21 @@ export default function ChecklistFill() {
 
                       {/* Photo upload */}
                       <div className={s.photoSection}>
+                        {/* Camera capture (opens camera directly on mobile/iPad) */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          style={{ display: 'none' }}
+                          ref={(el) => { fileInputRefs.current[`${key}-camera`] = el; }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              handlePhotoUpload(catIdx, itemIdx, e.target.files);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        {/* Photo library (opens file picker / photo library) */}
                         <input
                           type="file"
                           accept="image/*"
@@ -306,12 +321,20 @@ export default function ChecklistFill() {
                             }
                           }}
                         />
-                        <button
-                          className={s.photoAddBtn}
-                          onClick={() => fileInputRefs.current[key]?.click()}
-                        >
-                          + Add Photo
-                        </button>
+                        <div className={s.photoBtnGroup}>
+                          <button
+                            className={s.photoAddBtn}
+                            onClick={() => fileInputRefs.current[`${key}-camera`]?.click()}
+                          >
+                            Take Photo
+                          </button>
+                          <button
+                            className={s.photoAddBtn}
+                            onClick={() => fileInputRefs.current[key]?.click()}
+                          >
+                            Photo Library
+                          </button>
+                        </div>
 
                         {uploading[key] && (
                           <div className={s.photoUploading}>Uploading...</div>

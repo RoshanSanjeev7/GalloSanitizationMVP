@@ -171,22 +171,35 @@
   margin-left: 26px;
 }
 
+.photo-btn-group {
+  display: flex;
+  gap: 8px;
+}
+
 .photo-add-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--primary);
   background: none;
   border: 1px dashed var(--border);
   border-radius: var(--radius-xs);
   cursor: pointer;
-  padding: 6px 10px;
-  transition: border-color 0.15s;
+  padding: 10px 14px;
+  min-height: 44px;
+  transition: border-color 0.15s, background-color 0.15s;
 }
 
 .photo-add-btn:hover {
   border-color: var(--primary);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.photo-add-btn:active {
+  background: rgba(0, 0, 0, 0.05);
 }
 
 .photo-thumbs {
