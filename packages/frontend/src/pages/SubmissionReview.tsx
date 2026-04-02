@@ -16,6 +16,14 @@ export default function SubmissionReview() {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [showComment, setShowComment] = useState<Record<string, boolean>>({});
   const [reviewedNotes, setReviewedNotes] = useState<Record<number, boolean>>({});
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+
+  const loadImageUrl = async (imageKey: string) => {
+    if (imageUrls[imageKey]) return;
+    if (!id) return;
+    const url = await api.getImageUrl(id, imageKey);
+    setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
+  };
 
   const currentUser = api.getStoredUser();
 
@@ -334,6 +342,30 @@ export default function SubmissionReview() {
                               )}
                             </div>
 
+                            {item.images && item.images.length > 0 && (
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                                {item.images.map((imgKey) => {
+                                  if (!imageUrls[imgKey]) loadImageUrl(imgKey);
+                                  return (
+                                    <img
+                                      key={imgKey}
+                                      src={imageUrls[imgKey] || ''}
+                                      alt="Checklist photo"
+                                      style={{
+                                        width: 48,
+                                        height: 48,
+                                        objectFit: 'cover',
+                                        borderRadius: 4,
+                                        border: '1px solid var(--border)',
+                                        cursor: 'pointer',
+                                      }}
+                                      onClick={() => imageUrls[imgKey] && window.open(imageUrls[imgKey], '_blank')}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            )}
+
                             {showComment[key] ? (
                               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
                                 <input
@@ -417,6 +449,29 @@ export default function SubmissionReview() {
                                 <div className={cl.issueBox} style={{ marginTop: 4, padding: '6px 10px', fontSize: 12 }}>
                                   <strong>Comment:</strong>
                                   {item.issue}
+                                </div>
+                              )}
+                              {item.images && item.images.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                                  {item.images.map((imgKey) => {
+                                    if (!imageUrls[imgKey]) loadImageUrl(imgKey);
+                                    return (
+                                      <img
+                                        key={imgKey}
+                                        src={imageUrls[imgKey] || ''}
+                                        alt="Checklist photo"
+                                        style={{
+                                          width: 48,
+                                          height: 48,
+                                          objectFit: 'cover',
+                                          borderRadius: 4,
+                                          border: '1px solid var(--border)',
+                                          cursor: 'pointer',
+                                        }}
+                                        onClick={() => imageUrls[imgKey] && window.open(imageUrls[imgKey], '_blank')}
+                                      />
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>
