@@ -182,6 +182,7 @@ export interface ChecklistItem {
   completedBy: string | null;
   completedAt: string | null;
   issue: string | null;
+  images: string[];
 }
 
 export interface ChecklistCategory {
@@ -250,6 +251,55 @@ async function deleteChecklist(id: string): Promise<void> {
   await request(`/checklists/${id}`, { method: 'DELETE' });
 }
 
+// ─── Images ────────────────────────────────────────────────────────
+async function uploadImages(
+  checklistId: string,
+  machineIdx: number,
+  catIdx: number,
+  itemIdx: number,
+  files: File[],
+): Promise<{ images: string[] }> {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('machineIdx', String(machineIdx));
+  formData.append('catIdx', String(catIdx));
+  formData.append('itemIdx', String(itemIdx));
+  files.forEach((file) => formData.append('images', file));
+
+  const res = await fetch(`${API_BASE}/checklists/${checklistId}/images`, {
+    method: 'POST',
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Upload failed');
+  }
+
+  return res.json();
+}
+
+async function getImageUrl(checklistId: string, key: string): Promise<string> {
+  const data = await request<{ url: string }>(`/checklists/${checklistId}/images/${key}`);
+  return data.url;
+}
+
+async function deleteImage(
+  checklistId: string,
+  key: string,
+  machineIdx: number,
+  catIdx: number,
+  itemIdx: number,
+): Promise<{ images: string[] }> {
+  return request<{ images: string[] }>(`/checklists/${checklistId}/images`, {
+    method: 'DELETE',
+    body: JSON.stringify({ key, machineIdx, catIdx, itemIdx }),
+  });
+}
+
 const api = {
   login,
   logout,
@@ -272,6 +322,9 @@ const api = {
   approveChecklist,
   denyChecklist,
   deleteChecklist,
+  uploadImages,
+  getImageUrl,
+  deleteImage,
 };
 
 export default api;
