@@ -165,3 +165,71 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+.photo-section {
+  margin-top: 8px;
+  margin-left: 26px;
+}
+
+.photo-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--primary);
+  background: none;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+  padding: 6px 10px;
+  transition: border-color 0.15s;
+}
+
+.photo-add-btn:hover {
+  border-color: var(--primary);
+}
+
+.photo-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.photo-thumb-wrapper {
+  position: relative;
+  width: 64px;
+  height: 64px;
+}
+
+.photo-thumb {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+}
+
+.photo-remove-btn {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--red);
+  color: var(--white);
+  border: none;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-uploading {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
