@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/env.js';
-import { getStore } from '../data/store.js';
+import { getUserByEmail, getUser } from '../data/dynamo.js';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
-router.post('/login', (req, res) => {
+router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -14,8 +14,7 @@ router.post('/login', (req, res) => {
     return;
   }
 
-  const store = getStore();
-  const user = store.users.find(u => u.email === email);
+  const user = await getUserByEmail(email);
 
   if (!user || user.password !== password) {
     res.status(401).json({ error: 'Invalid credentials' });
@@ -32,9 +31,8 @@ router.post('/login', (req, res) => {
   res.json({ user: userPublic, token });
 });
 
-router.get('/me', authMiddleware, (req: AuthRequest, res) => {
-  const store = getStore();
-  const user = store.users.find(u => u.id === req.userId);
+router.get('/me', authMiddleware, async (req: AuthRequest, res) => {
+  const user = await getUser(req.userId!);
 
   if (!user) {
     res.status(404).json({ error: 'User not found' });
