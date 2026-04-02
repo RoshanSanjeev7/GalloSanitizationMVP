@@ -40,6 +40,7 @@ export interface ChecklistItem {
   completedBy: string | null;
   completedAt: string | null;
   issue: string | null;
+  images: string[];
 }
 
 export interface ChecklistCategory {

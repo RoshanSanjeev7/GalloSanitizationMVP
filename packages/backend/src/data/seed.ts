@@ -619,6 +619,7 @@ function toChecklistMachines(
           completedBy: done ? operatorName : null,
           completedAt: done ? ts : null,
           issue: issueOnFirst && i === 0 ? 'Needs re-inspection' : null,
+          images: [],
         };
       }),
     })),
