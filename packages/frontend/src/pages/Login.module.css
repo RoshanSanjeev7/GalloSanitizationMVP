@@ -47,3 +47,52 @@
 .forgot-link:hover {
   color: var(--primary);
 }
+
+.demo-credentials {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.demo-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.credentials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.credential {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: monospace;
+}
+
+.role-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  font-family: system-ui, sans-serif;
+}
+
+.admin-tag {
+  background: var(--primary-light, #e0e7ff);
+  color: var(--primary, #4f46e5);
+}
+
+.operator-tag {
+  background: var(--green-light, #d1fae5);
+  color: var(--green, #059669);
+}

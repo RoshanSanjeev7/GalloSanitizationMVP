@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist } from '../services/api';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistDetail.module.css';
+import sr from './SubmissionReview.module.css';
 
 export default function ChecklistDetail() {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +38,14 @@ export default function ChecklistDetail() {
   const formatDateTime = (d: Date) =>
     `${d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}, ${formatTime(d)}`;
 
+  const formatFullDate = (d: Date) =>
+    d.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+
   const statusLabel: Record<string, string> = {
     in_progress: 'In Progress',
     submitted: 'Submitted',
@@ -52,6 +61,42 @@ export default function ChecklistDetail() {
     const key = collapseKey(catIdx);
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  const allItems = checklist.machines.flatMap((m) =>
+    m.categories.flatMap((c) => c.items)
+  );
+  const completeCount = allItems.filter((i) => i.completed !== null).length;
+  const incompleteCount = allItems.length - completeCount;
+
+  const machineStats = checklist.machines.map((m) => {
+    const items = m.categories.flatMap((c) => c.items);
+    return {
+      name: m.name,
+      total: items.length,
+      done: items.filter((i) => i.completed !== null).length,
+    };
+  });
+
+  const allNotes = checklist.machines.flatMap((m) =>
+    m.categories.flatMap((c) =>
+      c.items
+        .filter((i) => i.issue)
+        .map((i) => ({
+          machine: m.name,
+          task: i.description,
+          note: i.issue!,
+          completedBy: i.completedBy,
+        }))
+    )
+  );
+
+  const allContributors = Array.from(
+    new Set(
+      allItems
+        .map((i) => i.completedBy)
+        .filter((name): name is string => name !== null)
+    )
+  );
 
   return (
     <div className="page-container">
@@ -70,43 +115,12 @@ export default function ChecklistDetail() {
           <span>{checklist.lineName} Checklist</span>
         </div>
 
-        <div className={s.detailTitleBlock}>
-          <h1 className={s.detailTitle}>
-            {checklist.lineName} &mdash; Weekly Deep Clean Checklist
-          </h1>
-          <p className={s.detailSubtitle}>Gallo Bottling Sanitation Hub</p>
-        </div>
-
-        <div className={s.detailMeta}>
-          <div className={s.detailMetaItem}>
-            <span className={s.detailMetaLabel}>OPERATOR</span>
-            <span className={s.detailMetaValue}>{checklist.operatorName}</span>
-          </div>
-          <div className={s.detailMetaItem}>
-            <span className={s.detailMetaLabel}>DATE</span>
-            <span className={s.detailMetaValue}>{formatDate(start)}</span>
-          </div>
-          <div className={s.detailMetaItem}>
-            <span className={s.detailMetaLabel}>START</span>
-            <span className={s.detailMetaValue}>{formatTime(start)}</span>
-          </div>
-          {end && (
-            <div className={s.detailMetaItem}>
-              <span className={s.detailMetaLabel}>END</span>
-              <span className={s.detailMetaValue}>{formatTime(end)}</span>
-            </div>
-          )}
-          <div className={s.detailMetaItem}>
-            <span className={s.detailMetaLabel}>DURATION</span>
-            <span className={s.detailMetaValue}>{durationMin} min</span>
-          </div>
-          <div className={s.detailMetaItem}>
-            <span className={s.detailMetaLabel}>STATUS</span>
-            <span className={s.detailMetaValue}>
-              {statusLabel[checklist.status] || checklist.status}
-            </span>
-          </div>
-        </div>
+        <h2 style={{ marginBottom: 2 }}>
+          {checklist.lineName} - {statusLabel[checklist.status] || checklist.status}
+        </h2>
+        <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
+          {formatFullDate(start)} - {formatTime(start)}
+        </p>
 
         <div className="no-print">
           <select
@@ -122,60 +136,145 @@ export default function ChecklistDetail() {
             ))}
           </select>
 
-          {currentMachine.categories.map((cat, catIdx) => {
-            const isCollapsed = collapsed[collapseKey(catIdx)] ?? false;
-            const doneCount = cat.items.filter((i) => i.completed !== null).length;
+          <div className={sr.reviewLayout}>
+            <div>
+              {currentMachine.categories.map((cat, catIdx) => {
+                const isCollapsed = collapsed[collapseKey(catIdx)] ?? false;
+                const doneCount = cat.items.filter((i) => i.completed !== null).length;
 
-            return (
-              <div key={catIdx} className={cl.fillCategory}>
-                <button
-                  className={cl.fillCategoryHeader}
-                  onClick={() => toggleCollapse(catIdx)}
-                >
-                  <div className={cl.fillCategoryLeft}>
-                    <span className={`${cl.fillChevron} ${isCollapsed ? '' : cl.fillChevronOpen}`}>
-                      &#9654;
-                    </span>
-                    <span className={cl.fillCategoryName}>{cat.name}</span>
-                  </div>
-                  <span className={cl.fillCategoryCount}>
-                    {doneCount}/{cat.items.length}
-                  </span>
-                </button>
-
-                {!isCollapsed &&
-                  cat.items.map((item, itemIdx) => (
-                    <div key={itemIdx} className={cl.fillTask}>
-                      <div className={cl.fillTaskLeft}>
-                        <div className={cl.fillTaskContent}>
-                          <span className={cl.fillTaskText}>{item.description}</span>
-                          {item.completed !== null && item.completedBy && (
-                            <span className={cl.fillStamp}>
-                              {item.completedBy}
-                              {item.completedAt
-                                ? ` at ${new Date(item.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
-                                : ''}
-                            </span>
-                          )}
-                          {item.issue && (
-                            <div className={cl.issueBox} style={{ marginTop: 4, padding: '6px 10px', fontSize: 12 }}>
-                              <strong>Issue Reported</strong>
-                              {item.issue}
-                            </div>
-                          )}
-                        </div>
+                return (
+                  <div key={catIdx} className={cl.fillCategory}>
+                    <button
+                      className={cl.fillCategoryHeader}
+                      onClick={() => toggleCollapse(catIdx)}
+                    >
+                      <div className={cl.fillCategoryLeft}>
+                        <span className={`${cl.fillChevron} ${isCollapsed ? '' : cl.fillChevronOpen}`}>
+                          &#9654;
+                        </span>
+                        <span className={cl.fillCategoryName}>{cat.name}</span>
                       </div>
-                      <span
-                        className={cl.fillTaskStatus}
-                        style={{ color: item.completed === true ? 'var(--green)' : item.completed === false ? 'var(--red)' : 'var(--text-muted)' }}
-                      >
-                        {item.completed === true ? '\u2713' : item.completed === false ? '\u2717' : '\u2014'}
+                      <span className={cl.fillCategoryCount}>
+                        {doneCount}/{cat.items.length}
                       </span>
+                    </button>
+
+                    {!isCollapsed &&
+                      cat.items.map((item, itemIdx) => (
+                        <div key={itemIdx} className={cl.fillTask}>
+                          <div className={cl.fillTaskLeft}>
+                            <div className={cl.fillTaskContent}>
+                              <span className={cl.fillTaskText}>{item.description}</span>
+                              {item.completed !== null && item.completedBy && (
+                                <span className={cl.fillStamp}>
+                                  {item.completedBy}
+                                  {item.completedAt
+                                    ? ` at ${new Date(item.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+                                    : ''}
+                                </span>
+                              )}
+                              {item.issue && (
+                                <div className={cl.issueBox} style={{ marginTop: 4, padding: '6px 10px', fontSize: 12 }}>
+                                  <strong>Comment:</strong>
+                                  {item.issue}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className={cl.fillTaskStatus}
+                            style={{ color: item.completed === true ? 'var(--green)' : item.completed === false ? 'var(--red)' : 'var(--text-muted)' }}
+                          >
+                            {item.completed === true ? '\u2713' : item.completed === false ? '\u2717' : '\u2014'}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div>
+              <div className={sr.summaryPanel}>
+                <h3>Summary</h3>
+                <div className={sr.summaryRow}>
+                  <span className={sr.label}>Created By</span>
+                  <span className={sr.value}>{checklist.operatorName}</span>
+                </div>
+                {allContributors.length > 0 && (
+                  <div className={sr.summaryRow}>
+                    <span className={sr.label}>Contributors</span>
+                    <span className={sr.value}>{allContributors.join(', ')}</span>
+                  </div>
+                )}
+                <div className={sr.summaryRow}>
+                  <span className={sr.label}>Start</span>
+                  <span className={sr.value}>{formatTime(start)}</span>
+                </div>
+                {end && (
+                  <div className={sr.summaryRow}>
+                    <span className={sr.label}>End</span>
+                    <span className={sr.value}>{formatTime(end)}</span>
+                  </div>
+                )}
+                <div className={sr.summaryRow}>
+                  <span className={sr.label}>Duration</span>
+                  <span className={sr.value}>{durationMin} min</span>
+                </div>
+                <div className={sr.summaryRow}>
+                  <span className={sr.label}>Status</span>
+                  <span className={sr.value} style={{ textTransform: 'capitalize' }}>
+                    {statusLabel[checklist.status] || checklist.status}
+                  </span>
+                </div>
+              </div>
+
+              <div className={sr.completionPanel}>
+                <h3>Completion</h3>
+                <div className={sr.completionStat}>
+                  <span className={sr.statComplete}>&#10003; Filled</span>
+                  <span className={sr.statComplete}>{completeCount}</span>
+                </div>
+                <div className={sr.completionStat}>
+                  <span className={sr.statIncomplete}>&#10005; Unfilled</span>
+                  <span className={sr.statIncomplete}>{incompleteCount}</span>
+                </div>
+              </div>
+
+              <div className={sr.machinePanel}>
+                <h3>Machine Progress</h3>
+                {machineStats.map((ms, idx) => (
+                  <div key={idx} className={sr.machineRow}>
+                    <div className={sr.machineRowTop}>
+                      <span className={sr.machineName}>{ms.name}</span>
+                      <span className={sr.machineCount}>{ms.done}/{ms.total}</span>
+                    </div>
+                    <div className={sr.progressBar}>
+                      <div
+                        className={sr.progressFill}
+                        style={{ width: `${ms.total > 0 ? (ms.done / ms.total) * 100 : 0}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {allNotes.length > 0 && (
+                <div className={sr.notesPanel}>
+                  <h3>Notes &amp; Issues ({allNotes.length})</h3>
+                  {allNotes.map((n, idx) => (
+                    <div key={idx} className={sr.noteItem}>
+                      <div className={sr.noteMeta}>
+                        {n.machine} {n.completedBy && <span>&middot; {n.completedBy}</span>}
+                      </div>
+                      <div className={sr.noteTask}>{n.task}</div>
+                      <div className={sr.noteText}>{n.note}</div>
                     </div>
                   ))}
-              </div>
-            );
-          })}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className={s.printOnly}>
@@ -209,6 +308,11 @@ export default function ChecklistDetail() {
                                 ? ` \u2014 ${new Date(item.completedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}`
                                 : ''}
                             </span>
+                          )}
+                          {item.issue && (
+                            <div className={s.printIssue}>
+                              <strong>Issue:</strong> {item.issue}
+                            </div>
                           )}
                         </div>
                       </div>

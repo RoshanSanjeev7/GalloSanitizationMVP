@@ -10,10 +10,12 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@types/pdfkit": "^0.17.5",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
+    "pdfkit": "^0.18.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

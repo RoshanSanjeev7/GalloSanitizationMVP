@@ -16,7 +16,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<Tab>('submitted');
   const [search, setSearch] = useState('');
   const [lineFilter, setLineFilter] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
@@ -148,10 +148,10 @@ export default function AdminDashboard() {
 
         <div className={d.dashTabs}>
           {([
-            { key: 'all' as Tab, label: 'All', count: counts.all },
             { key: 'submitted' as Tab, label: 'Pending', count: counts.submitted },
-            { key: 'approved' as Tab, label: 'Approved', count: counts.approved },
             { key: 'in_progress' as Tab, label: 'In Progress', count: counts.in_progress },
+            { key: 'approved' as Tab, label: 'Approved', count: counts.approved },
+            { key: 'all' as Tab, label: 'All', count: counts.all },
           ]).map((t) => (
             <button
               key={t.key}

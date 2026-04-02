@@ -65,6 +65,15 @@ export default function Login() {
         </form>
 
         <a href="#" className={s.forgotLink}>Forgot password?</a>
+
+        <div className={s.demoCredentials}>
+          <p className={s.demoTitle}>Demo Credentials</p>
+          <div className={s.credentialsList}>
+            <div className={s.credential}>ymartinez@gallo.com / admin123</div>
+            <div className={s.credential}>gsanchez@gallo.com / operator123</div>
+            <div className={s.credential}>mrivera@gallo.com / operator123</div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -10,33 +10,51 @@ export default function RoleAssignment() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'operator' | 'admin'>('operator');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     loadUsers();
   }, []);
 
   const loadUsers = async () => {
-    const data = await api.getUsers();
-    setUsers(data);
+    try {
+      const data = await api.getUsers();
+      setUsers(data);
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   const handleAdd = async () => {
     if (!name || !email) return;
-    await api.createUser({
-      name,
-      email,
-      password: 'changeme123',
-      role,
-    });
-    setName('');
-    setEmail('');
-    setRole('operator');
-    loadUsers();
+    setLoading(true);
+    setError('');
+    try {
+      await api.createUser({
+        name,
+        email,
+        password: 'changeme123',
+        role,
+      });
+      setName('');
+      setEmail('');
+      setRole('operator');
+      await loadUsers();
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRoleChange = async (userId: string, newRole: string) => {
-    await api.updateUserRole(userId, newRole);
-    loadUsers();
+    try {
+      await api.updateUserRole(userId, newRole);
+      await loadUsers();
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   return (
@@ -45,6 +63,12 @@ export default function RoleAssignment() {
         <button className="back-link" onClick={() => navigate('/settings')}>
           &larr; Role Assignment
         </button>
+
+        {error && (
+          <div style={{ maxWidth: 500, margin: '0 auto 16px', padding: '10px 14px', background: 'var(--red-light)', border: '1px solid var(--red-border)', borderRadius: 'var(--radius)', color: 'var(--red)', fontSize: 13 }}>
+            {error}
+          </div>
+        )}
 
         <div className="card" style={{ maxWidth: 500, margin: '0 auto 24px' }}>
           <h3 style={{ fontSize: 15, marginBottom: 16 }}>Add New User</h3>
@@ -87,9 +111,9 @@ export default function RoleAssignment() {
           <button
             className="btn btn-primary btn-block"
             onClick={handleAdd}
-            disabled={!name || !email}
+            disabled={!name || !email || loading}
           >
-            Add User
+            {loading ? 'Adding...' : 'Add User'}
           </button>
         </div>
 
