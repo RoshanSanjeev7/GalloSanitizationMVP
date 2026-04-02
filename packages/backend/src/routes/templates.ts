@@ -1,20 +1,24 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getStore, save } from '../data/store.js';
+import {
+  getAllTemplates,
+  getTemplate,
+  putTemplate,
+  deleteTemplate as deleteTemplateDynamo,
+} from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', (_req, res) => {
-  const store = getStore();
-  res.json(store.templates);
+router.get('/', async (_req, res) => {
+  const templates = await getAllTemplates();
+  res.json(templates);
 });
 
-router.get('/:id', (req, res) => {
-  const store = getStore();
-  const template = store.templates.find(t => t.id === req.params.id);
+router.get('/:id', async (req, res) => {
+  const template = await getTemplate(req.params.id as string);
   if (!template) {
     res.status(404).json({ error: 'Template not found' });
     return;
@@ -22,7 +26,7 @@ router.get('/:id', (req, res) => {
   res.json(template);
 });
 
-router.post('/', adminOnly, (req: AuthRequest, res) => {
+router.post('/', adminOnly, async (req: AuthRequest, res) => {
   const { title, lineId, machines } = req.body;
 
   if (!title || !lineId || !machines) {
@@ -31,24 +35,20 @@ router.post('/', adminOnly, (req: AuthRequest, res) => {
   }
 
   const template = { id: uuid(), title, lineId, machines };
-  const store = getStore();
-  store.templates.push(template);
-  save();
+  await putTemplate(template);
 
   res.status(201).json(template);
 });
 
-router.delete('/:id', adminOnly, (req: AuthRequest, res) => {
-  const store = getStore();
-  const idx = store.templates.findIndex(t => t.id === req.params.id);
+router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
+  const template = await getTemplate(req.params.id as string);
 
-  if (idx === -1) {
+  if (!template) {
     res.status(404).json({ error: 'Template not found' });
     return;
   }
 
-  store.templates.splice(idx, 1);
-  save();
+  await deleteTemplateDynamo(req.params.id as string);
   res.status(204).send();
 });
 

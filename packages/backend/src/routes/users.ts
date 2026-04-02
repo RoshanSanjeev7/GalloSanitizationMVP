@@ -1,19 +1,25 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getStore, save } from '../data/store.js';
+import {
+  getAllUsers,
+  getUserByEmail,
+  putUser,
+  getUser,
+  deleteUser as deleteUserDynamo,
+} from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', (req, res) => {
-  const store = getStore();
-  const users = store.users.map(({ password, ...rest }) => rest);
-  res.json(users);
+router.get('/', async (req, res) => {
+  const users = await getAllUsers();
+  const usersPublic = users.map(({ password, ...rest }) => rest);
+  res.json(usersPublic);
 });
 
-router.post('/', adminOnly, (req: AuthRequest, res) => {
+router.post('/', adminOnly, async (req: AuthRequest, res) => {
   const { name, email, password, role } = req.body;
 
   if (!name || !email || !password || !role) {
@@ -21,24 +27,22 @@ router.post('/', adminOnly, (req: AuthRequest, res) => {
     return;
   }
 
-  const store = getStore();
-  if (store.users.find(u => u.email === email)) {
+  const existing = await getUserByEmail(email);
+  if (existing) {
     res.status(409).json({ error: 'Email already exists' });
     return;
   }
 
   const user = { id: uuid(), name, email, password, role };
-  store.users.push(user);
-  save();
+  await putUser(user);
 
   const { password: _, ...userPublic } = user;
   res.status(201).json(userPublic);
 });
 
-router.put('/:id', adminOnly, (req: AuthRequest, res) => {
+router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
   const { role } = req.body;
-  const store = getStore();
-  const user = store.users.find(u => u.id === req.params.id);
+  const user = await getUser(req.params.id as string);
 
   if (!user) {
     res.status(404).json({ error: 'User not found' });
@@ -46,23 +50,21 @@ router.put('/:id', adminOnly, (req: AuthRequest, res) => {
   }
 
   if (role) user.role = role;
-  save();
+  await putUser(user);
 
   const { password: _, ...userPublic } = user;
   res.json(userPublic);
 });
 
-router.delete('/:id', adminOnly, (req: AuthRequest, res) => {
-  const store = getStore();
-  const idx = store.users.findIndex(u => u.id === req.params.id);
+router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
+  const user = await getUser(req.params.id as string);
 
-  if (idx === -1) {
+  if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
 
-  store.users.splice(idx, 1);
-  save();
+  await deleteUserDynamo(req.params.id as string);
   res.status(204).send();
 });
 

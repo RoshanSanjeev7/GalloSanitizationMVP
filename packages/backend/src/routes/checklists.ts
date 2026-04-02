@@ -1,29 +1,35 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getStore, save } from '../data/store.js';
+import {
+  getChecklist,
+  putChecklist,
+  deleteChecklist as deleteChecklistDynamo,
+  queryChecklists,
+  getLine,
+  getUser,
+  getTemplatesByLineId,
+  getAllTemplates,
+} from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', (req: AuthRequest, res) => {
-  const store = getStore();
-  let checklists = [...store.checklists];
+router.get('/', async (req: AuthRequest, res) => {
+  const { status, operatorId, lineId } = req.query as Record<string, string>;
+  let checklists = await queryChecklists({
+    status: status || undefined,
+    operatorId: operatorId || undefined,
+    lineId: lineId || undefined,
+  });
 
-  const { status, operatorId, lineId } = req.query;
-  if (status) checklists = checklists.filter(c => c.status === status);
-  if (operatorId) checklists = checklists.filter(c => c.operatorId === operatorId);
-  if (lineId) checklists = checklists.filter(c => c.lineId === lineId);
-
-  // Sort newest first
   checklists.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
   res.json(checklists);
 });
 
-router.get('/:id', (req, res) => {
-  const store = getStore();
-  const checklist = store.checklists.find(c => c.id === req.params.id);
+router.get('/:id', async (req, res) => {
+  const checklist = await getChecklist(req.params.id as string);
   if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
     return;
@@ -31,24 +37,26 @@ router.get('/:id', (req, res) => {
   res.json(checklist);
 });
 
-router.post('/', (req: AuthRequest, res) => {
+router.post('/', async (req: AuthRequest, res) => {
   const { lineId } = req.body;
-  const store = getStore();
 
-  const line = store.lines.find(l => l.id === lineId);
+  const line = await getLine(lineId);
   if (!line) {
     res.status(404).json({ error: 'Line not found' });
     return;
   }
 
-  const user = store.users.find(u => u.id === req.userId);
+  const user = await getUser(req.userId!);
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
 
-  // Find a template for this line, or use the first template
-  const template = store.templates.find(t => t.lineId === lineId) || store.templates[0];
+  let templates = await getTemplatesByLineId(lineId);
+  if (templates.length === 0) {
+    templates = await getAllTemplates();
+  }
+  const template = templates[0];
   if (!template) {
     res.status(400).json({ error: 'No template available for this line' });
     return;
@@ -81,25 +89,22 @@ router.post('/', (req: AuthRequest, res) => {
     })),
   };
 
-  store.checklists.push(checklist);
-  save();
+  await putChecklist(checklist);
   res.status(201).json(checklist);
 });
 
-router.put('/:id/items', (req: AuthRequest, res) => {
+router.put('/:id/items', async (req: AuthRequest, res) => {
   const { machines } = req.body;
-  const store = getStore();
-  const checklist = store.checklists.find(c => c.id === req.params.id);
+  const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
     return;
   }
 
-  const user = store.users.find(u => u.id === req.userId);
+  const user = await getUser(req.userId!);
   const isAdmin = user?.role === 'admin';
 
-  // Operators can only edit in_progress, admins can also edit submitted
   if (checklist.status !== 'in_progress' && !(isAdmin && checklist.status === 'submitted')) {
     res.status(400).json({ error: 'Cannot update items on this checklist' });
     return;
@@ -109,13 +114,12 @@ router.put('/:id/items', (req: AuthRequest, res) => {
     checklist.machines = machines;
   }
 
-  save();
+  await putChecklist(checklist);
   res.json(checklist);
 });
 
-router.post('/:id/submit', (req: AuthRequest, res) => {
-  const store = getStore();
-  const checklist = store.checklists.find(c => c.id === req.params.id);
+router.post('/:id/submit', async (req: AuthRequest, res) => {
+  const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
@@ -124,13 +128,12 @@ router.post('/:id/submit', (req: AuthRequest, res) => {
 
   checklist.status = 'submitted';
   checklist.endTime = new Date().toISOString();
-  save();
+  await putChecklist(checklist);
   res.json(checklist);
 });
 
-router.post('/:id/approve', adminOnly, (req: AuthRequest, res) => {
-  const store = getStore();
-  const checklist = store.checklists.find(c => c.id === req.params.id);
+router.post('/:id/approve', adminOnly, async (req: AuthRequest, res) => {
+  const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
@@ -138,13 +141,12 @@ router.post('/:id/approve', adminOnly, (req: AuthRequest, res) => {
   }
 
   checklist.status = 'approved';
-  save();
+  await putChecklist(checklist);
   res.json(checklist);
 });
 
-router.post('/:id/deny', adminOnly, (req: AuthRequest, res) => {
-  const store = getStore();
-  const checklist = store.checklists.find(c => c.id === req.params.id);
+router.post('/:id/deny', adminOnly, async (req: AuthRequest, res) => {
+  const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
@@ -152,21 +154,19 @@ router.post('/:id/deny', adminOnly, (req: AuthRequest, res) => {
   }
 
   checklist.status = 'denied';
-  save();
+  await putChecklist(checklist);
   res.json(checklist);
 });
 
-router.delete('/:id', adminOnly, (req: AuthRequest, res) => {
-  const store = getStore();
-  const idx = store.checklists.findIndex(c => c.id === req.params.id);
+router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
+  const checklist = await getChecklist(req.params.id as string);
 
-  if (idx === -1) {
+  if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
     return;
   }
 
-  store.checklists.splice(idx, 1);
-  save();
+  await deleteChecklistDynamo(req.params.id as string);
   res.status(204).send();
 });
 
