@@ -1,22 +1,18 @@
 import express from 'express';
 import cors from 'cors';
 import { config } from './config/env.js';
-import { load } from './data/store.js';
-import { seedIfEmpty } from './data/seed.js';
+import { seedIfEmpty } from './data/seed-dynamo.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import lineRoutes from './routes/lines.js';
 import templateRoutes from './routes/templates.js';
 import checklistRoutes from './routes/checklists.js';
+import imageRoutes from './routes/images.js';
 
 const app = express();
 
 app.use(cors({ origin: config.frontendOrigin, credentials: true }));
 app.use(express.json());
-
-// Load data from file
-load();
-seedIfEmpty();
 
 // Health check
 app.get('/health', (_req, res) => {
@@ -29,7 +25,13 @@ app.use('/api/users', userRoutes);
 app.use('/api/lines', lineRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/checklists', checklistRoutes);
+app.use('/api/checklists', imageRoutes);
 
-app.listen(config.port, () => {
-  console.log(`Backend running on http://localhost:${config.port}`);
+// Seed on startup, then listen
+seedIfEmpty().then(() => {
+  app.listen(config.port, () => {
+    console.log(`Backend running on http://localhost:${config.port}`);
+  });
 });
+
+export { app };
