@@ -1,0 +1,15 @@
+services:
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=dynamodb,s3,lambda,apigateway
+      - DEFAULT_REGION=us-west-2
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    volumes:
+      - "./localstack:/etc/localstack/init/ready.d"
+      - "localstack-data:/var/lib/localstack"
+
+volumes:
+  localstack-data:
