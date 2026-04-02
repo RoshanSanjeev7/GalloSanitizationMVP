@@ -1,6 +1,7 @@
 #!/bin/bash
 ENDPOINT="http://localhost:4566"
 REGION="us-west-2"
+export AWS_DEFAULT_REGION="$REGION"
 
 echo "Creating DynamoDB tables..."
 
