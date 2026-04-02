@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
 import cl from '../styles/checklist.module.css';
@@ -13,6 +13,9 @@ export default function ChecklistFill() {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [showComment, setShowComment] = useState<Record<string, boolean>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const currentUser = api.getStoredUser();
 
@@ -88,6 +91,67 @@ export default function ChecklistFill() {
         }),
       })),
     }));
+  };
+
+  const loadImageUrl = async (imageKey: string) => {
+    if (imageUrls[imageKey]) return;
+    if (!id) return;
+    const url = await api.getImageUrl(id, imageKey);
+    setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
+  };
+
+  const handlePhotoUpload = async (catIdx: number, itemIdx: number, files: FileList) => {
+    if (!id) return;
+    const key = itemKey(catIdx, itemIdx);
+    setUploading((prev) => ({ ...prev, [key]: true }));
+
+    const result = await api.uploadImages(id, activeMachine, catIdx, itemIdx, Array.from(files));
+
+    setMachines((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeMachine) return m;
+        return {
+          ...m,
+          categories: m.categories.map((c, ci) => {
+            if (ci !== catIdx) return c;
+            return {
+              ...c,
+              items: c.items.map((item, ii) => {
+                if (ii !== itemIdx) return item;
+                return { ...item, images: result.images };
+              }),
+            };
+          }),
+        };
+      })
+    );
+
+    setUploading((prev) => ({ ...prev, [key]: false }));
+  };
+
+  const handlePhotoDelete = async (catIdx: number, itemIdx: number, imageKey: string) => {
+    if (!id) return;
+
+    const result = await api.deleteImage(id, imageKey, activeMachine, catIdx, itemIdx);
+
+    setMachines((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeMachine) return m;
+        return {
+          ...m,
+          categories: m.categories.map((c, ci) => {
+            if (ci !== catIdx) return c;
+            return {
+              ...c,
+              items: c.items.map((item, ii) => {
+                if (ii !== itemIdx) return item;
+                return { ...item, images: result.images };
+              }),
+            };
+          }),
+        };
+      })
+    );
   };
 
   const handleSave = async () => {
@@ -226,6 +290,62 @@ export default function ChecklistFill() {
                           <strong>Comment:</strong> {item.issue}
                         </div>
                       )}
+
+                      {/* Photo upload */}
+                      <div className={s.photoSection}>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          style={{ display: 'none' }}
+                          ref={(el) => { fileInputRefs.current[key] = el; }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              handlePhotoUpload(catIdx, itemIdx, e.target.files);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        <button
+                          className={s.photoAddBtn}
+                          onClick={() => fileInputRefs.current[key]?.click()}
+                        >
+                          + Add Photo
+                        </button>
+
+                        {uploading[key] && (
+                          <div className={s.photoUploading}>Uploading...</div>
+                        )}
+
+                        {item.images && item.images.length > 0 && (
+                          <div className={s.photoThumbs}>
+                            {item.images.map((imgKey) => {
+                              if (!imageUrls[imgKey]) loadImageUrl(imgKey);
+                              return (
+                                <div key={imgKey} className={s.photoThumbWrapper}>
+                                  {imageUrls[imgKey] ? (
+                                    <img
+                                      className={s.photoThumb}
+                                      src={imageUrls[imgKey]}
+                                      alt="Uploaded"
+                                      onClick={() => window.open(imageUrls[imgKey], '_blank')}
+                                      style={{ cursor: 'pointer' }}
+                                    />
+                                  ) : (
+                                    <div className={s.photoThumb} style={{ background: '#f3f4f6' }} />
+                                  )}
+                                  <button
+                                    className={s.photoRemoveBtn}
+                                    onClick={() => handlePhotoDelete(catIdx, itemIdx, imgKey)}
+                                  >
+                                    &times;
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
