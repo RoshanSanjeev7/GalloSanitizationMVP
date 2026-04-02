@@ -609,24 +609,24 @@ export async function seedIfEmpty(): Promise<void> {
   /* ---- Users ---- */
   const admin: User = {
     id: uuid(),
-    name: 'Admin User',
-    email: 'admin@gallo.com',
+    name: 'Yolanda Martinez',
+    email: 'ymartinez@gallo.com',
     password: 'admin123',
     role: 'admin',
   };
 
   const operator1: User = {
     id: uuid(),
-    name: 'John Operator',
-    email: 'john@gallo.com',
+    name: 'Gabriel Sanchez',
+    email: 'gsanchez@gallo.com',
     password: 'operator123',
     role: 'operator',
   };
 
   const operator2: User = {
     id: uuid(),
-    name: 'Jane Operator',
-    email: 'jane@gallo.com',
+    name: 'Marcus Rivera',
+    email: 'mrivera@gallo.com',
     password: 'operator123',
     role: 'operator',
   };
@@ -638,11 +638,13 @@ export async function seedIfEmpty(): Promise<void> {
   /* ---- Lines ---- */
   const line91: Line = { id: uuid(), name: 'Line 91' };
   const line92: Line = { id: uuid(), name: 'Line 92' };
+  const line93: Line = { id: uuid(), name: 'Line 93' };
 
   await putLine(line91);
   await putLine(line92);
+  await putLine(line93);
 
-  /* ---- Templates (same machines for Line 91 & Line 92) ---- */
+  /* ---- Templates ---- */
   const template91: Template = {
     id: uuid(),
     title: 'Weekly Deep Clean Checklist',
@@ -657,14 +659,22 @@ export async function seedIfEmpty(): Promise<void> {
     machines,
   };
 
+  const template93: Template = {
+    id: uuid(),
+    title: 'Weekly Deep Clean Checklist',
+    lineId: line93.id,
+    machines: machines93,
+  };
+
   await putTemplate(template91);
   await putTemplate(template92);
+  await putTemplate(template93);
 
   console.log('Database seeded successfully!');
   console.log('Demo credentials:');
-  console.log('  Admin:      admin@gallo.com / admin123');
-  console.log('  Operator 1: john@gallo.com / operator123');
-  console.log('  Operator 2: jane@gallo.com / operator123');
+  console.log('  Admin:      ymartinez@gallo.com / admin123');
+  console.log('  Operator 1: gsanchez@gallo.com / operator123');
+  console.log('  Operator 2: mrivera@gallo.com / operator123');
 }
 
 /* ------------------------------------------------------------------ */
