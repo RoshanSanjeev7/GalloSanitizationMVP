@@ -75,6 +75,7 @@ router.post('/', (req: AuthRequest, res) => {
           completedBy: null,
           completedAt: null,
           issue: null,
+          images: [],
         })),
       })),
     })),
