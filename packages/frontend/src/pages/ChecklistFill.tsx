@@ -15,6 +15,7 @@ export default function ChecklistFill() {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [photoMenu, setPhotoMenu] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const currentUser = api.getStoredUser();
@@ -274,6 +275,67 @@ export default function ChecklistFill() {
                         >
                           {showComment[key] ? 'Hide comment' : '+ Add comment'}
                         </button>
+                        <div className={s.cameraWrapper}>
+                          <button
+                            className={s.cameraBtn}
+                            onClick={() => setPhotoMenu(photoMenu === key ? null : key)}
+                            title="Add photo"
+                          >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                              <circle cx="12" cy="13" r="4"/>
+                            </svg>
+                          </button>
+                          {photoMenu === key && (
+                            <div className={s.photoPopover}>
+                              <button
+                                className={s.photoPopoverItem}
+                                onClick={() => {
+                                  setPhotoMenu(null);
+                                  fileInputRefs.current[`${key}-camera`]?.click();
+                                }}
+                              >
+                                Take Photo
+                              </button>
+                              <button
+                                className={s.photoPopoverItem}
+                                onClick={() => {
+                                  setPhotoMenu(null);
+                                  fileInputRefs.current[key]?.click();
+                                }}
+                              >
+                                Photo Library
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {/* Hidden file inputs */}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          style={{ display: 'none' }}
+                          ref={(el) => { fileInputRefs.current[`${key}-camera`] = el; }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              handlePhotoUpload(catIdx, itemIdx, e.target.files);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          style={{ display: 'none' }}
+                          ref={(el) => { fileInputRefs.current[key] = el; }}
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files.length > 0) {
+                              handlePhotoUpload(catIdx, itemIdx, e.target.files);
+                              e.target.value = '';
+                            }
+                          }}
+                        />
                       </div>
 
                       {showComment[key] && (
@@ -291,84 +353,38 @@ export default function ChecklistFill() {
                         </div>
                       )}
 
-                      {/* Photo upload */}
-                      <div className={s.photoSection}>
-                        {/* Camera capture (opens camera directly on mobile/iPad) */}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          style={{ display: 'none' }}
-                          ref={(el) => { fileInputRefs.current[`${key}-camera`] = el; }}
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              handlePhotoUpload(catIdx, itemIdx, e.target.files);
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                        {/* Photo library (opens file picker / photo library) */}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          style={{ display: 'none' }}
-                          ref={(el) => { fileInputRefs.current[key] = el; }}
-                          onChange={(e) => {
-                            if (e.target.files && e.target.files.length > 0) {
-                              handlePhotoUpload(catIdx, itemIdx, e.target.files);
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                        <div className={s.photoBtnGroup}>
-                          <button
-                            className={s.photoAddBtn}
-                            onClick={() => fileInputRefs.current[`${key}-camera`]?.click()}
-                          >
-                            Take Photo
-                          </button>
-                          <button
-                            className={s.photoAddBtn}
-                            onClick={() => fileInputRefs.current[key]?.click()}
-                          >
-                            Photo Library
-                          </button>
+                      {uploading[key] && (
+                        <div className={s.photoUploading}>Uploading...</div>
+                      )}
+
+                      {item.images && item.images.length > 0 && (
+                        <div className={s.photoThumbs}>
+                          {item.images.map((imgKey) => {
+                            if (!imageUrls[imgKey]) loadImageUrl(imgKey);
+                            return (
+                              <div key={imgKey} className={s.photoThumbWrapper}>
+                                {imageUrls[imgKey] ? (
+                                  <img
+                                    className={s.photoThumb}
+                                    src={imageUrls[imgKey]}
+                                    alt="Uploaded"
+                                    onClick={() => window.open(imageUrls[imgKey], '_blank')}
+                                    style={{ cursor: 'pointer' }}
+                                  />
+                                ) : (
+                                  <div className={s.photoThumb} style={{ background: '#f3f4f6' }} />
+                                )}
+                                <button
+                                  className={s.photoRemoveBtn}
+                                  onClick={() => handlePhotoDelete(catIdx, itemIdx, imgKey)}
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
-
-                        {uploading[key] && (
-                          <div className={s.photoUploading}>Uploading...</div>
-                        )}
-
-                        {item.images && item.images.length > 0 && (
-                          <div className={s.photoThumbs}>
-                            {item.images.map((imgKey) => {
-                              if (!imageUrls[imgKey]) loadImageUrl(imgKey);
-                              return (
-                                <div key={imgKey} className={s.photoThumbWrapper}>
-                                  {imageUrls[imgKey] ? (
-                                    <img
-                                      className={s.photoThumb}
-                                      src={imageUrls[imgKey]}
-                                      alt="Uploaded"
-                                      onClick={() => window.open(imageUrls[imgKey], '_blank')}
-                                      style={{ cursor: 'pointer' }}
-                                    />
-                                  ) : (
-                                    <div className={s.photoThumb} style={{ background: '#f3f4f6' }} />
-                                  )}
-                                  <button
-                                    className={s.photoRemoveBtn}
-                                    onClick={() => handlePhotoDelete(catIdx, itemIdx, imgKey)}
-                                  >
-                                    &times;
-                                  </button>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   );
                 })}
