@@ -11,6 +11,14 @@ export default function ChecklistDetail() {
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [activeMachine, setActiveMachine] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+
+  const loadImageUrl = async (imageKey: string) => {
+    if (imageUrls[imageKey]) return;
+    if (!id) return;
+    const url = await api.getImageUrl(id, imageKey);
+    setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
+  };
 
   useEffect(() => {
     if (id) api.getChecklist(id).then(setChecklist);
@@ -179,6 +187,29 @@ export default function ChecklistDetail() {
                                   {item.issue}
                                 </div>
                               )}
+                              {item.images && item.images.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                                  {item.images.map((imgKey) => {
+                                    if (!imageUrls[imgKey]) loadImageUrl(imgKey);
+                                    return (
+                                      <img
+                                        key={imgKey}
+                                        src={imageUrls[imgKey] || ''}
+                                        alt="Checklist photo"
+                                        style={{
+                                          width: 48,
+                                          height: 48,
+                                          objectFit: 'cover',
+                                          borderRadius: 4,
+                                          border: '1px solid var(--border)',
+                                          cursor: 'pointer',
+                                        }}
+                                        onClick={() => imageUrls[imgKey] && window.open(imageUrls[imgKey], '_blank')}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                           </div>
                           <span
@@ -312,6 +343,29 @@ export default function ChecklistDetail() {
                           {item.issue && (
                             <div className={s.printIssue}>
                               <strong>Issue:</strong> {item.issue}
+                            </div>
+                          )}
+                          {item.images && item.images.length > 0 && (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                              {item.images.map((imgKey) => {
+                                if (!imageUrls[imgKey]) loadImageUrl(imgKey);
+                                return (
+                                  <img
+                                    key={imgKey}
+                                    src={imageUrls[imgKey] || ''}
+                                    alt="Checklist photo"
+                                    style={{
+                                      width: 48,
+                                      height: 48,
+                                      objectFit: 'cover',
+                                      borderRadius: 4,
+                                      border: '1px solid var(--border)',
+                                      cursor: 'pointer',
+                                    }}
+                                    onClick={() => imageUrls[imgKey] && window.open(imageUrls[imgKey], '_blank')}
+                                  />
+                                );
+                              })}
                             </div>
                           )}
                         </div>
