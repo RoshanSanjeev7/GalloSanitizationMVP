@@ -19,7 +19,6 @@ export default function OperatorDashboard() {
   const [tab, setTab] = useState<Tab>('in_progress');
   const [showModal, setShowModal] = useState(false);
   const [selectedLine, setSelectedLine] = useState('');
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -29,7 +28,7 @@ export default function OperatorDashboard() {
   const loadData = async () => {
     try {
       const [cls, lns] = await Promise.all([
-        api.getChecklists({ operatorId: user!.id }),
+        api.getChecklists(),
         api.getLines(),
       ]);
       setChecklists(cls);
@@ -59,18 +58,6 @@ export default function OperatorDashboard() {
     setShowModal(false);
     setSelectedLine('');
     await loadData();
-  };
-
-  const confirmDelete = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setDeleteTarget(id);
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-    await api.deleteChecklist(deleteTarget);
-    setChecklists((prev) => prev.filter((c) => c.id !== deleteTarget));
-    setDeleteTarget(null);
   };
 
   const formatDate = (iso: string) => {
@@ -148,15 +135,6 @@ export default function OperatorDashboard() {
               </div>
               <div className={d.dashRowRight}>
                 <StatusBadge status={cl.status} />
-                {cl.status === 'in_progress' && (
-                  <button
-                    className={d.dashDelete}
-                    onClick={(e) => confirmDelete(e, cl.id)}
-                    title="Delete"
-                  >
-                    &times;
-                  </button>
-                )}
               </div>
             </div>
           ))}
@@ -201,22 +179,6 @@ export default function OperatorDashboard() {
         </Modal>
       )}
 
-      {deleteTarget && (
-        <Modal onClose={() => setDeleteTarget(null)}>
-          <h2>Delete Checklist</h2>
-          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 4 }}>
-            Are you sure you want to delete this checklist? This action cannot be undone.
-          </p>
-          <div className="modal-actions">
-            <button className="btn btn-outline" onClick={() => setDeleteTarget(null)}>
-              Cancel
-            </button>
-            <button className="btn btn-red-outline" onClick={handleDelete}>
-              Delete
-            </button>
-          </div>
-        </Modal>
-      )}
     </div>
   );
 }

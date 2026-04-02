@@ -14,7 +14,7 @@ Welcome to the documentation for the Checklist Management System.
    - Color scheme
 
 2. **[Technical Blueprints: Back-End](2-Technical-Blueprints-Backend)**
-   - Database Schema (ERD with Mermaid)
+   - Data Models (ERD with Mermaid)
    - API Specification (REST endpoints)
    - System Architecture diagrams
    - Sequence diagrams for key flows
@@ -24,21 +24,29 @@ Welcome to the documentation for the Checklist Management System.
 
 ## Quick Links
 
-- **Frontend:** React 19 with React Router
-- **Backend:** Flask with SQLAlchemy
-- **Database:** SQLite
+- **Frontend:** React 18 with React Router 6, Redux Toolkit, Vite
+- **Backend:** Express.js with TypeScript
+- **Storage:** JSON file (data.json)
+- **Auth:** JWT (jsonwebtoken)
 
 ## Project Structure
 
 ```
-S26-CSE-311/
-├── frontend/          # React application
-│   └── src/
-│       ├── pages/     # Page components
-│       └── services/  # API client
-├── backend/           # Flask server
-│   ├── models/        # SQLAlchemy models
-│   ├── routes/        # API blueprints
-│   └── extensions/    # Database setup
-└── wiki/              # Documentation
+GalloSanitizationMVP/
+├── packages/
+│   ├── backend/           # Express.js API server
+│   │   ├── src/
+│   │   │   ├── config/    # Environment config
+│   │   │   ├── data/      # JSON store & seed data
+│   │   │   ├── middleware/# JWT auth
+│   │   │   ├── routes/    # API endpoints
+│   │   │   └── types/     # TypeScript interfaces
+│   │   └── data.json      # Persistent storage
+│   └── frontend/          # React application
+│       └── src/
+│           ├── components/# Shared UI components
+│           ├── pages/     # Page components
+│           ├── services/  # API client
+│           └── store/     # Redux state
+└── wiki/                  # Documentation
 ```

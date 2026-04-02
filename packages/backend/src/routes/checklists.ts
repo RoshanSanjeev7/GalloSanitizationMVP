@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
 import { getStore, save } from '../data/store.js';
-import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
+import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -95,8 +95,12 @@ router.put('/:id/items', (req: AuthRequest, res) => {
     return;
   }
 
-  if (checklist.status !== 'in_progress') {
-    res.status(400).json({ error: 'Can only update items on in-progress checklists' });
+  const user = store.users.find(u => u.id === req.userId);
+  const isAdmin = user?.role === 'admin';
+
+  // Operators can only edit in_progress, admins can also edit submitted
+  if (checklist.status !== 'in_progress' && !(isAdmin && checklist.status === 'submitted')) {
+    res.status(400).json({ error: 'Cannot update items on this checklist' });
     return;
   }
 
@@ -123,7 +127,7 @@ router.post('/:id/submit', (req: AuthRequest, res) => {
   res.json(checklist);
 });
 
-router.post('/:id/approve', (req: AuthRequest, res) => {
+router.post('/:id/approve', adminOnly, (req: AuthRequest, res) => {
   const store = getStore();
   const checklist = store.checklists.find(c => c.id === req.params.id);
 
@@ -137,7 +141,7 @@ router.post('/:id/approve', (req: AuthRequest, res) => {
   res.json(checklist);
 });
 
-router.post('/:id/deny', (req: AuthRequest, res) => {
+router.post('/:id/deny', adminOnly, (req: AuthRequest, res) => {
   const store = getStore();
   const checklist = store.checklists.find(c => c.id === req.params.id);
 
@@ -151,7 +155,7 @@ router.post('/:id/deny', (req: AuthRequest, res) => {
   res.json(checklist);
 });
 
-router.delete('/:id', (req: AuthRequest, res) => {
+router.delete('/:id', adminOnly, (req: AuthRequest, res) => {
   const store = getStore();
   const idx = store.checklists.findIndex(c => c.id === req.params.id);
 

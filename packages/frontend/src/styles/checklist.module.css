@@ -93,8 +93,8 @@
 }
 
 .issue-box {
-  background-color: var(--red-light);
-  border: 1px solid var(--red-border);
+  background-color: #f3f4f6;
+  border: 1px solid var(--border);
   border-radius: var(--radius-xs);
   padding: 8px 12px;
   margin-top: 8px;
@@ -102,7 +102,7 @@
 }
 
 .issue-box strong {
-  color: var(--red);
+  color: var(--text-secondary);
   display: block;
   margin-bottom: 2px;
   font-size: 12px;

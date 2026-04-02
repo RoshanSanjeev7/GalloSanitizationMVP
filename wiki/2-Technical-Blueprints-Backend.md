@@ -2,11 +2,11 @@
 
 ## Overview
 
-This document defines the database schema, API endpoints, and system architecture for the Checklist Management System built with Flask and SQLite.
+This document defines the data models, API endpoints, and system architecture for the Checklist Management System built with Express.js (TypeScript) and JSON file storage.
 
 ---
 
-## Database Schema (ERD)
+## Data Models
 
 ### Entity-Relationship Diagram
 
@@ -14,7 +14,7 @@ This document defines the database schema, API endpoints, and system architectur
 erDiagram
     USER ||--o{ CHECKLIST : creates
     USER {
-        int id PK
+        string id PK
         string name
         string email UK
         string password
@@ -24,108 +24,148 @@ erDiagram
     LINE ||--o{ TEMPLATE : has
     LINE ||--o{ CHECKLIST : assigned_to
     LINE {
-        int id PK
+        string id PK
         string name
-        string description
     }
 
-    TEMPLATE ||--o{ TEMPLATE_ITEM : contains
+    TEMPLATE ||--o{ MACHINE_TEMPLATE : contains
     TEMPLATE ||--o{ CHECKLIST : based_on
     TEMPLATE {
-        int id PK
+        string id PK
+        string title
+        string lineId FK
+    }
+
+    MACHINE_TEMPLATE ||--o{ CATEGORY_TEMPLATE : contains
+    MACHINE_TEMPLATE {
         string name
-        int line_id FK
-        datetime created_at
     }
 
-    TEMPLATE_ITEM {
-        int id PK
-        int template_id FK
-        string text
-        int order
+    CATEGORY_TEMPLATE ||--o{ TASK_TEMPLATE : contains
+    CATEGORY_TEMPLATE {
+        string name
     }
 
-    CHECKLIST ||--o{ CHECKLIST_ITEM : contains
+    TASK_TEMPLATE {
+        string description
+        string machine
+    }
+
+    CHECKLIST ||--o{ CHECKLIST_MACHINE : contains
     CHECKLIST {
-        int id PK
-        int template_id FK
-        int operator_id FK
-        int line_id FK
+        string id PK
+        string templateId FK
+        string lineId FK
+        string lineName
+        string operatorId FK
+        string operatorName
         string status
-        string notes
-        datetime created_at
-        datetime submitted_at
-        datetime reviewed_at
-        int reviewed_by FK
+        string startTime
+        string endTime
+    }
+
+    CHECKLIST_MACHINE ||--o{ CHECKLIST_CATEGORY : contains
+    CHECKLIST_MACHINE {
+        string name
+    }
+
+    CHECKLIST_CATEGORY ||--o{ CHECKLIST_ITEM : contains
+    CHECKLIST_CATEGORY {
+        string name
     }
 
     CHECKLIST_ITEM {
-        int id PK
-        int checklist_id FK
-        string text
-        boolean checked
-        int order
+        string description
+        string machine
+        boolean completed
+        string completedBy
+        string completedAt
+        string issue
     }
 ```
 
 ---
 
-### Table Definitions
+### TypeScript Interfaces
 
 #### User
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTO INCREMENT | Unique identifier |
-| name | VARCHAR(120) | NOT NULL | User's display name |
-| email | VARCHAR(120) | UNIQUE, NOT NULL | Login email |
-| password | VARCHAR(256) | NOT NULL | Hashed password |
-| role | VARCHAR(20) | NOT NULL | "operator" or "admin" |
+```typescript
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: 'operator' | 'admin';
+}
+```
 
 #### Line
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTO INCREMENT | Unique identifier |
-| name | VARCHAR(100) | NOT NULL | Production line name |
-| description | TEXT | NULLABLE | Line description |
+```typescript
+interface Line {
+  id: string;
+  name: string;
+}
+```
 
 #### Template
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTO INCREMENT | Unique identifier |
-| name | VARCHAR(200) | NOT NULL | Template name |
-| line_id | INTEGER | FOREIGN KEY (Line.id) | Associated line |
-| created_at | DATETIME | DEFAULT NOW | Creation timestamp |
+```typescript
+interface TaskTemplate {
+  description: string;
+  machine: string | null;
+}
 
-#### TemplateItem
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTO INCREMENT | Unique identifier |
-| template_id | INTEGER | FOREIGN KEY (Template.id) | Parent template |
-| text | VARCHAR(500) | NOT NULL | Checklist item text |
-| order | INTEGER | NOT NULL | Display order |
+interface CategoryTemplate {
+  name: string;
+  tasks: TaskTemplate[];
+}
+
+interface MachineTemplate {
+  name: string;
+  categories: CategoryTemplate[];
+}
+
+interface Template {
+  id: string;
+  title: string;
+  lineId: string;
+  machines: MachineTemplate[];
+}
+```
 
 #### Checklist
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTO INCREMENT | Unique identifier |
-| template_id | INTEGER | FOREIGN KEY (Template.id) | Source template |
-| operator_id | INTEGER | FOREIGN KEY (User.id) | Assigned operator |
-| line_id | INTEGER | FOREIGN KEY (Line.id) | Target line |
-| status | VARCHAR(20) | NOT NULL | draft/pending/approved/denied |
-| notes | TEXT | NULLABLE | Additional notes |
-| created_at | DATETIME | DEFAULT NOW | Creation time |
-| submitted_at | DATETIME | NULLABLE | Submission time |
-| reviewed_at | DATETIME | NULLABLE | Review time |
-| reviewed_by | INTEGER | FOREIGN KEY (User.id), NULLABLE | Reviewing admin |
+```typescript
+interface ChecklistItem {
+  description: string;
+  machine: string | null;
+  completed: boolean | null;
+  completedBy: string | null;
+  completedAt: string | null;
+  issue: string | null;
+}
 
-#### ChecklistItem
-| Column | Type | Constraints | Description |
-|--------|------|-------------|-------------|
-| id | INTEGER | PRIMARY KEY, AUTO INCREMENT | Unique identifier |
-| checklist_id | INTEGER | FOREIGN KEY (Checklist.id) | Parent checklist |
-| text | VARCHAR(500) | NOT NULL | Item text |
-| checked | BOOLEAN | DEFAULT FALSE | Completion status |
-| order | INTEGER | NOT NULL | Display order |
+interface ChecklistCategory {
+  name: string;
+  items: ChecklistItem[];
+}
+
+interface ChecklistMachine {
+  name: string;
+  categories: ChecklistCategory[];
+}
+
+interface Checklist {
+  id: string;
+  templateId: string;
+  lineId: string;
+  lineName: string;
+  operatorId: string;
+  operatorName: string;
+  status: 'in_progress' | 'submitted' | 'approved' | 'denied';
+  startTime: string;
+  endTime: string | null;
+  machines: ChecklistMachine[];
+}
+```
 
 ---
 
@@ -136,9 +176,11 @@ erDiagram
 | User → Checklist | 1:N | One user creates many checklists |
 | Line → Template | 1:N | One line has many templates |
 | Line → Checklist | 1:N | One line has many checklists |
-| Template → TemplateItem | 1:N | One template has many items |
+| Template → MachineTemplate | 1:N | One template has many machines |
+| MachineTemplate → CategoryTemplate | 1:N | One machine has many categories |
+| CategoryTemplate → TaskTemplate | 1:N | One category has many tasks |
 | Template → Checklist | 1:N | One template spawns many checklists |
-| Checklist → ChecklistItem | 1:N | One checklist has many items |
+| Checklist → ChecklistMachine | 1:N | One checklist has many machines |
 
 ---
 
@@ -146,13 +188,18 @@ erDiagram
 
 ### Base URL
 ```
-http://localhost:5000/api
+http://localhost:5001/api
 ```
 
 ### Authentication
 
+All endpoints except `/auth/login` require a Bearer token in the Authorization header:
+```
+Authorization: Bearer <jwt_token>
+```
+
 #### POST /auth/login
-Login and receive user session.
+Login and receive JWT token.
 
 **Request:**
 ```json
@@ -166,11 +213,12 @@ Login and receive user session.
 ```json
 {
   "user": {
-    "id": 1,
+    "id": "uuid",
     "name": "John Doe",
     "email": "user@example.com",
     "role": "operator"
-  }
+  },
+  "token": "jwt_token_here"
 }
 ```
 
@@ -187,7 +235,7 @@ Get current logged-in user.
 **Response (200):**
 ```json
 {
-  "id": 1,
+  "id": "uuid",
   "name": "John Doe",
   "email": "user@example.com",
   "role": "operator"
@@ -196,16 +244,16 @@ Get current logged-in user.
 
 ---
 
-### Users (Admin only)
+### Users (Admin only for mutations)
 
 #### GET /users
-List all users.
+List all users (passwords excluded).
 
 **Response (200):**
 ```json
 [
   {
-    "id": 1,
+    "id": "uuid",
     "name": "John Doe",
     "email": "john@example.com",
     "role": "operator"
@@ -214,7 +262,7 @@ List all users.
 ```
 
 #### POST /users
-Create new user.
+Create new user. (Admin only)
 
 **Request:**
 ```json
@@ -229,7 +277,7 @@ Create new user.
 **Response (201):**
 ```json
 {
-  "id": 2,
+  "id": "uuid",
   "name": "Jane Smith",
   "email": "jane@example.com",
   "role": "operator"
@@ -237,7 +285,7 @@ Create new user.
 ```
 
 #### PUT /users/:id
-Update user role.
+Update user role. (Admin only)
 
 **Request:**
 ```json
@@ -249,19 +297,17 @@ Update user role.
 **Response (200):**
 ```json
 {
-  "message": "User updated successfully"
+  "id": "uuid",
+  "name": "Jane Smith",
+  "email": "jane@example.com",
+  "role": "admin"
 }
 ```
 
 #### DELETE /users/:id
-Delete user.
+Delete user. (Admin only)
 
-**Response (200):**
-```json
-{
-  "message": "User deleted successfully"
-}
-```
+**Response (204):** No content
 
 ---
 
@@ -274,9 +320,8 @@ List all production lines.
 ```json
 [
   {
-    "id": 1,
-    "name": "Line A - Assembly",
-    "description": "Main assembly line"
+    "id": "uuid",
+    "name": "Line A - Assembly"
   }
 ]
 ```
@@ -292,43 +337,59 @@ List all templates.
 ```json
 [
   {
-    "id": 1,
-    "name": "Daily Safety Check",
-    "line_id": 1,
-    "line_name": "Line A",
-    "item_count": 10,
-    "created_at": "2024-01-15T10:30:00Z"
+    "id": "uuid",
+    "title": "Daily Safety Check",
+    "lineId": "line-uuid",
+    "machines": [
+      {
+        "name": "Machine 1",
+        "categories": [
+          {
+            "name": "Safety",
+            "tasks": [
+              {"description": "Check emergency stops", "machine": null}
+            ]
+          }
+        ]
+      }
+    ]
   }
 ]
 ```
 
 #### GET /templates/:id
-Get template with items.
+Get template by ID.
 
 **Response (200):**
 ```json
 {
-  "id": 1,
-  "name": "Daily Safety Check",
-  "line_id": 1,
-  "items": [
-    {"id": 1, "text": "Emergency exits clear", "order": 1},
-    {"id": 2, "text": "Fire extinguishers in place", "order": 2}
-  ]
+  "id": "uuid",
+  "title": "Daily Safety Check",
+  "lineId": "line-uuid",
+  "machines": [...]
 }
 ```
 
 #### POST /templates
-Create new template (Admin only).
+Create new template. (Admin only)
 
 **Request:**
 ```json
 {
-  "name": "Weekly Review",
-  "line_id": 1,
-  "items": [
-    {"text": "Check equipment", "order": 1},
-    {"text": "Review logs", "order": 2}
+  "title": "Weekly Review",
+  "lineId": "line-uuid",
+  "machines": [
+    {
+      "name": "Machine 1",
+      "categories": [
+        {
+          "name": "Maintenance",
+          "tasks": [
+            {"description": "Check oil levels", "machine": null}
+          ]
+        }
+      ]
+    }
   ]
 }
 ```
@@ -336,21 +397,17 @@ Create new template (Admin only).
 **Response (201):**
 ```json
 {
-  "id": 2,
-  "name": "Weekly Review",
-  "message": "Template created successfully"
+  "id": "uuid",
+  "title": "Weekly Review",
+  "lineId": "line-uuid",
+  "machines": [...]
 }
 ```
 
 #### DELETE /templates/:id
-Delete template (Admin only).
+Delete template. (Admin only)
 
-**Response (200):**
-```json
-{
-  "message": "Template deleted successfully"
-}
-```
+**Response (204):** No content
 
 ---
 
@@ -360,44 +417,63 @@ Delete template (Admin only).
 List checklists with optional filters.
 
 **Query Parameters:**
-- `status`: filter by status (draft/pending/approved/denied)
-- `operator_id`: filter by operator
-- `line_id`: filter by line
+- `status`: filter by status (in_progress/submitted/approved/denied)
+- `operatorId`: filter by operator
+- `lineId`: filter by line
 
 **Response (200):**
 ```json
 [
   {
-    "id": 1,
-    "template_name": "Daily Safety Check",
-    "line_name": "Line A",
-    "operator_name": "John Doe",
-    "status": "pending",
-    "created_at": "2024-01-20T08:00:00Z",
-    "submitted_at": "2024-01-20T09:30:00Z"
+    "id": "uuid",
+    "templateId": "template-uuid",
+    "lineId": "line-uuid",
+    "lineName": "Line A",
+    "operatorId": "user-uuid",
+    "operatorName": "John Doe",
+    "status": "submitted",
+    "startTime": "2024-01-20T08:00:00.000Z",
+    "endTime": "2024-01-20T09:30:00.000Z",
+    "machines": [...]
   }
 ]
 ```
 
 #### GET /checklists/:id
-Get checklist with items.
+Get checklist by ID.
 
 **Response (200):**
 ```json
 {
-  "id": 1,
-  "template_id": 1,
-  "template_name": "Daily Safety Check",
-  "operator": {"id": 1, "name": "John Doe"},
-  "line": {"id": 1, "name": "Line A"},
-  "status": "pending",
-  "notes": "All clear",
-  "items": [
-    {"id": 1, "text": "Emergency exits clear", "checked": true, "order": 1},
-    {"id": 2, "text": "Fire extinguishers in place", "checked": true, "order": 2}
-  ],
-  "created_at": "2024-01-20T08:00:00Z",
-  "submitted_at": "2024-01-20T09:30:00Z"
+  "id": "uuid",
+  "templateId": "template-uuid",
+  "lineId": "line-uuid",
+  "lineName": "Line A",
+  "operatorId": "user-uuid",
+  "operatorName": "John Doe",
+  "status": "in_progress",
+  "startTime": "2024-01-20T08:00:00.000Z",
+  "endTime": null,
+  "machines": [
+    {
+      "name": "Machine 1",
+      "categories": [
+        {
+          "name": "Safety",
+          "items": [
+            {
+              "description": "Check emergency stops",
+              "machine": null,
+              "completed": true,
+              "completedBy": "John Doe",
+              "completedAt": "2024-01-20T08:15:00.000Z",
+              "issue": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -407,38 +483,56 @@ Create new checklist from template.
 **Request:**
 ```json
 {
-  "template_id": 1,
-  "line_id": 1
+  "lineId": "line-uuid"
 }
 ```
 
 **Response (201):**
 ```json
 {
-  "id": 1,
-  "message": "Checklist created successfully"
+  "id": "uuid",
+  "templateId": "template-uuid",
+  "lineId": "line-uuid",
+  "lineName": "Line A",
+  "operatorId": "user-uuid",
+  "operatorName": "John Doe",
+  "status": "in_progress",
+  "startTime": "2024-01-20T08:00:00.000Z",
+  "endTime": null,
+  "machines": [...]
 }
 ```
 
 #### PUT /checklists/:id/items
-Update checklist items.
+Update checklist items (machines array).
 
 **Request:**
 ```json
 {
-  "items": [
-    {"id": 1, "checked": true},
-    {"id": 2, "checked": false}
+  "machines": [
+    {
+      "name": "Machine 1",
+      "categories": [
+        {
+          "name": "Safety",
+          "items": [
+            {
+              "description": "Check emergency stops",
+              "machine": null,
+              "completed": true,
+              "completedBy": "John Doe",
+              "completedAt": "2024-01-20T08:15:00.000Z",
+              "issue": null
+            }
+          ]
+        }
+      ]
+    }
   ]
 }
 ```
 
-**Response (200):**
-```json
-{
-  "message": "Items updated successfully"
-}
-```
+**Response (200):** Updated checklist object
 
 #### POST /checklists/:id/submit
 Submit checklist for approval.
@@ -446,39 +540,41 @@ Submit checklist for approval.
 **Response (200):**
 ```json
 {
-  "message": "Checklist submitted for approval"
+  "id": "uuid",
+  "status": "submitted",
+  "endTime": "2024-01-20T09:30:00.000Z",
+  ...
 }
 ```
 
 #### POST /checklists/:id/approve
-Approve checklist (Admin only).
+Approve checklist. (Admin only)
 
 **Response (200):**
 ```json
 {
-  "message": "Checklist approved"
+  "id": "uuid",
+  "status": "approved",
+  ...
 }
 ```
 
 #### POST /checklists/:id/deny
-Deny checklist (Admin only).
+Deny checklist. (Admin only)
 
 **Response (200):**
 ```json
 {
-  "message": "Checklist denied"
+  "id": "uuid",
+  "status": "denied",
+  ...
 }
 ```
 
 #### DELETE /checklists/:id
 Delete checklist.
 
-**Response (200):**
-```json
-{
-  "message": "Checklist deleted successfully"
-}
-```
+**Response (204):** No content
 
 ---
 
@@ -489,29 +585,33 @@ Delete checklist.
 ```mermaid
 graph TB
     subgraph Frontend
-        React[React App]
-        Router[React Router]
+        React[React 18 App]
+        Router[React Router 6]
+        Redux[Redux Toolkit]
         API_Client[API Service]
     end
 
     subgraph Backend
-        Flask[Flask Server]
+        Express[Express.js Server]
         CORS[CORS Middleware]
-        Blueprints[Route Blueprints]
-        Models[SQLAlchemy Models]
+        Auth[JWT Auth Middleware]
+        Routes[Route Handlers]
+        Store[JSON File Store]
     end
 
-    subgraph Database
-        SQLite[(SQLite DB)]
+    subgraph Storage
+        JSON[(data.json)]
     end
 
     React --> Router
+    React --> Redux
     Router --> API_Client
-    API_Client -->|HTTP/JSON| Flask
-    Flask --> CORS
-    CORS --> Blueprints
-    Blueprints --> Models
-    Models --> SQLite
+    API_Client -->|HTTP/JSON + JWT| Express
+    Express --> CORS
+    CORS --> Auth
+    Auth --> Routes
+    Routes --> Store
+    Store --> JSON
 ```
 
 ---
@@ -523,38 +623,38 @@ sequenceDiagram
     participant O as Operator
     participant F as Frontend
     participant B as Backend
-    participant DB as Database
+    participant S as JSON Store
     participant A as Admin
 
-    O->>F: Select template
-    F->>B: POST /checklists
-    B->>DB: Create checklist
-    DB-->>B: Checklist ID
-    B-->>F: {id: 1}
+    O->>F: Select line
+    F->>B: POST /checklists {lineId}
+    B->>S: Create checklist from template
+    S-->>B: Checklist object
+    B-->>F: {id, status: "in_progress", ...}
 
-    O->>F: Check items
-    F->>B: PUT /checklists/1/items
-    B->>DB: Update items
-    DB-->>B: Success
-    B-->>F: {message: "Updated"}
+    O->>F: Complete items
+    F->>B: PUT /checklists/:id/items
+    B->>S: Update machines array
+    S-->>B: Success
+    B-->>F: Updated checklist
 
     O->>F: Submit checklist
-    F->>B: POST /checklists/1/submit
-    B->>DB: Set status="pending"
-    DB-->>B: Success
-    B-->>F: {message: "Submitted"}
+    F->>B: POST /checklists/:id/submit
+    B->>S: Set status="submitted", endTime
+    S-->>B: Success
+    B-->>F: {status: "submitted"}
 
     A->>F: View pending
-    F->>B: GET /checklists?status=pending
-    B->>DB: Query pending
-    DB-->>B: Checklist list
-    B-->>F: [{id: 1, ...}]
+    F->>B: GET /checklists?status=submitted
+    B->>S: Query submitted
+    S-->>B: Checklist list
+    B-->>F: [{id, status: "submitted", ...}]
 
     A->>F: Approve checklist
-    F->>B: POST /checklists/1/approve
-    B->>DB: Set status="approved"
-    DB-->>B: Success
-    B-->>F: {message: "Approved"}
+    F->>B: POST /checklists/:id/approve
+    B->>S: Set status="approved"
+    S-->>B: Success
+    B-->>F: {status: "approved"}
 ```
 
 ---
@@ -569,13 +669,14 @@ flowchart LR
     end
 
     subgraph Processing
-        Auth[Authentication]
-        Valid[Validation]
+        Auth[JWT Authentication]
+        Valid[Request Validation]
         Logic[Business Logic]
     end
 
     subgraph Storage
         Users[(Users)]
+        Lines[(Lines)]
         Templates[(Templates)]
         Checklists[(Checklists)]
     end
@@ -590,6 +691,7 @@ flowchart LR
     Auth --> Valid
     Valid --> Logic
     Logic --> Users
+    Logic --> Lines
     Logic --> Templates
     Logic --> Checklists
     Logic --> JSON
@@ -600,14 +702,18 @@ flowchart LR
 
 ## Technology Stack
 
-| Layer | Technology | Purpose |
-|-------|------------|---------|
-| Frontend | React 19 | UI Components |
-| Routing | React Router 7 | Client-side navigation |
-| Backend | Flask 3.x | REST API server |
-| ORM | Flask-SQLAlchemy | Database abstraction |
-| Database | SQLite | Data persistence |
-| CORS | Flask-CORS | Cross-origin requests |
+| Layer | Technology | Version | Purpose |
+|-------|------------|---------|---------|
+| Frontend | React | 18.3 | UI Components |
+| State Management | Redux Toolkit | 2.5 | Global state |
+| Routing | React Router | 6.28 | Client-side navigation |
+| Build Tool | Vite | 7.3 | Development & bundling |
+| Backend | Express.js | 4.21 | REST API server |
+| Language | TypeScript | 5.7 | Type safety |
+| Authentication | jsonwebtoken | 9.0 | JWT tokens |
+| IDs | uuid | 11.1 | Unique identifiers |
+| Storage | JSON File | - | Data persistence |
+| Testing | Vitest | 3.0 | Unit tests |
 
 ---
 
@@ -615,10 +721,50 @@ flowchart LR
 
 | Status Code | Description | Example |
 |-------------|-------------|---------|
-| 200 | Success | GET request successful |
+| 200 | Success | GET/PUT request successful |
 | 201 | Created | Resource created |
-| 400 | Bad Request | Invalid input data |
-| 401 | Unauthorized | Invalid credentials |
-| 403 | Forbidden | Insufficient permissions |
+| 204 | No Content | DELETE successful |
+| 400 | Bad Request | Missing required fields |
+| 401 | Unauthorized | Invalid/missing JWT token |
+| 403 | Forbidden | Admin access required |
 | 404 | Not Found | Resource doesn't exist |
-| 500 | Server Error | Internal error |
+| 409 | Conflict | Email already exists |
+
+---
+
+## Project Structure
+
+```
+packages/
+├── backend/
+│   ├── src/
+│   │   ├── config/
+│   │   │   └── env.ts          # Environment config
+│   │   ├── data/
+│   │   │   ├── seed.ts         # Seed data
+│   │   │   └── store.ts        # JSON file store
+│   │   ├── middleware/
+│   │   │   └── auth.ts         # JWT auth middleware
+│   │   ├── routes/
+│   │   │   ├── auth.ts         # Auth endpoints
+│   │   │   ├── checklists.ts   # Checklist CRUD
+│   │   │   ├── lines.ts        # Lines endpoint
+│   │   │   ├── templates.ts    # Template CRUD
+│   │   │   └── users.ts        # User CRUD
+│   │   ├── types/
+│   │   │   └── index.ts        # TypeScript interfaces
+│   │   └── index.ts            # Express app entry
+│   ├── data.json               # Persistent data store
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── components/         # Shared components
+│   │   ├── pages/              # Page components
+│   │   ├── services/
+│   │   │   └── api.ts          # API client
+│   │   ├── store/              # Redux store
+│   │   ├── App.tsx
+│   │   └── main.tsx
+│   └── package.json
+└── package.json                # Monorepo root
+```

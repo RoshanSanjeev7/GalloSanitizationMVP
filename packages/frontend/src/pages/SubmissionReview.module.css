@@ -31,6 +31,7 @@
   padding: 8px 0;
   font-size: 13px;
   border-bottom: 1px solid var(--border-light);
+  gap: 12px;
 }
 
 .summary-row:last-child {
@@ -39,11 +40,13 @@
 
 .label {
   color: var(--text-muted);
+  flex-shrink: 0;
 }
 
 .value {
   font-weight: 600;
   color: var(--text);
+  text-align: right;
 }
 
 .completion-panel {

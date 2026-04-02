@@ -1,22 +1,38 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import api, { type Checklist } from '../services/api';
+import api, { type Checklist, type ChecklistMachine } from '../services/api';
 import cl from '../styles/checklist.module.css';
 import s from './SubmissionReview.module.css';
+import fillStyles from './ChecklistFill.module.css';
 
 export default function SubmissionReview() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [checklist, setChecklist] = useState<Checklist | null>(null);
+  const [machines, setMachines] = useState<ChecklistMachine[]>([]);
   const [activeMachine, setActiveMachine] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  const [editMode, setEditMode] = useState(false);
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+  const [showComment, setShowComment] = useState<Record<string, boolean>>({});
+  const [reviewedNotes, setReviewedNotes] = useState<Record<number, boolean>>({});
+
+  const currentUser = api.getStoredUser();
 
   useEffect(() => {
-    if (id) api.getChecklist(id).then(setChecklist);
+    if (id) {
+      api.getChecklist(id).then((data) => {
+        setChecklist(data);
+        setMachines(data.machines);
+      });
+    }
   }, [id]);
 
   const handleApprove = async () => {
     if (!id) return;
+    if (editMode) {
+      await api.updateChecklistItems(id, machines);
+    }
     await api.approveChecklist(id);
     navigate('/admin');
   };
@@ -27,6 +43,95 @@ export default function SubmissionReview() {
     navigate('/admin');
   };
 
+  const handleSaveEdits = async () => {
+    if (!id) return;
+    await api.updateChecklistItems(id, buildMachines());
+    setEditMode(false);
+    // Reload to get fresh data
+    const data = await api.getChecklist(id);
+    setChecklist(data);
+    setMachines(data.machines);
+  };
+
+  const itemKey = (catIdx: number, itemIdx: number) =>
+    `${activeMachine}-${catIdx}-${itemIdx}`;
+
+  const setItemStatus = (catIdx: number, itemIdx: number, completed: boolean) => {
+    setMachines((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeMachine) return m;
+        return {
+          ...m,
+          categories: m.categories.map((c, ci) => {
+            if (ci !== catIdx) return c;
+            return {
+              ...c,
+              items: c.items.map((item, ii) => {
+                if (ii !== itemIdx) return item;
+                const newStatus = item.completed === completed ? null : completed;
+                return {
+                  ...item,
+                  completed: newStatus,
+                  completedBy: newStatus !== null ? (currentUser?.name || 'Admin') : null,
+                  completedAt: newStatus !== null ? new Date().toISOString() : null,
+                };
+              }),
+            };
+          }),
+        };
+      })
+    );
+  };
+
+  const toggleComment = (catIdx: number, itemIdx: number) => {
+    const key = itemKey(catIdx, itemIdx);
+    setShowComment((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const setCommentText = (catIdx: number, itemIdx: number, text: string) => {
+    const key = itemKey(catIdx, itemIdx);
+    setCommentInputs((prev) => ({ ...prev, [key]: text }));
+  };
+
+  const deleteComment = (catIdx: number, itemIdx: number) => {
+    setMachines((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeMachine) return m;
+        return {
+          ...m,
+          categories: m.categories.map((c, ci) => {
+            if (ci !== catIdx) return c;
+            return {
+              ...c,
+              items: c.items.map((item, ii) => {
+                if (ii !== itemIdx) return item;
+                return { ...item, issue: null };
+              }),
+            };
+          }),
+        };
+      })
+    );
+  };
+
+  const buildMachines = (): ChecklistMachine[] => {
+    return machines.map((machine, mi) => ({
+      ...machine,
+      categories: machine.categories.map((cat, catIdx) => ({
+        ...cat,
+        items: cat.items.map((item, itemIdx) => {
+          const key = `${mi}-${catIdx}-${itemIdx}`;
+          // Use commentInputs if key exists (even if empty string to allow deletion)
+          const hasCommentInput = key in commentInputs;
+          return {
+            ...item,
+            issue: hasCommentInput ? (commentInputs[key] || null) : item.issue,
+          };
+        }),
+      })),
+    }));
+  };
+
   if (!checklist) {
     return (
       <div className="page-container">
@@ -35,7 +140,7 @@ export default function SubmissionReview() {
     );
   }
 
-  const allItems = checklist.machines.flatMap((m) =>
+  const allItems = machines.flatMap((m) =>
     m.categories.flatMap((c) => c.items)
   );
   const completeCount = allItems.filter((i) => i.completed !== null).length;
@@ -57,7 +162,7 @@ export default function SubmissionReview() {
       year: 'numeric',
     });
 
-  const machineStats = checklist.machines.map((m) => {
+  const machineStats = machines.map((m) => {
     const items = m.categories.flatMap((c) => c.items);
     return {
       name: m.name,
@@ -66,12 +171,15 @@ export default function SubmissionReview() {
     };
   });
 
-  const allNotes = checklist.machines.flatMap((m) =>
-    m.categories.flatMap((c) =>
+  const allNotes = machines.flatMap((m, mIdx) =>
+    m.categories.flatMap((c, cIdx) =>
       c.items
         .filter((i) => i.issue)
-        .map((i) => ({
+        .map((i, iIdx) => ({
           machine: m.name,
+          machineIdx: mIdx,
+          categoryIdx: cIdx,
+          itemIdx: c.items.indexOf(i),
           task: i.description,
           note: i.issue!,
           completedBy: i.completedBy,
@@ -79,7 +187,34 @@ export default function SubmissionReview() {
     )
   );
 
-  const currentMachine = checklist.machines[activeMachine];
+  const jumpToNote = (machineIdx: number, categoryIdx: number, itemIdx: number) => {
+    setActiveMachine(machineIdx);
+    // Expand the category
+    const key = `${machineIdx}-${categoryIdx}`;
+    setCollapsed((prev) => ({ ...prev, [key]: false }));
+    // Scroll to the task after state updates
+    setTimeout(() => {
+      const taskId = `task-${machineIdx}-${categoryIdx}-${itemIdx}`;
+      const element = document.getElementById(taskId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.style.backgroundColor = '#fef9c3';
+        setTimeout(() => {
+          element.style.backgroundColor = '';
+        }, 2000);
+      }
+    }, 100);
+  };
+
+  const allContributors = Array.from(
+    new Set(
+      allItems
+        .map((i) => i.completedBy)
+        .filter((name): name is string => name !== null)
+    )
+  );
+
+  const currentMachine = machines[activeMachine];
 
   const collapseKey = (catIdx: number) => `${activeMachine}-${catIdx}`;
 
@@ -88,15 +223,38 @@ export default function SubmissionReview() {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
+  const formatStamp = (iso: string) => {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
   return (
     <div className="page-container">
       <div className="main-content">
-        <button className="back-link" onClick={() => navigate('/admin')}>
-          &larr; Back
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <button className="back-link" onClick={() => navigate('/admin')} style={{ marginBottom: 0 }}>
+            &larr; Back
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {editMode ? (
+              <>
+                <button className="btn btn-outline btn-sm" onClick={() => setEditMode(false)}>
+                  Cancel
+                </button>
+                <button className="btn btn-green btn-sm" onClick={handleSaveEdits}>
+                  Save Changes
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-outline btn-sm" onClick={() => setEditMode(true)}>
+                Edit Checklist
+              </button>
+            )}
+          </div>
+        </div>
 
         <h2 style={{ marginBottom: 2 }}>
-          {checklist.lineName} - Submission Review
+          {checklist.lineName} - {editMode ? 'Edit Submission' : 'Submission Review'}
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
           {formatDate(start)} - {formatTime(start)}
@@ -108,7 +266,7 @@ export default function SubmissionReview() {
           onChange={(e) => setActiveMachine(Number(e.target.value))}
           style={{ marginBottom: 16 }}
         >
-          {checklist.machines.map((m, idx) => (
+          {machines.map((m, idx) => (
             <option key={idx} value={idx}>
               {m.name}
             </option>
@@ -139,46 +297,163 @@ export default function SubmissionReview() {
                   </button>
 
                   {!isCollapsed &&
-                    cat.items.map((item, itemIdx) => (
-                      <div key={itemIdx} className={cl.fillTask}>
-                        <div className={cl.fillTaskLeft}>
-                          <div className={cl.fillTaskContent}>
-                            <span className={cl.fillTaskText}>{item.description}</span>
-                            {item.completed !== null && item.completedBy && (
-                              <span className={cl.fillStamp}>
-                                {item.completedBy}
-                                {item.completedAt
-                                  ? ` at ${new Date(item.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
-                                  : ''}
-                              </span>
-                            )}
-                            {item.issue && (
-                              <div className={cl.issueBox} style={{ marginTop: 4, padding: '6px 10px', fontSize: 12 }}>
-                                <strong>Issue Reported</strong>
-                                {item.issue}
+                    cat.items.map((item, itemIdx) => {
+                      const key = itemKey(catIdx, itemIdx);
+
+                      if (editMode) {
+                        return (
+                          <div key={itemIdx} id={`task-${activeMachine}-${catIdx}-${itemIdx}`} className={fillStyles.fillItem} style={{ transition: 'background-color 0.3s' }}>
+                            <div className={fillStyles.fillItemRow}>
+                              <div className={fillStyles.fillItemDesc}>
+                                <span className={fillStyles.fillItemNum}>{itemIdx + 1}.</span>
+                                <span className={fillStyles.fillItemText}>{item.description}</span>
                               </div>
+                              <div className={fillStyles.fillItemActions}>
+                                <button
+                                  className={`${fillStyles.fillBtn} ${item.completed === true ? fillStyles.fillBtnDoneActive : ''}`}
+                                  onClick={() => setItemStatus(catIdx, itemIdx, true)}
+                                  title="Mark as done"
+                                >
+                                  &#10003;
+                                </button>
+                                <button
+                                  className={`${fillStyles.fillBtn} ${item.completed === false ? fillStyles.fillBtnSkipActive : ''}`}
+                                  onClick={() => setItemStatus(catIdx, itemIdx, false)}
+                                  title="Mark with issue"
+                                >
+                                  &#10005;
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className={fillStyles.fillItemFooter}>
+                              {item.completed !== null && item.completedBy && (
+                                <span className={cl.fillStamp}>
+                                  {item.completedBy}{item.completedAt ? ` at ${formatStamp(item.completedAt)}` : ''}
+                                </span>
+                              )}
+                            </div>
+
+                            {showComment[key] ? (
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                                <input
+                                  className={fillStyles.fillCommentInput}
+                                  style={{ flex: 1, marginBottom: 0, marginLeft: 0, marginTop: 0 }}
+                                  placeholder="Leave a comment..."
+                                  value={commentInputs[key] ?? item.issue ?? ''}
+                                  onChange={(e) => setCommentText(catIdx, itemIdx, e.target.value)}
+                                />
+                                <button
+                                  className="btn btn-outline btn-sm"
+                                  style={{ flexShrink: 0 }}
+                                  onClick={() => toggleComment(catIdx, itemIdx)}
+                                >
+                                  Done
+                                </button>
+                                {(item.issue || commentInputs[key]) && (
+                                  <button
+                                    className="btn btn-red-outline btn-sm"
+                                    style={{ flexShrink: 0 }}
+                                    onClick={() => {
+                                      setCommentText(catIdx, itemIdx, '');
+                                      deleteComment(catIdx, itemIdx);
+                                      toggleComment(catIdx, itemIdx);
+                                    }}
+                                  >
+                                    Delete
+                                  </button>
+                                )}
+                              </div>
+                            ) : (item.issue || commentInputs[key]) ? (
+                              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                                <div className={fillStyles.fillCommentBox} style={{ flex: 1, marginTop: 0, marginLeft: 0 }}>
+                                  <strong>Comment:</strong> {commentInputs[key] ?? item.issue}
+                                </div>
+                                <button
+                                  className="btn btn-outline btn-sm"
+                                  style={{ flexShrink: 0 }}
+                                  onClick={() => toggleComment(catIdx, itemIdx)}
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  className="btn btn-red-outline btn-sm"
+                                  style={{ flexShrink: 0 }}
+                                  onClick={() => {
+                                    setCommentText(catIdx, itemIdx, '');
+                                    deleteComment(catIdx, itemIdx);
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                className={fillStyles.fillCommentToggle}
+                                style={{ marginTop: 4 }}
+                                onClick={() => toggleComment(catIdx, itemIdx)}
+                              >
+                                + Add comment
+                              </button>
                             )}
                           </div>
+                        );
+                      }
+
+                      return (
+                        <div key={itemIdx} id={`task-${activeMachine}-${catIdx}-${itemIdx}`} className={cl.fillTask} style={{ transition: 'background-color 0.3s' }}>
+                          <div className={cl.fillTaskLeft}>
+                            <div className={cl.fillTaskContent}>
+                              <span className={cl.fillTaskText}>{item.description}</span>
+                              {item.completed !== null && item.completedBy && (
+                                <span className={cl.fillStamp}>
+                                  {item.completedBy}
+                                  {item.completedAt
+                                    ? ` at ${new Date(item.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+                                    : ''}
+                                </span>
+                              )}
+                              {item.issue && (
+                                <div className={cl.issueBox} style={{ marginTop: 4, padding: '6px 10px', fontSize: 12 }}>
+                                  <strong>Comment:</strong>
+                                  {item.issue}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <span
+                            className={cl.fillTaskStatus}
+                            style={{ color: item.completed === true ? 'var(--green)' : item.completed === false ? 'var(--red)' : 'var(--text-muted)' }}
+                          >
+                            {item.completed === true ? '\u2713' : item.completed === false ? '\u2717' : '\u2014'}
+                          </span>
                         </div>
-                        <span
-                          className={cl.fillTaskStatus}
-                          style={{ color: item.completed === true ? 'var(--green)' : item.completed === false ? 'var(--red)' : 'var(--text-muted)' }}
-                        >
-                          {item.completed === true ? '\u2713' : item.completed === false ? '\u2717' : '\u2014'}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               );
             })}
 
             <div className="action-buttons">
-              <button className="btn btn-red-outline" onClick={handleDeny}>
-                Deny
-              </button>
-              <button className="btn btn-green" onClick={handleApprove}>
-                Approve
-              </button>
+              {editMode ? (
+                <>
+                  <button className="btn btn-outline" onClick={() => setEditMode(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-green" onClick={handleSaveEdits}>
+                    Save Changes
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn-red-outline" onClick={handleDeny}>
+                    Deny
+                  </button>
+                  <button className="btn btn-green" onClick={handleApprove}>
+                    Approve
+                  </button>
+                </>
+              )}
             </div>
           </div>
 
@@ -186,9 +461,15 @@ export default function SubmissionReview() {
             <div className={s.summaryPanel}>
               <h3>Summary</h3>
               <div className={s.summaryRow}>
-                <span className={s.label}>Operator</span>
+                <span className={s.label}>Created By</span>
                 <span className={s.value}>{checklist.operatorName}</span>
               </div>
+              {allContributors.length > 0 && (
+                <div className={s.summaryRow}>
+                  <span className={s.label}>Contributors</span>
+                  <span className={s.value}>{allContributors.join(', ')}</span>
+                </div>
+              )}
               <div className={s.summaryRow}>
                 <span className={s.label}>Start</span>
                 <span className={s.value}>{formatTime(start)}</span>
@@ -243,14 +524,39 @@ export default function SubmissionReview() {
 
             {allNotes.length > 0 && (
               <div className={s.notesPanel}>
-                <h3>Notes &amp; Issues ({allNotes.length})</h3>
+                <h3>Notes &amp; Issues ({Object.values(reviewedNotes).filter(Boolean).length}/{allNotes.length})</h3>
                 {allNotes.map((n, idx) => (
-                  <div key={idx} className={s.noteItem}>
-                    <div className={s.noteMeta}>
-                      {n.machine} {n.completedBy && <span>&middot; {n.completedBy}</span>}
+                  <div
+                    key={idx}
+                    className={s.noteItem}
+                    style={{
+                      opacity: reviewedNotes[idx] ? 0.6 : 1,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <input
+                        type="checkbox"
+                        checked={reviewedNotes[idx] || false}
+                        onChange={() => setReviewedNotes((prev) => ({ ...prev, [idx]: !prev[idx] }))}
+                        style={{ marginTop: 2, cursor: 'pointer' }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div className={s.noteMeta}>
+                          {n.machine} {n.completedBy && <span>&middot; {n.completedBy}</span>}
+                        </div>
+                        <div className={s.noteTask}>{n.task}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+                          <div className={s.noteText} style={{ flex: 1, margin: 0 }}>{n.note}</div>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            style={{ flexShrink: 0, fontSize: 11, padding: '4px 10px' }}
+                            onClick={() => jumpToNote(n.machineIdx, n.categoryIdx, n.itemIdx)}
+                          >
+                            Go to &rarr;
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className={s.noteTask}>{n.task}</div>
-                    <div className={s.noteText}>{n.note}</div>
                   </div>
                 ))}
               </div>
