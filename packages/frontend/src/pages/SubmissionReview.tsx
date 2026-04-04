@@ -243,7 +243,7 @@ export default function SubmissionReview() {
           <button className="back-link" onClick={() => navigate('/admin')} style={{ marginBottom: 0 }}>
             &larr; Back
           </button>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {editMode ? (
               <>
                 <button className="btn btn-outline btn-sm" onClick={() => setEditMode(false)}>
@@ -254,9 +254,17 @@ export default function SubmissionReview() {
                 </button>
               </>
             ) : (
-              <button className="btn btn-outline btn-sm" onClick={() => setEditMode(true)}>
-                Edit Checklist
-              </button>
+              <>
+                <button className="btn btn-outline btn-sm" onClick={() => setEditMode(true)}>
+                  Edit Checklist
+                </button>
+                <button className="btn btn-red-outline btn-sm" onClick={handleDeny}>
+                  Deny
+                </button>
+                <button className="btn btn-green btn-sm" onClick={handleApprove}>
+                  Approve
+                </button>
+              </>
             )}
           </div>
         </div>

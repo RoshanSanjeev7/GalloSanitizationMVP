@@ -300,6 +300,27 @@ async function deleteImage(
   });
 }
 
+async function downloadChecklistPdf(id: string): Promise<void> {
+  const token = getToken();
+  const res = await fetch(`${API_BASE}/checklists/${id}/pdf`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to download PDF');
+  }
+
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `checklist-${id.slice(0, 8)}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+}
+
 const api = {
   login,
   logout,
@@ -325,6 +346,7 @@ const api = {
   uploadImages,
   getImageUrl,
   deleteImage,
+  downloadChecklistPdf,
 };
 
 export default api;

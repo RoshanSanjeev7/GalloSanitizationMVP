@@ -396,7 +396,7 @@ export default function ChecklistFill() {
           <div className={s.machineNav}>
             <button
               className={s.machineNavBtn}
-              onClick={() => setActiveMachine((prev) => prev - 1)}
+              onClick={() => { setActiveMachine((prev) => prev - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               disabled={activeMachine === 0}
             >
               &larr; {activeMachine > 0 ? machines[activeMachine - 1].name : ''}
@@ -406,7 +406,7 @@ export default function ChecklistFill() {
             </span>
             <button
               className={s.machineNavBtn}
-              onClick={() => setActiveMachine((prev) => prev + 1)}
+              onClick={() => { setActiveMachine((prev) => prev + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               disabled={activeMachine === machines.length - 1}
             >
               {activeMachine < machines.length - 1 ? machines[activeMachine + 1].name : ''} &rarr;

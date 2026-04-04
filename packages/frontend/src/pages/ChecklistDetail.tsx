@@ -113,7 +113,7 @@ export default function ChecklistDetail() {
           <button className="back-link" onClick={() => navigate(-1)} style={{ marginBottom: 0 }}>
             &larr; Back
           </button>
-          <button className="btn btn-green btn-sm" onClick={() => window.print()}>
+          <button className="btn btn-green btn-sm" onClick={() => id && api.downloadChecklistPdf(id)}>
             Export PDF
           </button>
         </div>
