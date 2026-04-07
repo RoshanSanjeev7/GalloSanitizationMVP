@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
+import Modal from '../components/Modal';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistFill.module.css';
 
@@ -16,6 +17,7 @@ export default function ChecklistFill() {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [photoMenu, setPhotoMenu] = useState<string | null>(null);
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const currentUser = api.getStoredUser();
@@ -155,14 +157,27 @@ export default function ChecklistFill() {
     );
   };
 
-  const handleSave = async () => {
-    if (!id) return;
-    await api.updateChecklistItems(id, buildMachines());
-    navigate('/');
-  };
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasLoadedRef = useRef(false);
 
-  const handleSubmit = async () => {
+  useEffect(() => {
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true;
+      return;
+    }
     if (!id) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      api.updateChecklistItems(id, buildMachines());
+    }, 1000);
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [machines, commentInputs]);
+
+  const confirmSubmit = async () => {
+    if (!id) return;
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     await api.updateChecklistItems(id, buildMachines());
     await api.submitChecklist(id);
     navigate('/');
@@ -186,9 +201,18 @@ export default function ChecklistFill() {
   return (
     <div className="page-container">
       <div className="main-content">
-        <button className="back-link" onClick={() => navigate('/')}>
-          &larr; Back
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <button className="back-link" style={{ marginBottom: 0 }} onClick={async () => {
+            if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+            if (id) await api.updateChecklistItems(id, buildMachines());
+            navigate('/');
+          }}>
+            &larr; Back
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={() => setShowSubmitConfirm(true)}>
+            Submit Checklist
+          </button>
+        </div>
 
         <h2 style={{ marginBottom: 4 }}>{checklist.lineName} &mdash; Deep Clean</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
@@ -264,17 +288,6 @@ export default function ChecklistFill() {
                       </div>
 
                       <div className={s.fillItemFooter}>
-                        {item.completed !== null && item.completedBy && (
-                          <span className={cl.fillStamp}>
-                            {item.completedBy}{item.completedAt ? ` at ${formatStamp(item.completedAt)}` : ''}
-                          </span>
-                        )}
-                        <button
-                          className={s.fillCommentToggle}
-                          onClick={() => toggleComment(catIdx, itemIdx)}
-                        >
-                          {showComment[key] ? 'Hide comment' : '+ Add comment'}
-                        </button>
                         <div className={s.cameraWrapper}>
                           <button
                             className={s.cameraBtn}
@@ -309,6 +322,17 @@ export default function ChecklistFill() {
                             </div>
                           )}
                         </div>
+                        <button
+                          className={s.fillCommentToggle}
+                          onClick={() => toggleComment(catIdx, itemIdx)}
+                        >
+                          {showComment[key] ? 'Hide comment' : '+ Add comment'}
+                        </button>
+                        {item.completed !== null && item.completedBy && (
+                          <span className={s.fillStampRight}>
+                            {item.completedBy}{item.completedAt ? ` at ${formatStamp(item.completedAt)}` : ''}
+                          </span>
+                        )}
                         {/* Hidden file inputs */}
                         <input
                           type="file"
@@ -415,14 +439,36 @@ export default function ChecklistFill() {
         )}
 
         <div className="action-buttons" style={{ marginBottom: 40, marginTop: 16 }}>
-          <button className="btn btn-primary" onClick={handleSubmit}>
+          <button className="btn btn-primary" onClick={() => setShowSubmitConfirm(true)}>
             Submit Checklist
-          </button>
-          <button className="btn btn-outline" onClick={handleSave}>
-            Save &amp; Exit
           </button>
         </div>
       </div>
+
+      {showSubmitConfirm && (() => {
+        const allItems = machines.flatMap(m => m.categories.flatMap(c => c.items));
+        const completed = allItems.filter(i => i.completed !== null).length;
+        const total = allItems.length;
+        return (
+          <Modal onClose={() => setShowSubmitConfirm(false)}>
+            <h2>Submit Checklist</h2>
+            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+              {completed} out of {total} items completed.
+            </p>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+              Are you sure you want to submit this checklist for review?
+            </p>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button className="btn btn-outline btn-sm" onClick={() => setShowSubmitConfirm(false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={confirmSubmit}>
+                Submit
+              </button>
+            </div>
+          </Modal>
+        );
+      })()}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import api, { type Checklist } from '../services/api';
+import type { RootState } from '../store';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistDetail.module.css';
 import sr from './SubmissionReview.module.css';
@@ -8,6 +10,7 @@ import sr from './SubmissionReview.module.css';
 export default function ChecklistDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const user = useSelector((state: RootState) => state.auth.user);
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [activeMachine, setActiveMachine] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -113,9 +116,11 @@ export default function ChecklistDetail() {
           <button className="back-link" onClick={() => navigate(-1)} style={{ marginBottom: 0 }}>
             &larr; Back
           </button>
-          <button className="btn btn-green btn-sm" onClick={() => id && api.downloadChecklistPdf(id)}>
-            Export PDF
-          </button>
+          {user?.role === 'admin' && (
+            <button className="btn btn-green btn-sm" onClick={() => id && api.downloadChecklistPdf(id)}>
+              Export PDF
+            </button>
+          )}
         </div>
 
         <div className={s.printHeader}>

@@ -74,6 +74,8 @@ router.post('/', async (req: AuthRequest, res) => {
     status: 'in_progress' as const,
     startTime: new Date().toISOString(),
     endTime: null,
+    submittedAt: null,
+    updatedAt: null,
     machines: template.machines.map(m => ({
       name: m.name,
       categories: m.categories.map(c => ({
@@ -116,6 +118,7 @@ router.put('/:id/items', async (req: AuthRequest, res) => {
     checklist.machines = machines;
   }
 
+  checklist.updatedAt = new Date().toISOString();
   await putChecklist(checklist);
   res.json(checklist);
 });
@@ -128,8 +131,10 @@ router.post('/:id/submit', async (req: AuthRequest, res) => {
     return;
   }
 
+  const now = new Date().toISOString();
   checklist.status = 'submitted';
-  checklist.endTime = new Date().toISOString();
+  checklist.endTime = now;
+  checklist.submittedAt = now;
   await putChecklist(checklist);
   res.json(checklist);
 });
@@ -182,7 +187,7 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
  * - Page 1: Header, summary info, completion stats, machine progress overview
  * - Subsequent pages: One page per machine with all categories and task details
  */
-router.get('/:id/pdf', async (req, res) => {
+router.get('/:id/pdf', adminOnly, async (req, res) => {
   const checklist = await getChecklist(req.params.id as string) as Checklist | null;
 
   if (!checklist) {
