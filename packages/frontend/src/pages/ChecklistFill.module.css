@@ -1,6 +1,7 @@
 .fill-item {
   border-top: 1px solid var(--border-light);
-  padding: 10px 14px;
+  padding: 6px 14px;
+  overflow: visible;
 }
 
 .fill-item-row {
@@ -37,14 +38,22 @@
   flex-shrink: 0;
 }
 
+.fill-stamp-right {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: nowrap;
+}
+
 .fill-btn {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
@@ -82,9 +91,9 @@
 .fill-item-footer {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 4px;
-  padding-left: 26px;
+  gap: 8px;
+  margin-top: -2px;
+  padding-left: 0;
 }
 
 .fill-comment-toggle {
@@ -102,7 +111,7 @@
 }
 
 .fill-comment-input {
-  margin-top: 6px;
+  margin-top: 4px;
   margin-left: 26px;
   width: calc(100% - 26px);
   padding: 8px 10px;
@@ -118,9 +127,9 @@
 }
 
 .fill-comment-box {
-  margin-top: 6px;
+  margin-top: 4px;
   margin-left: 26px;
-  padding: 6px 10px;
+  padding: 4px 10px;
   background: #f3f4f6;
   border: 1px solid var(--border);
   border-radius: var(--radius-xs);
@@ -168,15 +177,14 @@
 
 .camera-wrapper {
   position: relative;
-  margin-left: auto;
 }
 
 .camera-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
   border: none;
   background: none;
@@ -193,7 +201,7 @@
 
 .photo-popover {
   position: absolute;
-  right: 0;
+  left: 0;
   top: 100%;
   margin-top: 4px;
   background: var(--white);
@@ -233,8 +241,8 @@
 .photo-thumbs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 4px;
   margin-left: 26px;
 }
 

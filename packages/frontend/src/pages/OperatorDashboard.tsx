@@ -130,7 +130,7 @@ export default function OperatorDashboard() {
               <div className={d.dashRowInfo}>
                 <span className={d.dashRowLine}>{cl.lineName}</span>
                 <span className={d.dashRowSub}>
-                  {formatDate(cl.startTime)} &middot; {formatTime(cl.startTime)}
+                  {cl.operatorName} &middot; {formatDate(cl.startTime)} &middot; {formatTime(cl.startTime)}
                 </span>
               </div>
               <div className={d.dashRowRight}>

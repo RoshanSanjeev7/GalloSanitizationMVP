@@ -205,6 +205,8 @@ export interface Checklist {
   status: 'in_progress' | 'submitted' | 'approved' | 'denied';
   startTime: string;
   endTime: string | null;
+  submittedAt: string | null;
+  updatedAt: string | null;
   machines: ChecklistMachine[];
 }
 

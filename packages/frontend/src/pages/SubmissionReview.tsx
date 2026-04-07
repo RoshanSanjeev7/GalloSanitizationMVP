@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
 import cl from '../styles/checklist.module.css';
@@ -17,12 +17,69 @@ export default function SubmissionReview() {
   const [showComment, setShowComment] = useState<Record<string, boolean>>({});
   const [reviewedNotes, setReviewedNotes] = useState<Record<number, boolean>>({});
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [photoMenu, setPhotoMenu] = useState<string | null>(null);
+  const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const loadImageUrl = async (imageKey: string) => {
     if (imageUrls[imageKey]) return;
     if (!id) return;
     const url = await api.getImageUrl(id, imageKey);
     setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
+  };
+
+  const handlePhotoUpload = async (catIdx: number, itemIdx: number, files: FileList) => {
+    if (!id) return;
+    const key = itemKey(catIdx, itemIdx);
+    setUploading((prev) => ({ ...prev, [key]: true }));
+
+    const result = await api.uploadImages(id, activeMachine, catIdx, itemIdx, Array.from(files));
+
+    setMachines((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeMachine) return m;
+        return {
+          ...m,
+          categories: m.categories.map((c, ci) => {
+            if (ci !== catIdx) return c;
+            return {
+              ...c,
+              items: c.items.map((item, ii) => {
+                if (ii !== itemIdx) return item;
+                return { ...item, images: result.images };
+              }),
+            };
+          }),
+        };
+      })
+    );
+
+    setUploading((prev) => ({ ...prev, [key]: false }));
+  };
+
+  const handlePhotoDelete = async (catIdx: number, itemIdx: number, imageKey: string) => {
+    if (!id) return;
+
+    const result = await api.deleteImage(id, imageKey, activeMachine, catIdx, itemIdx);
+
+    setMachines((prev) =>
+      prev.map((m, mi) => {
+        if (mi !== activeMachine) return m;
+        return {
+          ...m,
+          categories: m.categories.map((c, ci) => {
+            if (ci !== catIdx) return c;
+            return {
+              ...c,
+              items: c.items.map((item, ii) => {
+                if (ii !== itemIdx) return item;
+                return { ...item, images: result.images };
+              }),
+            };
+          }),
+        };
+      })
+    );
   };
 
   const currentUser = api.getStoredUser();
@@ -343,32 +400,101 @@ export default function SubmissionReview() {
                             </div>
 
                             <div className={fillStyles.fillItemFooter}>
+                              <div className={fillStyles.cameraWrapper}>
+                                <button
+                                  className={fillStyles.cameraBtn}
+                                  onClick={() => setPhotoMenu(photoMenu === key ? null : key)}
+                                  title="Add photo"
+                                >
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                    <circle cx="12" cy="13" r="4"/>
+                                  </svg>
+                                </button>
+                                {photoMenu === key && (
+                                  <div className={fillStyles.photoPopover}>
+                                    <button
+                                      className={fillStyles.photoPopoverItem}
+                                      onClick={() => {
+                                        setPhotoMenu(null);
+                                        fileInputRefs.current[`${key}-camera`]?.click();
+                                      }}
+                                    >
+                                      Take Photo
+                                    </button>
+                                    <button
+                                      className={fillStyles.photoPopoverItem}
+                                      onClick={() => {
+                                        setPhotoMenu(null);
+                                        fileInputRefs.current[key]?.click();
+                                      }}
+                                    >
+                                      Photo Library
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                style={{ display: 'none' }}
+                                ref={(el) => { fileInputRefs.current[`${key}-camera`] = el; }}
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files.length > 0) {
+                                    handlePhotoUpload(catIdx, itemIdx, e.target.files);
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                style={{ display: 'none' }}
+                                ref={(el) => { fileInputRefs.current[key] = el; }}
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files.length > 0) {
+                                    handlePhotoUpload(catIdx, itemIdx, e.target.files);
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
                               {item.completed !== null && item.completedBy && (
-                                <span className={cl.fillStamp}>
+                                <span className={fillStyles.fillStampRight}>
                                   {item.completedBy}{item.completedAt ? ` at ${formatStamp(item.completedAt)}` : ''}
                                 </span>
                               )}
                             </div>
 
+                            {uploading[key] && (
+                              <div className={fillStyles.photoUploading}>Uploading...</div>
+                            )}
+
                             {item.images && item.images.length > 0 && (
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                              <div className={fillStyles.photoThumbs}>
                                 {item.images.map((imgKey) => {
                                   if (!imageUrls[imgKey]) loadImageUrl(imgKey);
                                   return (
-                                    <img
-                                      key={imgKey}
-                                      src={imageUrls[imgKey] || ''}
-                                      alt="Checklist photo"
-                                      style={{
-                                        width: 48,
-                                        height: 48,
-                                        objectFit: 'cover',
-                                        borderRadius: 4,
-                                        border: '1px solid var(--border)',
-                                        cursor: 'pointer',
-                                      }}
-                                      onClick={() => imageUrls[imgKey] && window.open(imageUrls[imgKey], '_blank')}
-                                    />
+                                    <div key={imgKey} className={fillStyles.photoThumbWrapper}>
+                                      {imageUrls[imgKey] ? (
+                                        <img
+                                          className={fillStyles.photoThumb}
+                                          src={imageUrls[imgKey]}
+                                          alt="Uploaded"
+                                          onClick={() => window.open(imageUrls[imgKey], '_blank')}
+                                          style={{ cursor: 'pointer' }}
+                                        />
+                                      ) : (
+                                        <div className={fillStyles.photoThumb} style={{ background: '#f3f4f6' }} />
+                                      )}
+                                      <button
+                                        className={fillStyles.photoRemoveBtn}
+                                        onClick={() => handlePhotoDelete(catIdx, itemIdx, imgKey)}
+                                      >
+                                        &times;
+                                      </button>
+                                    </div>
                                   );
                                 })}
                               </div>

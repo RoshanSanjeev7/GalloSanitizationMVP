@@ -177,7 +177,19 @@ export default function AdminDashboard() {
               <div className={d.dashRowInfo}>
                 <span className={d.dashRowLine}>{cl.lineName}</span>
                 <span className={d.dashRowSub}>
-                  {cl.operatorName} &middot; {formatDate(cl.startTime)} &middot; {formatTime(cl.startTime)}
+                  {cl.operatorName} &middot;{' '}
+                  {cl.status === 'in_progress' ? (
+                    <>
+                      Created {formatDate(cl.startTime)} &middot; {formatTime(cl.startTime)}
+                      {cl.updatedAt && (
+                        <> &middot; Last edit {formatDate(cl.updatedAt)} &middot; {formatTime(cl.updatedAt)}</>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      Submitted on {cl.submittedAt ? `${formatDate(cl.submittedAt)} \u00b7 ${formatTime(cl.submittedAt)}` : `${formatDate(cl.endTime || cl.startTime)} \u00b7 ${formatTime(cl.endTime || cl.startTime)}`}
+                    </>
+                  )}
                 </span>
               </div>
               <div className={d.dashRowRight}>
