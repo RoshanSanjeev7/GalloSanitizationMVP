@@ -34,6 +34,9 @@ export default function CreateTemplate() {
   const [activeMachine, setActiveMachine] = useState(0);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [newLineName, setNewLineName] = useState('');
+  const [showNewLine, setShowNewLine] = useState(false);
+  const [creatingLine, setCreatingLine] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getLines(), api.getTemplates()]).then(([lns, tpls]) => {
@@ -72,6 +75,20 @@ export default function CreateTemplate() {
       setTitle('');
       setMachines([emptyMachine()]);
       setActiveMachine(0);
+    }
+  };
+
+  const handleCreateLine = async () => {
+    if (!newLineName.trim()) return;
+    setCreatingLine(true);
+    try {
+      const newLine = await api.createLine(newLineName.trim());
+      setLines(prev => [...prev, newLine]);
+      setNewLineName('');
+      setShowNewLine(false);
+      handleLineSelect(newLine.id);
+    } finally {
+      setCreatingLine(false);
     }
   };
 
@@ -236,12 +253,51 @@ export default function CreateTemplate() {
             </select>
           </div>
 
+          {lineId && isEditing && (() => {
+            const tpl = templates.find(t => t.lineId === lineId);
+            return tpl?.updatedAt ? (
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
+                Last updated: {new Date(tpl.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(tpl.updatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
+                {tpl.createdAt && <> &middot; Created: {new Date(tpl.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>}
+              </p>
+            ) : null;
+          })()}
+
           {lineId && (
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 8 }}>
               {isEditing
                 ? `Editing existing template for ${selectedLine?.name}`
                 : `Creating new template for ${selectedLine?.name}`}
             </p>
+          )}
+
+          {!showNewLine ? (
+            <button className={s.addLink} style={{ marginTop: 12 }} onClick={() => setShowNewLine(true)}>
+              + Create New Line
+            </button>
+          ) : (
+            <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center' }}>
+              <input
+                className="form-input"
+                placeholder="e.g. Line 94"
+                value={newLineName}
+                onChange={(e) => setNewLineName(e.target.value)}
+                style={{ flex: 1, marginBottom: 0 }}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleCreateLine}
+                disabled={!newLineName.trim() || creatingLine}
+              >
+                {creatingLine ? 'Creating...' : 'Create'}
+              </button>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => { setShowNewLine(false); setNewLineName(''); }}
+              >
+                Cancel
+              </button>
+            </div>
           )}
         </div>
 

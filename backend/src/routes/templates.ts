@@ -34,7 +34,8 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
     return;
   }
 
-  const template = { id: uuid(), title, lineId, machines };
+  const now = new Date().toISOString();
+  const template = { id: uuid(), title, lineId, machines, createdAt: now, updatedAt: now };
   await putTemplate(template);
 
   res.status(201).json(template);
@@ -52,6 +53,7 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
   if (title) template.title = title;
   if (lineId) template.lineId = lineId;
   if (machines) template.machines = machines;
+  (template as any).updatedAt = new Date().toISOString();
 
   await putTemplate(template);
   res.json(template);
