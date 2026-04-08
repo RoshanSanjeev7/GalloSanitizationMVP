@@ -97,11 +97,19 @@ export default function ChecklistFill() {
   };
 
   const loadImageUrl = async (imageKey: string) => {
-    if (imageUrls[imageKey]) return;
     if (!id) return;
     const url = await api.getImageUrl(id, imageKey);
     setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
   };
+
+  useEffect(() => {
+    if (!machines.length) return;
+    const machine = machines[activeMachine];
+    if (!machine) return;
+    const keys = machine.categories.flatMap(c => c.items.flatMap(i => i.images || []));
+    const missing = keys.filter(k => !imageUrls[k]);
+    missing.forEach(k => loadImageUrl(k));
+  }, [machines, activeMachine]);
 
   const handlePhotoUpload = async (catIdx: number, itemIdx: number, files: FileList) => {
     if (!id) return;
@@ -173,7 +181,7 @@ export default function ChecklistFill() {
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [machines, commentInputs]);
+  }, [machines, commentInputs, showComment]);
 
   const confirmSubmit = async () => {
     if (!id) return;
@@ -384,7 +392,6 @@ export default function ChecklistFill() {
                       {item.images && item.images.length > 0 && (
                         <div className={s.photoThumbs}>
                           {item.images.map((imgKey) => {
-                            if (!imageUrls[imgKey]) loadImageUrl(imgKey);
                             return (
                               <div key={imgKey} className={s.photoThumbWrapper}>
                                 {imageUrls[imgKey] ? (

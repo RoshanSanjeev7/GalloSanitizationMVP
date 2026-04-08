@@ -106,8 +106,7 @@ router.put('/:id/items', async (req: AuthRequest, res) => {
     return;
   }
 
-  const user = await getUser(req.userId!);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = req.userRole === 'admin';
 
   if (checklist.status !== 'in_progress' && !(isAdmin && checklist.status === 'submitted')) {
     res.status(400).json({ error: 'Cannot update items on this checklist' });

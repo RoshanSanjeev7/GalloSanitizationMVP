@@ -17,7 +17,6 @@ export default function ChecklistDetail() {
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
 
   const loadImageUrl = async (imageKey: string) => {
-    if (imageUrls[imageKey]) return;
     if (!id) return;
     const url = await api.getImageUrl(id, imageKey);
     setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
@@ -26,6 +25,13 @@ export default function ChecklistDetail() {
   useEffect(() => {
     if (id) api.getChecklist(id).then(setChecklist);
   }, [id]);
+
+  useEffect(() => {
+    if (!checklist) return;
+    const keys = checklist.machines.flatMap(m => m.categories.flatMap(c => c.items.flatMap(i => i.images || [])));
+    const missing = keys.filter(k => !imageUrls[k]);
+    missing.forEach(k => loadImageUrl(k));
+  }, [checklist]);
 
   if (!checklist) {
     return (
@@ -195,7 +201,6 @@ export default function ChecklistDetail() {
                               {item.images && item.images.length > 0 && (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                                   {item.images.map((imgKey) => {
-                                    if (!imageUrls[imgKey]) loadImageUrl(imgKey);
                                     return (
                                       <img
                                         key={imgKey}

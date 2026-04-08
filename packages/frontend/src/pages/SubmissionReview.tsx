@@ -22,11 +22,17 @@ export default function SubmissionReview() {
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const loadImageUrl = async (imageKey: string) => {
-    if (imageUrls[imageKey]) return;
     if (!id) return;
     const url = await api.getImageUrl(id, imageKey);
     setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
   };
+
+  useEffect(() => {
+    if (!machines.length) return;
+    const keys = machines.flatMap(m => m.categories.flatMap(c => c.items.flatMap(i => i.images || [])));
+    const missing = keys.filter(k => !imageUrls[k]);
+    missing.forEach(k => loadImageUrl(k));
+  }, [machines]);
 
   const handlePhotoUpload = async (catIdx: number, itemIdx: number, files: FileList) => {
     if (!id) return;
@@ -474,7 +480,6 @@ export default function SubmissionReview() {
                             {item.images && item.images.length > 0 && (
                               <div className={fillStyles.photoThumbs}>
                                 {item.images.map((imgKey) => {
-                                  if (!imageUrls[imgKey]) loadImageUrl(imgKey);
                                   return (
                                     <div key={imgKey} className={fillStyles.photoThumbWrapper}>
                                       {imageUrls[imgKey] ? (
