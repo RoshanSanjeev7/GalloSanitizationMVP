@@ -8,6 +8,7 @@ import { useImageUrlsForMachines } from '../hooks/useImageUrls';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistDetail.module.css';
 import sr from '../styles/sidebar.module.css';
+import Spinner from '../components/Spinner';
 
 export default function ChecklistDetail() {
   const { id } = useParams<{ id: string }>();
@@ -26,7 +27,7 @@ export default function ChecklistDetail() {
   if (!checklist) {
     return (
       <div className="page-container">
-        <div className="main-content">Loading...</div>
+        <div className="main-content"><Spinner label="Loading checklist..." /></div>
       </div>
     );
   }

@@ -6,6 +6,7 @@ import { useImageUrlsForMachines } from '../hooks/useImageUrls';
 import cl from '../styles/checklist.module.css';
 import s from '../styles/sidebar.module.css';
 import fillStyles from './ChecklistFill.module.css';
+import Spinner from '../components/Spinner';
 
 export default function SubmissionReview() {
   const { id } = useParams<{ id: string }>();
@@ -126,7 +127,7 @@ export default function SubmissionReview() {
   if (!checklist) {
     return (
       <div className="page-container">
-        <div className="main-content">Loading...</div>
+        <div className="main-content"><Spinner label="Loading review..." /></div>
       </div>
     );
   }
