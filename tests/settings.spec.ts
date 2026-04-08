@@ -6,7 +6,7 @@ test.describe('Settings & Role Assignment', () => {
     await login(page, OPERATOR);
     await page.click('text=Settings');
     await expect(page).toHaveURL('/settings');
-    await expect(page.locator('h2')).toContainText('Gabriel Sanchez');
+    await expect(page.locator('text=Gabriel Sanchez')).toBeVisible();
     await expect(page.locator('text=Operator')).toBeVisible();
   });
 
@@ -14,7 +14,7 @@ test.describe('Settings & Role Assignment', () => {
     await login(page, ADMIN);
     await page.click('text=Settings');
     await expect(page).toHaveURL('/settings');
-    await expect(page.locator('h2')).toContainText('Yolanda Martinez');
+    await expect(page.locator('text=Yolanda Martinez')).toBeVisible();
     await expect(page.locator('text=Administrator')).toBeVisible();
   });
 
@@ -39,10 +39,10 @@ test.describe('Settings & Role Assignment', () => {
     await expect(page.locator('text=Marcus Rivera')).toBeVisible();
   });
 
-  test('home link navigates correctly', async ({ page }) => {
+  test('back navigates to dashboard', async ({ page }) => {
     await login(page, OPERATOR);
     await page.click('text=Settings');
-    await page.click('text=Home');
+    await page.click('text=Back');
     await expect(page).toHaveURL('/');
   });
 });
