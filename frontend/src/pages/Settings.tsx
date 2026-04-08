@@ -20,8 +20,10 @@ export default function Settings() {
     <div className="page-container">
       <div className="main-content">
         <button className="back-link" onClick={() => navigate(homeRoute)}>
-          &larr; Settings
+          &larr; Back
         </button>
+
+        <h2 style={{ textAlign: 'center', marginBottom: 20 }}>Settings</h2>
 
         <div className={`card ${s.profileCard}`} style={{ maxWidth: 400, margin: '0 auto' }}>
           <Avatar name={user.name} size="lg" />
@@ -44,12 +46,11 @@ export default function Settings() {
           </span>
         </div>
 
-        <div className={`card ${s.navCard}`} style={{ maxWidth: 400, margin: '16px auto 0' }}>
-          <Link to={homeRoute}>Home</Link>
-          {user.role === 'admin' && (
+        {user.role === 'admin' && (
+          <div className={`card ${s.navCard}`} style={{ maxWidth: 400, margin: '16px auto 0' }}>
             <Link to="/settings/roles">Edit Role Assignments</Link>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -10,10 +10,12 @@ export default function RoleAssignment() {
   const [users, setUsers] = useState<UserPublic[]>([]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<'operator' | 'admin'>('operator');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
+  const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: UserPublic; newRole: string } | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -29,18 +31,19 @@ export default function RoleAssignment() {
   };
 
   const handleAdd = async () => {
-    if (!name || !email) return;
+    if (!name || !email || !password) return;
     setLoading(true);
     setError('');
     try {
       await api.createUser({
         name,
         email,
-        password: 'changeme123',
+        password,
         role,
       });
       setName('');
       setEmail('');
+      setPassword('');
       setRole('operator');
       await loadUsers();
     } catch (err) {
@@ -61,13 +64,21 @@ export default function RoleAssignment() {
     }
   };
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
+  const confirmRoleChange = async () => {
+    if (!roleChangeTarget) return;
     try {
-      await api.updateUserRole(userId, newRole);
+      await api.updateUserRole(roleChangeTarget.user.id, roleChangeTarget.newRole);
+      setRoleChangeTarget(null);
       await loadUsers();
     } catch (err) {
       setError((err as Error).message);
+      setRoleChangeTarget(null);
     }
+  };
+
+  const handleRoleChange = (user: UserPublic, newRole: string) => {
+    if (user.role === newRole) return;
+    setRoleChangeTarget({ user, newRole });
   };
 
   return (
@@ -105,6 +116,16 @@ export default function RoleAssignment() {
             />
           </div>
           <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              className="form-input"
+              type="password"
+              placeholder="Enter password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          <div className="form-group">
             <label className="form-label">Role</label>
             <div className={s.roleToggle}>
               <button
@@ -124,7 +145,7 @@ export default function RoleAssignment() {
           <button
             className="btn btn-primary btn-block"
             onClick={handleAdd}
-            disabled={!name || !email || loading}
+            disabled={!name || !email || !password || loading}
           >
             {loading ? 'Adding...' : 'Add User'}
           </button>
@@ -145,14 +166,14 @@ export default function RoleAssignment() {
                 <div className={s.roleToggle} style={{ width: 180 }}>
                   <button
                     className={u.role === 'operator' ? s.roleToggleActive : ''}
-                    onClick={() => handleRoleChange(u.id, 'operator')}
+                    onClick={() => handleRoleChange(u, 'operator')}
                     style={{ padding: '6px 12px', fontSize: 12 }}
                   >
                     Operator
                   </button>
                   <button
                     className={u.role === 'admin' ? s.roleToggleActive : ''}
-                    onClick={() => handleRoleChange(u.id, 'admin')}
+                    onClick={() => handleRoleChange(u, 'admin')}
                     style={{ padding: '6px 12px', fontSize: 12 }}
                   >
                     Admin
@@ -170,6 +191,23 @@ export default function RoleAssignment() {
           ))}
         </div>
       </div>
+
+      {roleChangeTarget && (
+        <Modal onClose={() => setRoleChangeTarget(null)}>
+          <h2>Change Role</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Are you sure you want to change <strong>{roleChangeTarget.user.name}</strong> from <strong>{roleChangeTarget.user.role}</strong> to <strong>{roleChangeTarget.newRole}</strong>?
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-outline btn-sm" onClick={() => setRoleChangeTarget(null)}>
+              Cancel
+            </button>
+            <button className="btn btn-primary btn-sm" onClick={confirmRoleChange}>
+              Confirm
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {deleteTarget && (
         <Modal onClose={() => setDeleteTarget(null)}>

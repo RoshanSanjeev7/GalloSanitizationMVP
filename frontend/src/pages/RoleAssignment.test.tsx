@@ -95,13 +95,14 @@ describe('RoleAssignment', () => {
 
     await user.type(screen.getByPlaceholderText('Enter full name'), 'New User');
     await user.type(screen.getByPlaceholderText('user@gallo.com'), 'new@gallo.com');
+    await user.type(screen.getByPlaceholderText('Enter password'), 'testpass123');
     await user.click(screen.getByText('Add User'));
 
     await waitFor(() => {
       expect(api.createUser).toHaveBeenCalledWith({
         name: 'New User',
         email: 'new@gallo.com',
-        password: 'changeme123',
+        password: 'testpass123',
         role: 'operator',
       });
     });
