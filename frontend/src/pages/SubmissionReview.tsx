@@ -127,7 +127,7 @@ export default function SubmissionReview() {
   if (!checklist) {
     return (
       <div className="page-container">
-        <div className="main-content"><Spinner label="Loading review..." /></div>
+        <div className="main-content"><Spinner label="Loading review..." delay={0} /></div>
       </div>
     );
   }
