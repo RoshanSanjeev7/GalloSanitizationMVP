@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
@@ -12,6 +12,15 @@ import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'in_progress' | 'submitted' | 'completed';
 
+const PAGE_LIMIT = 20;
+
+function statusParamsForTab(tab: Tab): Record<string, string> {
+  if (tab === 'in_progress') return { status: 'in_progress' };
+  if (tab === 'submitted') return { status: 'submitted' };
+  if (tab === 'completed') return { status: 'approved,denied' };
+  return {};
+}
+
 export default function OperatorDashboard() {
   const user = useSelector((s: RootState) => s.auth.user);
   const navigate = useNavigate();
@@ -21,48 +30,97 @@ export default function OperatorDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [selectedLine, setSelectedLine] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [counts, setCounts] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    if (!user) { navigate('/login'); return; }
-    loadData();
-  }, [user]);
+  const fetchCounts = useCallback(async () => {
+    const [inProgress, submitted, completed, all] = await Promise.all([
+      api.getChecklists({ status: 'in_progress', limit: '1' }),
+      api.getChecklists({ status: 'submitted', limit: '1' }),
+      api.getChecklists({ status: 'approved,denied', limit: '1' }),
+      api.getChecklists({ limit: '1' }),
+    ]);
+    setCounts({
+      in_progress: inProgress.total,
+      submitted: submitted.total,
+      completed: completed.total,
+      all: all.total,
+    });
+  }, []);
 
-  const loadData = async () => {
+  const fetchChecklists = useCallback(async (currentTab: Tab, currentOffset: number, append: boolean) => {
+    const params: Record<string, string> = {
+      limit: String(PAGE_LIMIT),
+      offset: String(currentOffset),
+      ...statusParamsForTab(currentTab),
+    };
+    const res = await api.getChecklists(params);
+    if (append) {
+      setChecklists((prev) => [...prev, ...res.items]);
+    } else {
+      setChecklists(res.items);
+    }
+    setTotal(res.total);
+    setHasMore(res.hasMore);
+  }, []);
+
+  const loadData = useCallback(async (currentTab: Tab) => {
     setLoading(true);
+    setOffset(0);
     try {
-      const [cls, lns] = await Promise.all([
-        api.getChecklists(),
+      const [, lns] = await Promise.all([
+        fetchChecklists(currentTab, 0, false),
         api.getLines(),
+        fetchCounts(),
       ]);
-      setChecklists(cls);
       setLines(lns);
     } catch {
       // 401 handled by api interceptor
     } finally {
       setLoading(false);
     }
+  }, [fetchChecklists, fetchCounts]);
+
+  useEffect(() => {
+    if (!user) { navigate('/login'); return; }
+    loadData(tab);
+  }, [user]);
+
+  const handleTabChange = (newTab: Tab) => {
+    setTab(newTab);
+    setOffset(0);
+    setChecklists([]);
+    setLoading(true);
+    fetchChecklists(newTab, 0, false)
+      .catch(() => {})
+      .finally(() => setLoading(false));
   };
 
-  const filtered = checklists.filter((c) => {
-    if (tab === 'in_progress') return c.status === 'in_progress';
-    if (tab === 'submitted') return c.status === 'submitted';
-    if (tab === 'completed') return c.status === 'approved' || c.status === 'denied';
-    return true;
-  });
-
-  const counts = {
-    all: checklists.length,
-    in_progress: checklists.filter((c) => c.status === 'in_progress').length,
-    submitted: checklists.filter((c) => c.status === 'submitted').length,
-    completed: checklists.filter((c) => c.status === 'approved' || c.status === 'denied').length,
+  const handleLoadMore = async () => {
+    const newOffset = offset + PAGE_LIMIT;
+    setLoadingMore(true);
+    try {
+      await fetchChecklists(tab, newOffset, true);
+      setOffset(newOffset);
+    } catch {
+      // handled
+    } finally {
+      setLoadingMore(false);
+    }
   };
+
+  // Sort is handled server-side (newest first by default)
+  // For "oldest", the operator dashboard doesn't have a sort toggle, so we just use server order
 
   const handleCreate = async () => {
     if (!selectedLine) return;
     await api.createChecklist({ lineId: selectedLine });
     setShowModal(false);
     setSelectedLine('');
-    await loadData();
+    await loadData(tab);
   };
 
   const formatDate = (iso: string) => {
@@ -106,24 +164,24 @@ export default function OperatorDashboard() {
 
         <div className={d.dashTabs}>
           {([
-            { key: 'in_progress' as Tab, label: 'In Progress', count: counts.in_progress },
-            { key: 'submitted' as Tab, label: 'Pending Review', count: counts.submitted },
-            { key: 'completed' as Tab, label: 'Completed', count: counts.completed },
-            { key: 'all' as Tab, label: 'All', count: counts.all },
+            { key: 'in_progress' as Tab, label: 'In Progress' },
+            { key: 'submitted' as Tab, label: 'Pending Review' },
+            { key: 'completed' as Tab, label: 'Completed' },
+            { key: 'all' as Tab, label: 'All' },
           ]).map((t) => (
             <button
               key={t.key}
               className={`${d.dashTab} ${tab === t.key ? d.dashTabActive : ''}`}
-              onClick={() => setTab(t.key)}
+              onClick={() => handleTabChange(t.key)}
             >
-              {t.label} ({t.count})
+              {t.label} ({counts[t.key] ?? 0})
             </button>
           ))}
         </div>
 
         {loading && <Spinner label="Loading checklists..." />}
         {!loading && <div className={d.dashList}>
-          {filtered.map((cl) => (
+          {checklists.map((cl) => (
             <div
               key={cl.id}
               className={d.dashRow}
@@ -144,10 +202,19 @@ export default function OperatorDashboard() {
               </div>
             </div>
           ))}
-          {filtered.length === 0 && (
+          {checklists.length === 0 && (
             <div className={d.dashEmpty}>
               No checklists found
             </div>
+          )}
+          {hasMore && (
+            <button
+              className={`btn btn-outline ${d.loadMoreBtn}`}
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Loading...' : 'Load More'}
+            </button>
           )}
         </div>}
       </div>

@@ -13,7 +13,70 @@ function getStoredUser() {
   }
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Check if the JWT is expiring within 10 minutes and refresh proactively. */
+let refreshPromise: Promise<void> | null = null;
+
+async function refreshTokenIfNeeded(): Promise<void> {
+  const token = getToken();
+  if (!token) return;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    const expiresAt = payload.exp * 1000;
+    if (expiresAt - Date.now() > 10 * 60 * 1000) return; // More than 10min left
+  } catch {
+    return;
+  }
+
+  // Prevent concurrent refreshes
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+    } catch {
+      // Refresh failed — let the next request handle 401
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
+
+/** Retry wrapper for GET requests with exponential backoff (1s, 2s, 4s). */
+async function requestWithRetry<T = unknown>(endpoint: string, options: RequestInit = {}, maxRetries = 3): Promise<T> {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await request<T>(endpoint, options);
+    } catch (err: unknown) {
+      const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
+      const isRetryable = !status || status >= 500;
+      const isLast = attempt === maxRetries - 1;
+      if (!isRetryable || isLast) throw err;
+      await delay(1000 * Math.pow(2, attempt));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+
 async function request<T = unknown>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  // Proactively refresh token if expiring soon (skip for refresh endpoint itself)
+  if (!endpoint.includes('/auth/refresh')) {
+    await refreshTokenIfNeeded();
+  }
   const token = getToken();
   const url = `${API_BASE}${endpoint}`;
   const config: RequestInit = {
@@ -87,12 +150,13 @@ function logout(): void {
 }
 
 async function getMe(): Promise<UserPublic> {
-  return request<UserPublic>('/auth/me');
+  return requestWithRetry<UserPublic>('/auth/me');
 }
 
 // ─── Users ──────────────────────────────────────────────────────────
 async function getUsers(): Promise<UserPublic[]> {
-  return request<UserPublic[]>('/users');
+  const data = await requestWithRetry<{ items: UserPublic[]; total: number; hasMore: boolean }>('/users');
+  return data.items;
 }
 
 async function createUser(userData: {
@@ -125,7 +189,7 @@ export interface Line {
 }
 
 async function getLines(): Promise<Line[]> {
-  return request<Line[]>('/lines');
+  return requestWithRetry<Line[]>('/lines');
 }
 
 async function createLine(name: string): Promise<Line> {
@@ -161,11 +225,11 @@ export interface Template {
 }
 
 async function getTemplates(): Promise<Template[]> {
-  return request<Template[]>('/templates');
+  return requestWithRetry<Template[]>('/templates');
 }
 
 async function getTemplate(id: string): Promise<Template> {
-  return request<Template>(`/templates/${id}`);
+  return requestWithRetry<Template>(`/templates/${id}`);
 }
 
 async function createTemplate(templateData: {
@@ -223,17 +287,34 @@ export interface Checklist {
   endTime: string | null;
   submittedAt: string | null;
   updatedAt: string | null;
+  version: number;
+  viewedAt?: string | null;
+  viewedBy?: string | null;
+  activities?: Activity[];
   machines: ChecklistMachine[];
 }
 
-async function getChecklists(params: Record<string, string> = {}): Promise<Checklist[]> {
+export interface Activity {
+  type: 'comment' | 'image' | 'submit' | 'created';
+  by: string;
+  at: string;
+  detail?: string;
+}
+
+export interface ChecklistResponse {
+  items: Checklist[];
+  total: number;
+  hasMore: boolean;
+}
+
+async function getChecklists(params: Record<string, string> = {}): Promise<ChecklistResponse> {
   const query = new URLSearchParams(params).toString();
   const endpoint = query ? `/checklists?${query}` : '/checklists';
-  return request<Checklist[]>(endpoint);
+  return requestWithRetry<ChecklistResponse>(endpoint);
 }
 
 async function getChecklist(id: string): Promise<Checklist> {
-  return request<Checklist>(`/checklists/${id}`);
+  return requestWithRetry<Checklist>(`/checklists/${id}`);
 }
 
 async function createChecklist(checklistData: { lineId: string }): Promise<Checklist> {
@@ -245,11 +326,12 @@ async function createChecklist(checklistData: { lineId: string }): Promise<Check
 
 async function updateChecklistItems(
   id: string,
-  machines: ChecklistMachine[]
+  machines: ChecklistMachine[],
+  version?: number,
 ): Promise<Checklist> {
   return request<Checklist>(`/checklists/${id}/items`, {
     method: 'PUT',
-    body: JSON.stringify({ machines }),
+    body: JSON.stringify({ machines, ...(version !== undefined ? { version } : {}) }),
   });
 }
 
@@ -305,6 +387,14 @@ async function getImageUrl(checklistId: string, key: string): Promise<string> {
   return data.url;
 }
 
+async function getImageUrls(checklistId: string, keys: string[]): Promise<Record<string, string>> {
+  const data = await request<{ urls: Record<string, string> }>(`/checklists/${checklistId}/image-urls`, {
+    method: 'POST',
+    body: JSON.stringify({ keys }),
+  });
+  return data.urls;
+}
+
 async function deleteImage(
   checklistId: string,
   key: string,
@@ -316,6 +406,10 @@ async function deleteImage(
     method: 'DELETE',
     body: JSON.stringify({ key, machineIdx, catIdx, itemIdx }),
   });
+}
+
+async function markAllViewed(): Promise<{ marked: number }> {
+  return request<{ marked: number }>('/checklists/mark-all-viewed', { method: 'POST' });
 }
 
 async function downloadChecklistPdf(id: string): Promise<void> {
@@ -365,8 +459,10 @@ const api = {
   deleteChecklist,
   uploadImages,
   getImageUrl,
+  getImageUrls,
   deleteImage,
   downloadChecklistPdf,
+  markAllViewed,
 };
 
 export default api;

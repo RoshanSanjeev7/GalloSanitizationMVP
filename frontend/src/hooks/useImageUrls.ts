@@ -11,13 +11,14 @@ export function useImageUrls(checklistId: string | undefined) {
 
   const loadMissing = useCallback((keys: string[]) => {
     if (!checklistId) return;
-    for (const key of keys) {
-      if (loadedRef.current.has(key)) continue;
-      loadedRef.current.add(key);
-      api.getImageUrl(checklistId, key).then((url) => {
-        setImageUrls((prev) => ({ ...prev, [key]: url }));
-      });
-    }
+    const missing = keys.filter((k) => !loadedRef.current.has(k));
+    if (missing.length === 0) return;
+    missing.forEach((k) => loadedRef.current.add(k));
+
+    // Use batch endpoint for efficiency (1 request instead of N)
+    api.getImageUrls(checklistId, missing).then((urls) => {
+      setImageUrls((prev) => ({ ...prev, ...urls }));
+    });
   }, [checklistId]);
 
   return { imageUrls, loadMissing };

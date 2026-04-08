@@ -4,7 +4,7 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=dynamodb,s3,lambda,apigateway
+      - SERVICES=dynamodb,s3,sqs,lambda,apigateway
       - DEFAULT_REGION=us-west-2
       - DOCKER_HOST=unix:///var/run/docker.sock
       - LOCALSTACK_ACKNOWLEDGE_ACCOUNT_REQUIREMENT=1

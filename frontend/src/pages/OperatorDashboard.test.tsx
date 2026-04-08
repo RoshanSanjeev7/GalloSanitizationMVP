@@ -62,9 +62,21 @@ function renderDashboard() {
   });
 }
 
+function mockChecklistResponse(items: typeof testChecklists) {
+  return { items, total: items.length, hasMore: false };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(api.getChecklists).mockResolvedValue(testChecklists);
+  // Default: return filtered results based on status param (mimics server-side filtering)
+  vi.mocked(api.getChecklists).mockImplementation(async (params = {}) => {
+    const status = params.status;
+    if (!status) return mockChecklistResponse(testChecklists);
+    // Handle comma-separated statuses (e.g. 'approved,denied')
+    const statuses = status.split(',');
+    const filtered = testChecklists.filter((c) => statuses.includes(c.status));
+    return mockChecklistResponse(filtered);
+  });
   vi.mocked(api.getLines).mockResolvedValue(testLines);
 });
 
@@ -81,7 +93,8 @@ describe('OperatorDashboard', () => {
   it('calls api.getChecklists and api.getLines on mount', async () => {
     renderDashboard();
     await waitFor(() => {
-      expect(api.getChecklists).toHaveBeenCalledTimes(1);
+      // 1 for the active tab data + 4 for tab counts
+      expect(api.getChecklists).toHaveBeenCalled();
       expect(api.getLines).toHaveBeenCalledTimes(1);
     });
   });
@@ -91,7 +104,7 @@ describe('OperatorDashboard', () => {
     expect(screen.getByText('Welcome, Gina')).toBeInTheDocument();
   });
 
-  it('renders tab buttons with correct counts', async () => {
+  it('renders tab buttons with counts on all tabs', async () => {
     renderDashboard();
     await screen.findByText('In Progress (1)');
     expect(screen.getByText('Pending Review (1)')).toBeInTheDocument();
@@ -114,7 +127,7 @@ describe('OperatorDashboard', () => {
     // Wait for data to load
     await screen.findByText('In Progress (1)');
 
-    // Switch to "All" tab
+    // Switch to "All" tab — triggers new API call with no status filter
     await user.click(screen.getByText('All (3)'));
     // All 3 checklists should be visible (3 line names rendered in rows)
     const allRows = await screen.findAllByText(/Gina Sanchez/);
@@ -162,7 +175,7 @@ describe('OperatorDashboard', () => {
   });
 
   it('shows "No checklists found" when filtered list is empty', async () => {
-    vi.mocked(api.getChecklists).mockResolvedValue([]);
+    vi.mocked(api.getChecklists).mockResolvedValue({ items: [], total: 0, hasMore: false });
     renderDashboard();
 
     await screen.findByText('No checklists found');

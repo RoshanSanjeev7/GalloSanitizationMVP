@@ -27,13 +27,19 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/checklists', checklistRoutes);
 app.use('/api/checklists', imageRoutes);
 
-// Seed on startup, then listen (skip in test environment)
+// Seed on startup (skip in test and production environments), then listen
 if (!process.env.VITEST) {
-  seedIfEmpty().then(() => {
+  const startServer = () => {
     app.listen(config.port, () => {
       console.log(`Backend running on http://localhost:${config.port}`);
     });
-  });
+  };
+
+  if (process.env.NODE_ENV === 'production') {
+    startServer();
+  } else {
+    seedIfEmpty().then(startServer);
+  }
 }
 
 export { app };

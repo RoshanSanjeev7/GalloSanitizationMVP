@@ -56,6 +56,7 @@ export function makeChecklist(overrides: Partial<Checklist> = {}): Checklist {
     endTime: null,
     submittedAt: null,
     updatedAt: null,
+    version: 1,
     machines: [
       {
         name: 'Machine A',

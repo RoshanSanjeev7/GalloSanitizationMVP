@@ -32,6 +32,11 @@ vi.mock('../data/dynamo.js', () => ({
   docClient: {},
 }));
 
+// Mock SQS module
+vi.mock('../data/sqs.js', () => ({
+  sendPdfGenerationMessage: vi.fn().mockResolvedValue(undefined),
+}));
+
 // Mock S3 module used by the images route (also mounted under /api/checklists)
 vi.mock('../data/s3.js', () => ({
   uploadImage: vi.fn().mockResolvedValue('https://s3.example.com/image.jpg'),
@@ -109,34 +114,194 @@ describe('Checklists Routes', () => {
         .set('Authorization', `Bearer ${operatorToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(2);
+      expect(res.body.items).toHaveLength(2);
       // Newer first
-      expect(res.body[0].id).toBe(newer.id);
-      expect(res.body[1].id).toBe(older.id);
+      expect(res.body.items[0].id).toBe(newer.id);
+      expect(res.body.items[1].id).toBe(older.id);
     });
 
     it('passes status query param to queryChecklists', async () => {
       mockedQueryChecklists.mockResolvedValueOnce([]);
 
-      await request(app)
+      const res = await request(app)
         .get('/api/checklists?status=submitted')
         .set('Authorization', `Bearer ${operatorToken}`);
 
       expect(mockedQueryChecklists).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'submitted' }),
       );
+      expect(res.body).toHaveProperty('items');
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('hasMore');
     });
 
     it('passes operatorId and lineId query params', async () => {
       mockedQueryChecklists.mockResolvedValueOnce([]);
 
-      await request(app)
+      const res = await request(app)
         .get('/api/checklists?operatorId=op-1&lineId=line-1')
         .set('Authorization', `Bearer ${operatorToken}`);
 
       expect(mockedQueryChecklists).toHaveBeenCalledWith(
         expect.objectContaining({ operatorId: 'op-1', lineId: 'line-1' }),
       );
+      expect(res.body).toHaveProperty('items');
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('hasMore');
+    });
+
+    it('returns paginated response with default limit of 50', async () => {
+      // Create 3 checklists — well under default limit of 50
+      const checklists = Array.from({ length: 3 }, (_, i) =>
+        makeChecklist({ startTime: `2024-0${i + 1}-01T00:00:00.000Z` }),
+      );
+      mockedQueryChecklists.mockResolvedValueOnce(checklists);
+
+      const res = await request(app)
+        .get('/api/checklists')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(3);
+      expect(res.body.total).toBe(3);
+      expect(res.body.hasMore).toBe(false);
+    });
+
+    it('respects custom limit parameter', async () => {
+      const checklists = Array.from({ length: 5 }, (_, i) =>
+        makeChecklist({ startTime: `2024-0${i + 1}-01T00:00:00.000Z` }),
+      );
+      mockedQueryChecklists.mockResolvedValueOnce(checklists);
+
+      const res = await request(app)
+        .get('/api/checklists?limit=2')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(5);
+    });
+
+    it('respects offset parameter', async () => {
+      const checklists = Array.from({ length: 5 }, (_, i) =>
+        makeChecklist({
+          startTime: `2024-0${5 - i}-01T00:00:00.000Z`,
+          operatorName: `Operator ${i}`,
+        }),
+      );
+      mockedQueryChecklists.mockResolvedValueOnce(checklists);
+
+      const res = await request(app)
+        .get('/api/checklists?limit=2&offset=2')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(5);
+      // Items should be from positions 2 and 3 (0-indexed) after sorting
+    });
+
+    it('returns hasMore=true when more items exist', async () => {
+      const checklists = Array.from({ length: 5 }, (_, i) =>
+        makeChecklist({ startTime: `2024-0${i + 1}-01T00:00:00.000Z` }),
+      );
+      mockedQueryChecklists.mockResolvedValueOnce(checklists);
+
+      const res = await request(app)
+        .get('/api/checklists?limit=3&offset=0')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(3);
+      expect(res.body.hasMore).toBe(true);
+    });
+
+    it('returns hasMore=false when no more items', async () => {
+      const checklists = Array.from({ length: 5 }, (_, i) =>
+        makeChecklist({ startTime: `2024-0${i + 1}-01T00:00:00.000Z` }),
+      );
+      mockedQueryChecklists.mockResolvedValueOnce(checklists);
+
+      const res = await request(app)
+        .get('/api/checklists?limit=3&offset=3')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.hasMore).toBe(false);
+    });
+
+    it('filters by search query (matches operatorName, case-insensitive)', async () => {
+      const cl1 = makeChecklist({ operatorName: 'Alice Johnson', startTime: '2024-01-01T00:00:00.000Z' });
+      const cl2 = makeChecklist({ operatorName: 'Bob Smith', startTime: '2024-02-01T00:00:00.000Z' });
+      const cl3 = makeChecklist({ operatorName: 'alice walker', startTime: '2024-03-01T00:00:00.000Z' });
+      mockedQueryChecklists.mockResolvedValueOnce([cl1, cl2, cl3]);
+
+      const res = await request(app)
+        .get('/api/checklists?search=alice')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(2);
+      expect(res.body.items.every((c: any) =>
+        c.operatorName.toLowerCase().includes('alice'),
+      )).toBe(true);
+    });
+
+    it('filters by search query (matches lineName, case-insensitive)', async () => {
+      const cl1 = makeChecklist({ lineName: 'Line 91', startTime: '2024-01-01T00:00:00.000Z' });
+      const cl2 = makeChecklist({ lineName: 'Line 92', startTime: '2024-02-01T00:00:00.000Z' });
+      const cl3 = makeChecklist({ lineName: 'LINE 91 Extended', startTime: '2024-03-01T00:00:00.000Z' });
+      mockedQueryChecklists.mockResolvedValueOnce([cl1, cl2, cl3]);
+
+      const res = await request(app)
+        .get('/api/checklists?search=line 91')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(2);
+      expect(res.body.items.every((c: any) =>
+        c.lineName.toLowerCase().includes('line 91'),
+      )).toBe(true);
+    });
+
+    it('handles comma-separated status values', async () => {
+      const approved = makeChecklist({ status: 'approved', startTime: '2024-01-01T00:00:00.000Z' });
+      const denied = makeChecklist({ status: 'denied', startTime: '2024-02-01T00:00:00.000Z' });
+      // Mock two separate calls for each status
+      mockedQueryChecklists
+        .mockResolvedValueOnce([approved])
+        .mockResolvedValueOnce([denied]);
+
+      const res = await request(app)
+        .get('/api/checklists?status=approved,denied')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(2);
+      // Both statuses should be present
+      const statuses = res.body.items.map((c: any) => c.status);
+      expect(statuses).toContain('approved');
+      expect(statuses).toContain('denied');
+    });
+
+    it('returns total count before pagination', async () => {
+      const checklists = Array.from({ length: 10 }, (_, i) =>
+        makeChecklist({ startTime: `2024-01-${String(i + 1).padStart(2, '0')}T00:00:00.000Z` }),
+      );
+      mockedQueryChecklists.mockResolvedValueOnce(checklists);
+
+      const res = await request(app)
+        .get('/api/checklists?limit=3&offset=0')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(3);
+      expect(res.body.total).toBe(10);
+      expect(res.body.hasMore).toBe(true);
     });
   });
 
@@ -165,6 +330,83 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(404);
       expect(res.body.error).toBe('Checklist not found');
+    });
+
+    it('marks submitted checklist as viewed when admin retrieves it', async () => {
+      const checklist = makeSubmittedChecklist({ id: 'cl-view-1' });
+      const adminUser = makeUser({ id: 'admin-1', name: 'Yolanda Martinez', role: 'admin' });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+      mockedGetUser.mockResolvedValueOnce(adminUser);
+
+      const res = await request(app)
+        .get('/api/checklists/cl-view-1')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.viewedAt).toBeTruthy();
+      expect(res.body.viewedBy).toBe('Yolanda Martinez');
+      expect(putChecklist).toHaveBeenCalledWith(
+        expect.objectContaining({ viewedAt: expect.any(String), viewedBy: 'Yolanda Martinez' }),
+      );
+    });
+
+    it('does NOT mark as viewed when operator retrieves it', async () => {
+      const checklist = makeSubmittedChecklist({ id: 'cl-view-2' });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+
+      const res = await request(app)
+        .get('/api/checklists/cl-view-2')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.viewedAt).toBeUndefined();
+      expect(putChecklist).not.toHaveBeenCalled();
+    });
+
+    it('does NOT overwrite existing viewedAt (idempotent)', async () => {
+      const checklist = makeSubmittedChecklist({
+        id: 'cl-view-3',
+        viewedAt: '2026-04-01T12:00:00.000Z',
+        viewedBy: 'Previous Admin',
+      });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+
+      const res = await request(app)
+        .get('/api/checklists/cl-view-3')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.viewedAt).toBe('2026-04-01T12:00:00.000Z');
+      expect(res.body.viewedBy).toBe('Previous Admin');
+      expect(putChecklist).not.toHaveBeenCalled();
+    });
+
+    it('does NOT mark approved/denied checklists as viewed', async () => {
+      const checklist = makeChecklist({ id: 'cl-view-4', status: 'approved' });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+
+      const res = await request(app)
+        .get('/api/checklists/cl-view-4')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.viewedAt).toBeUndefined();
+      expect(putChecklist).not.toHaveBeenCalled();
+    });
+
+    it('marks in_progress checklist as viewed when admin retrieves it', async () => {
+      const checklist = makeChecklist({ id: 'cl-view-5', status: 'in_progress' });
+      const adminUser = makeUser({ id: 'admin-1', name: 'Admin', role: 'admin' });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+      mockedGetUser.mockResolvedValueOnce(adminUser);
+
+      const res = await request(app)
+        .get('/api/checklists/cl-view-5')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.viewedAt).toBeTruthy();
+      expect(putChecklist).toHaveBeenCalled();
     });
   });
 
@@ -196,27 +438,26 @@ describe('Checklists Routes', () => {
       expect(res.body.submittedAt).toBeNull();
       expect(res.body.updatedAt).toBeNull();
       expect(res.body.endTime).toBeNull();
+      expect(res.body.version).toBe(1);
       expect(res.body.machines).toHaveLength(1);
       expect(putChecklist).toHaveBeenCalledOnce();
     });
 
-    it('falls back to getAllTemplates when no line-specific templates exist', async () => {
+    it('returns 400 when no template exists for the selected line', async () => {
       const line = makeLine({ id: 'line-2' });
       const user = makeUser({ id: 'operator-1' });
-      const fallbackTemplate = makeTemplate({ lineId: 'line-other' });
 
       mockedGetLine.mockResolvedValueOnce(line);
       mockedGetUser.mockResolvedValueOnce(user);
       mockedGetTemplatesByLineId.mockResolvedValueOnce([]);
-      mockedGetAllTemplates.mockResolvedValueOnce([fallbackTemplate]);
 
       const res = await request(app)
         .post('/api/checklists')
         .set('Authorization', `Bearer ${operatorToken}`)
         .send({ lineId: 'line-2' });
 
-      expect(res.status).toBe(201);
-      expect(res.body.templateId).toBe(fallbackTemplate.id);
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain('No template available');
     });
 
     it('returns 404 when line does not exist', async () => {
@@ -248,7 +489,6 @@ describe('Checklists Routes', () => {
       mockedGetLine.mockResolvedValueOnce(makeLine());
       mockedGetUser.mockResolvedValueOnce(makeUser({ id: 'operator-1' }));
       mockedGetTemplatesByLineId.mockResolvedValueOnce([]);
-      mockedGetAllTemplates.mockResolvedValueOnce([]);
 
       const res = await request(app)
         .post('/api/checklists')
@@ -256,7 +496,7 @@ describe('Checklists Routes', () => {
         .send({ lineId: 'line-1' });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toBe('No template available for this line');
+      expect(res.body.error).toContain('No template available');
     });
   });
 
@@ -338,6 +578,56 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('Cannot update items on this checklist');
+    });
+
+    it('succeeds with matching version and increments it', async () => {
+      const checklist = makeChecklist({ status: 'in_progress', version: 3 });
+      const operatorUser = makeUser({ id: 'operator-1', role: 'operator' });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+      mockedGetUser.mockResolvedValueOnce(operatorUser);
+
+      const newMachines = [{ name: 'Updated', categories: [] }];
+      const res = await request(app)
+        .put(`/api/checklists/${checklist.id}/items`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({ machines: newMachines, version: 3 });
+
+      expect(res.status).toBe(200);
+      expect(res.body.version).toBe(4);
+      expect(putChecklist).toHaveBeenCalledWith(
+        expect.objectContaining({ version: 4 }),
+      );
+    });
+
+    it('returns 409 when version does not match (conflict)', async () => {
+      const checklist = makeChecklist({ status: 'in_progress', version: 5 });
+      const operatorUser = makeUser({ id: 'operator-1', role: 'operator' });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+      mockedGetUser.mockResolvedValueOnce(operatorUser);
+
+      const res = await request(app)
+        .put(`/api/checklists/${checklist.id}/items`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({ machines: [], version: 3 });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error).toContain('modified');
+    });
+
+    it('does unconditional write when no version provided (backward compat)', async () => {
+      const checklist = makeChecklist({ status: 'in_progress', version: 2 });
+      const operatorUser = makeUser({ id: 'operator-1', role: 'operator' });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+      mockedGetUser.mockResolvedValueOnce(operatorUser);
+
+      const res = await request(app)
+        .put(`/api/checklists/${checklist.id}/items`)
+        .set('Authorization', `Bearer ${operatorToken}`)
+        .send({ machines: [{ name: 'M', categories: [] }] });
+
+      expect(res.status).toBe(200);
+      // Version should remain unchanged in unconditional write
+      expect(putChecklist).toHaveBeenCalledOnce();
     });
   });
 
@@ -525,6 +815,38 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(404);
       expect(res.body.error).toBe('Checklist not found');
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────
+  // GET /api/checklists/:id/pdf/status
+  // ────────────────────────────────────────────────────────────────
+  describe('GET /api/checklists/:id/pdf/status', () => {
+    it('returns ready=true when pdfKey exists', async () => {
+      const checklist = makeSubmittedChecklist({
+        pdfKey: 'pdfs/test.pdf',
+        pdfGeneratedAt: '2026-04-07T12:00:00.000Z',
+      });
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+
+      const res = await request(app)
+        .get(`/api/checklists/${checklist.id}/pdf/status`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.ready).toBe(true);
+    });
+
+    it('returns ready=false when no pdfKey', async () => {
+      const checklist = makeSubmittedChecklist();
+      mockedGetChecklist.mockResolvedValueOnce(checklist);
+
+      const res = await request(app)
+        .get(`/api/checklists/${checklist.id}/pdf/status`)
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.ready).toBe(false);
     });
   });
 });

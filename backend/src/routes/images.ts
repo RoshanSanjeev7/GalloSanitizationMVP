@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
-import { uploadImage, getImageUrl, deleteImage } from '../data/s3.js';
-import { getChecklist, putChecklist } from '../data/dynamo.js';
+import { uploadImage, getImageUrl, getImageUrls, deleteImage } from '../data/s3.js';
+import { getChecklist, putChecklist, getUser } from '../data/dynamo.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -59,11 +59,37 @@ router.post(
 
     if (!item.images) item.images = [];
     item.images.push(...newKeys);
+
+    // Track image upload activity
+    if (!checklist.activities) checklist.activities = [];
+    const uploader = await getUser(req.userId!);
+    checklist.activities.push({
+      type: 'image',
+      by: uploader?.name || 'Unknown',
+      at: new Date().toISOString(),
+      detail: `${files.length} photo${files.length > 1 ? 's' : ''} added`,
+    });
+    // Reset viewedAt so admin sees new activity
+    checklist.viewedAt = null;
+    checklist.viewedBy = null;
+
     await putChecklist(checklist);
 
     res.json({ images: item.images });
   }
 );
+
+// Batch get presigned URLs for multiple images
+router.post('/:id/image-urls', async (req: AuthRequest, res) => {
+  const { keys } = req.body;
+  if (!Array.isArray(keys) || keys.length === 0) {
+    res.status(400).json({ error: 'keys array required' });
+    return;
+  }
+  const cappedKeys = keys.slice(0, 50);
+  const urls = await getImageUrls(cappedKeys);
+  res.json({ urls });
+});
 
 // Get a presigned URL for an image
 router.get('/:id/images/*', async (req: AuthRequest, res) => {

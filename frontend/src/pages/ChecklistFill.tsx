@@ -20,6 +20,9 @@ export default function ChecklistFill() {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [photoMenu, setPhotoMenu] = useState<string | null>(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'conflict'>('idle');
+  const [version, setVersion] = useState<number | undefined>();
+  const savingRef = useRef(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const imageUrls = useImageUrlsForMachines(id, machines, activeMachine);
 
@@ -34,6 +37,7 @@ export default function ChecklistFill() {
     const data = await api.getChecklist(id);
     setChecklist(data);
     setMachines(data.machines);
+    setVersion(data.version);
   };
 
   const setItemStatus = (catIdx: number, itemIdx: number, completed: boolean) => {
@@ -111,9 +115,24 @@ export default function ChecklistFill() {
     }
     if (!id) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(() => {
-      api.updateChecklistItems(id, buildMachines());
-    }, 1000);
+    saveTimeoutRef.current = setTimeout(async () => {
+      if (savingRef.current) return;
+      savingRef.current = true;
+      setSaveStatus('saving');
+      try {
+        const result = await api.updateChecklistItems(id, buildMachines(), version);
+        setVersion(result.version);
+        setSaveStatus('saved');
+      } catch (err: unknown) {
+        if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+          setSaveStatus('conflict');
+        } else {
+          setSaveStatus('error');
+        }
+      } finally {
+        savingRef.current = false;
+      }
+    }, 500);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
@@ -122,7 +141,7 @@ export default function ChecklistFill() {
   const confirmSubmit = async () => {
     if (!id) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    await api.updateChecklistItems(id, buildMachines());
+    await api.updateChecklistItems(id, buildMachines(), version);
     await api.submitChecklist(id);
     navigate('/');
   };
@@ -143,15 +162,26 @@ export default function ChecklistFill() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <button className="back-link" style={{ marginBottom: 0 }} onClick={async () => {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-            if (id) await api.updateChecklistItems(id, buildMachines());
+            if (id) await api.updateChecklistItems(id, buildMachines(), version);
             navigate('/');
           }}>
             &larr; Back
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => setShowSubmitConfirm(true)}>
-            Submit Checklist
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {saveStatus === 'saving' && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Saving...</span>}
+            {saveStatus === 'saved' && <span style={{ fontSize: 12, color: 'var(--success)' }}>Saved</span>}
+            {saveStatus === 'error' && <span style={{ fontSize: 12, color: 'var(--error)' }}>Save failed</span>}
+            <button className="btn btn-primary btn-sm" onClick={() => setShowSubmitConfirm(true)}>
+              Submit Checklist
+            </button>
+          </div>
         </div>
+
+        {saveStatus === 'conflict' && (
+          <div style={{ padding: '12px 16px', marginBottom: 12, background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, fontSize: 14 }}>
+            This checklist has been modified by another user. <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => { setSaveStatus('idle'); loadChecklist(); }}>Reload</button>
+          </div>
+        )}
 
         <h2 style={{ marginBottom: 4 }}>{checklist.lineName} &mdash; Deep Clean</h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>

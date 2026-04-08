@@ -1,16 +1,20 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from './store';
+import Spinner from './components/Spinner';
+import OfflineBanner from './components/OfflineBanner';
 import Login from './pages/Login';
 import OperatorDashboard from './pages/OperatorDashboard';
-import AdminDashboard from './pages/AdminDashboard';
 import ChecklistFill from './pages/ChecklistFill';
 import ChecklistDetail from './pages/ChecklistDetail';
-import SubmissionReview from './pages/SubmissionReview';
-import CreateTemplate from './pages/CreateTemplate';
 import Settings from './pages/Settings';
-import RoleAssignment from './pages/RoleAssignment';
+
+// Admin-only pages — lazy loaded for code splitting
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const SubmissionReview = React.lazy(() => import('./pages/SubmissionReview'));
+const CreateTemplate = React.lazy(() => import('./pages/CreateTemplate'));
+const RoleAssignment = React.lazy(() => import('./pages/RoleAssignment'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useSelector((s: RootState) => s.auth.user);
@@ -28,6 +32,8 @@ function HomeRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
+      <OfflineBanner />
+      <Suspense fallback={<Spinner label="Loading..." />}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/" element={<HomeRedirect />} />
@@ -88,6 +94,7 @@ export default function App() {
           }
         />
       </Routes>
+      </Suspense>
     </BrowserRouter>
   );
 }

@@ -85,4 +85,7 @@ awslocal dynamodb create-table \
 echo "Creating S3 bucket..."
 awslocal s3 mb s3://checklist-images
 
+echo "Creating SQS queue..."
+awslocal sqs create-queue --queue-name pdf-generation-queue
+
 echo "LocalStack init complete."
