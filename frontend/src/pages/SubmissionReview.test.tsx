@@ -67,7 +67,7 @@ describe('SubmissionReview', () => {
     // getChecklist returns a promise that never resolves during this test
     vi.mocked(api.getChecklist).mockReturnValue(new Promise(() => {}));
     renderWithProviders(<SubmissionReview />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText('Loading review...')).toBeInTheDocument();
   });
 
   it('renders checklist items in read-only mode (no check/X buttons)', async () => {

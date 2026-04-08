@@ -69,7 +69,7 @@ describe('ChecklistDetail', () => {
   it('shows loading before data arrives', () => {
     vi.mocked(api.getChecklist).mockReturnValue(new Promise(() => {}));
     renderWithProviders(<ChecklistDetail />);
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText('Loading checklist...')).toBeInTheDocument();
   });
 
   it('renders checklist items after loading', async () => {

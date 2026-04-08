@@ -88,10 +88,10 @@ describe('ChecklistFill', () => {
   });
 
   // 1. Loading state
-  it('shows "Loading..." before data arrives', () => {
+  it('shows loading spinner before data arrives', () => {
     vi.mocked(api.getChecklist).mockReturnValue(new Promise(() => {})); // never resolves
     renderPage();
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
+    expect(screen.getByText('Loading checklist...')).toBeInTheDocument();
   });
 
   // 2. Renders checklist items after data loads
