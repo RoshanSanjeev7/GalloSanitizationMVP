@@ -142,8 +142,8 @@ describe('ChecklistFill', () => {
     });
   });
 
-  // 6. Auto-save triggers after 1s debounce
-  it('auto-saves via updateChecklistItems after 1s debounce', async () => {
+  // 6. Auto-save triggers after 500ms debounce
+  it('auto-saves via updateChecklistItems after 500ms debounce', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPage();
@@ -156,11 +156,66 @@ describe('ChecklistFill', () => {
     // Should not have been called yet (debounced)
     expect(api.updateChecklistItems).not.toHaveBeenCalled();
 
-    // Advance timers by 1 second to trigger the debounced save
-    vi.advanceTimersByTime(1000);
+    // 200ms is not enough — still debounced
+    vi.advanceTimersByTime(200);
+    expect(api.updateChecklistItems).not.toHaveBeenCalled();
+
+    // Advance to 500ms to trigger the debounced save
+    vi.advanceTimersByTime(300);
 
     await waitFor(() => {
-      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array));
+      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array), 1);
+    });
+  });
+
+  it('shows save status indicator while saving', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    // Make save resolve after a delay
+    let resolveSave!: (value: any) => void;
+    vi.mocked(api.updateChecklistItems).mockReturnValueOnce(
+      new Promise((resolve) => { resolveSave = resolve; }),
+    );
+
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Flush water lines')).toBeInTheDocument();
+    });
+
+    const checkButtons = screen.getAllByTitle('Mark as done');
+    await user.click(checkButtons[0]);
+    vi.advanceTimersByTime(500);
+
+    await waitFor(() => {
+      expect(screen.getByText('Saving...')).toBeInTheDocument();
+    });
+
+    resolveSave(buildChecklist());
+    await waitFor(() => {
+      expect(screen.getByText('Saved')).toBeInTheDocument();
+    });
+  });
+
+  it('shows conflict message on 409 error', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    const conflictError = new Error('Conflict') as Error & { status: number };
+    conflictError.status = 409;
+    vi.mocked(api.updateChecklistItems).mockRejectedValueOnce(conflictError);
+
+    renderPage();
+    await waitFor(() => {
+      expect(screen.getByText('Flush water lines')).toBeInTheDocument();
+    });
+
+    const checkButtons = screen.getAllByTitle('Mark as done');
+    await user.click(checkButtons[0]);
+    vi.advanceTimersByTime(500);
+
+    await waitFor(() => {
+      expect(screen.getByText(/modified by another user/i)).toBeInTheDocument();
     });
   });
 
@@ -199,7 +254,7 @@ describe('ChecklistFill', () => {
     await user.click(confirmBtn);
 
     await waitFor(() => {
-      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array));
+      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array), 1);
       expect(api.submitChecklist).toHaveBeenCalledWith('test-cl-1');
       expect(mockNavigate).toHaveBeenCalledWith('/');
     });
@@ -314,7 +369,7 @@ describe('ChecklistFill', () => {
     await user.click(backBtn);
 
     await waitFor(() => {
-      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array));
+      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array), 1);
       expect(mockNavigate).toHaveBeenCalledWith('/');
     });
   });

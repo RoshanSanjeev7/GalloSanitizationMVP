@@ -65,7 +65,20 @@ export interface Checklist {
   endTime: string | null;
   submittedAt: string | null;
   updatedAt: string | null;
+  version: number;
+  pdfKey?: string;
+  pdfGeneratedAt?: string | null;
+  viewedAt?: string | null;
+  viewedBy?: string | null;
+  activities?: Activity[];
   machines: ChecklistMachine[];
+}
+
+export interface Activity {
+  type: 'comment' | 'image' | 'submit' | 'created';
+  by: string;
+  at: string;
+  detail?: string;
 }
 
 export type UserPublic = Omit<User, 'password'>;

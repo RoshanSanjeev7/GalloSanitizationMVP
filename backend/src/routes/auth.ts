@@ -24,7 +24,24 @@ router.post('/login', async (req, res) => {
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     config.jwtSecret,
-    { expiresIn: '24h' }
+    { expiresIn: '1h' }
+  );
+
+  const { password: _, ...userPublic } = user;
+  res.json({ user: userPublic, token });
+});
+
+router.post('/refresh', authMiddleware, async (req: AuthRequest, res) => {
+  const user = await getUser(req.userId!);
+  if (!user) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  const token = jwt.sign(
+    { userId: user.id, role: user.role },
+    config.jwtSecret,
+    { expiresIn: '1h' },
   );
 
   const { password: _, ...userPublic } = user;

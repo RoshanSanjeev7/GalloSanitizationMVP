@@ -144,6 +144,47 @@ describe('getChecklists()', () => {
   });
 });
 
+describe('retry logic for GET requests', () => {
+  it('retries GET request on 500 error and succeeds on second attempt', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.mocked(global.fetch)
+      .mockResolvedValueOnce(
+        mockFetchResponse(500, { error: 'Server Error' }, { 'content-type': 'application/json' }) as any,
+      )
+      .mockResolvedValueOnce(
+        mockFetchResponse(200, { items: [], total: 0, hasMore: false }, { 'content-type': 'application/json' }) as any,
+      );
+
+    const promise = api.getChecklists();
+    // Advance past retry delay
+    await vi.advanceTimersByTimeAsync(2000);
+    const result = await promise;
+
+    expect(result).toEqual({ items: [], total: 0, hasMore: false });
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it('does not retry on 400 client error', async () => {
+    vi.mocked(global.fetch).mockResolvedValueOnce(
+      mockFetchResponse(400, { error: 'Bad request' }, { 'content-type': 'application/json' }) as any,
+    );
+
+    await expect(api.getChecklists()).rejects.toThrow('Bad request');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not retry POST/PUT/DELETE requests', async () => {
+    localStorage.setItem('token', 'test-token');
+    vi.mocked(global.fetch).mockResolvedValueOnce(
+      mockFetchResponse(500, { error: 'Server Error' }, { 'content-type': 'application/json' }) as any,
+    );
+
+    await expect(api.submitChecklist('cl-1')).rejects.toThrow('Server Error');
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('uploadImages()', () => {
   it('uses FormData and does NOT set Content-Type header', async () => {
     localStorage.setItem('token', 'upload-token');

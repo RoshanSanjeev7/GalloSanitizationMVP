@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { type Line, type Template, type MachineTemplate } from '../services/api';
+import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
 import s from './CreateTemplate.module.css';
 
@@ -37,6 +38,8 @@ export default function CreateTemplate() {
   const [newLineName, setNewLineName] = useState('');
   const [showNewLine, setShowNewLine] = useState(false);
   const [creatingLine, setCreatingLine] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getLines(), api.getTemplates()]).then(([lns, tpls]) => {
@@ -198,8 +201,25 @@ export default function CreateTemplate() {
           })),
       }));
 
+  // Validate that every field is filled: title, all machine names, all category names, all task descriptions
+  const isValid = (() => {
+    if (!title.trim() || !lineId) return false;
+    for (const m of machines) {
+      if (!m.name.trim()) return false;
+      if (m.categories.length === 0) return false;
+      for (const c of m.categories) {
+        if (!c.name.trim()) return false;
+        if (c.tasks.length === 0) return false;
+        for (const t of c.tasks) {
+          if (!t.description.trim()) return false;
+        }
+      }
+    }
+    return machines.length > 0;
+  })();
+
   const handleSave = async () => {
-    if (!title || !lineId) return;
+    if (!isValid) return;
     setLoading(true);
     try {
       if (editingId) {
@@ -210,6 +230,23 @@ export default function CreateTemplate() {
       navigate('/admin');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!editingId) return;
+    setDeleting(true);
+    try {
+      await api.deleteTemplate(editingId);
+      setTemplates(prev => prev.filter(t => t.id !== editingId));
+      setEditingId(null);
+      setTitle('');
+      setMachines([emptyMachine()]);
+      setActiveMachine(0);
+      setLineId('');
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -226,9 +263,20 @@ export default function CreateTemplate() {
   return (
     <div className="page-container">
       <div className="main-content">
-        <button className="back-link" onClick={() => navigate('/admin')}>
-          &larr; Back
-        </button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <button className="back-link" style={{ marginBottom: 0 }} onClick={() => navigate('/admin')}>
+            &larr; Back
+          </button>
+          {lineId && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleSave}
+              disabled={!isValid || loading}
+            >
+              {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Template'}
+            </button>
+          )}
+        </div>
 
         <h2 className={s.pageTitle}>Checklist Template</h2>
 
@@ -406,10 +454,18 @@ export default function CreateTemplate() {
               <button className="btn btn-outline" onClick={() => navigate('/admin')}>
                 Cancel
               </button>
+              {isEditing && (
+                <button
+                  className="btn btn-red-outline"
+                  onClick={() => setShowDeleteConfirm(true)}
+                >
+                  Delete Template
+                </button>
+              )}
               <button
                 className="btn btn-primary"
                 onClick={handleSave}
-                disabled={!title || loading}
+                disabled={!isValid || loading}
               >
                 {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Template'}
               </button>
@@ -417,6 +473,26 @@ export default function CreateTemplate() {
           </>
         )}
       </div>
+
+      {showDeleteConfirm && (
+        <Modal onClose={() => setShowDeleteConfirm(false)}>
+          <h2>Delete Template</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Are you sure you want to delete the template for <strong>{selectedLine?.name}</strong>?
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+            This action cannot be undone. Any future checklists for this line will need a new template.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-outline btn-sm" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </button>
+            <button className="btn btn-red-outline btn-sm" onClick={handleDelete} disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

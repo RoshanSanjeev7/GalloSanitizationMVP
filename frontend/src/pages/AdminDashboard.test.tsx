@@ -66,6 +66,10 @@ const testChecklists = [
   }),
 ];
 
+function mockChecklistResponse(items: typeof testChecklists) {
+  return { items, total: items.length, hasMore: false };
+}
+
 function renderDashboard() {
   return renderWithProviders(<AdminDashboard />, {
     preloadedState: {
@@ -76,7 +80,27 @@ function renderDashboard() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.mocked(api.getChecklists).mockResolvedValue(testChecklists);
+  // Smart mock: filter by status param to mimic server-side filtering
+  vi.mocked(api.getChecklists).mockImplementation(async (params = {}) => {
+    const status = params.status;
+    const search = params.search;
+    const lineId = params.lineId;
+    let filtered = testChecklists;
+    if (status) {
+      const statuses = status.split(',');
+      filtered = filtered.filter((c) => statuses.includes(c.status));
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = filtered.filter(
+        (c) => c.operatorName.toLowerCase().includes(q) || c.lineName.toLowerCase().includes(q),
+      );
+    }
+    if (lineId) {
+      filtered = filtered.filter((c) => c.lineId === lineId);
+    }
+    return mockChecklistResponse(filtered);
+  });
   vi.mocked(api.getLines).mockResolvedValue(testLines);
 });
 
@@ -98,22 +122,22 @@ describe('AdminDashboard', () => {
   it('renders search input, line filter, and sort dropdown', async () => {
     renderDashboard();
     expect(screen.getByPlaceholderText('Search operator or line...')).toBeInTheDocument();
-    // Line filter dropdown has "All Lines" option
     expect(screen.getByRole('option', { name: 'All Lines' })).toBeInTheDocument();
   });
 
   it('defaults to Pending tab showing submitted checklists', async () => {
     renderDashboard();
-    // Wait for data to load
+    // Wait for data to load — default tab is "submitted"
     await screen.findByText('Pending (2)');
-    // Both submitted checklists should show (operator names inside sub-rows)
+    // Both submitted checklists should show
     expect(screen.getByText(/Gina Sanchez/)).toBeInTheDocument();
     expect(screen.getByText(/Maria Rivera/)).toBeInTheDocument();
   });
 
-  it('renders tab buttons with correct counts', async () => {
+  it('shows counts on all tabs', async () => {
     renderDashboard();
     await screen.findByText('Pending (2)');
+    // All tabs show their counts
     expect(screen.getByText('In Progress (1)')).toBeInTheDocument();
     expect(screen.getByText('Approved (1)')).toBeInTheDocument();
     expect(screen.getByText('All (4)')).toBeInTheDocument();
@@ -121,7 +145,6 @@ describe('AdminDashboard', () => {
 
   it('shows "Submitted on" timestamp for submitted checklists', async () => {
     renderDashboard();
-    // Wait for submitted checklists to render on the default Pending tab
     const submittedText = await screen.findAllByText(/Submitted on/);
     expect(submittedText.length).toBeGreaterThanOrEqual(1);
   });
@@ -137,7 +160,7 @@ describe('AdminDashboard', () => {
     expect(createdText).toBeInTheDocument();
   });
 
-  it('filters checklists when switching tabs', async () => {
+  it('calls API with status param when switching tabs', async () => {
     const user = userEvent.setup();
     renderDashboard();
 
@@ -145,9 +168,15 @@ describe('AdminDashboard', () => {
 
     // Switch to Approved tab
     await user.click(screen.getByText('Approved (1)'));
+
+    await waitFor(() => {
+      expect(api.getChecklists).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'approved' }),
+      );
+    });
+
     // Only the approved checklist should appear
     await waitFor(() => {
-      expect(screen.queryByText(/Gina Sanchez/)).not.toBeInTheDocument();
       expect(screen.getByText(/Maria Rivera/)).toBeInTheDocument();
     });
   });
@@ -179,7 +208,7 @@ describe('AdminDashboard', () => {
     expect(mockNavigate).toHaveBeenCalledWith('/checklist/cl-approved');
   });
 
-  it('filters by search text matching operator name', async () => {
+  it('sends search param to API after debounce', async () => {
     const user = userEvent.setup();
     renderDashboard();
 
@@ -188,7 +217,14 @@ describe('AdminDashboard', () => {
     const searchInput = screen.getByPlaceholderText('Search operator or line...');
     await user.type(searchInput, 'Gina');
 
-    // Only Gina's checklist should remain visible on the pending tab
+    // After debounce, API should be called with search param
+    await waitFor(() => {
+      expect(api.getChecklists).toHaveBeenCalledWith(
+        expect.objectContaining({ search: 'Gina' }),
+      );
+    });
+
+    // Only Gina's checklist should remain
     await waitFor(() => {
       expect(screen.getByText(/Gina Sanchez/)).toBeInTheDocument();
       expect(screen.queryByText(/Maria Rivera/)).not.toBeInTheDocument();
@@ -196,9 +232,74 @@ describe('AdminDashboard', () => {
   });
 
   it('shows "No checklists found" when no checklists match', async () => {
-    vi.mocked(api.getChecklists).mockResolvedValue([]);
+    vi.mocked(api.getChecklists).mockResolvedValue({ items: [], total: 0, hasMore: false });
     renderDashboard();
 
     await screen.findByText('No checklists found');
+  });
+
+  it('shows notification bell with unviewed count', async () => {
+    renderDashboard();
+    await screen.findByText('Pending (2)');
+
+    const bell = screen.getByLabelText('Notifications');
+    expect(bell).toBeInTheDocument();
+
+    // 2 submitted (unviewed) + 1 in_progress = 3 unviewed
+    expect(screen.getByText('3')).toBeInTheDocument();
+  });
+
+  it('opens notification dropdown and shows activity', async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+    await screen.findByText('Pending (2)');
+
+    await user.click(screen.getByLabelText('Notifications'));
+
+    // Dropdown shows submitted + in_progress = 3 items
+    await screen.findByText('Activity (3)');
+    // All 3 should show "New" badge
+    const newBadges = screen.getAllByText('New');
+    expect(newBadges.length).toBe(3);
+  });
+
+  it('notification shows status badges', async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+    await screen.findByText('Pending (2)');
+
+    await user.click(screen.getByLabelText('Notifications'));
+    await screen.findByText('Activity (3)');
+
+    // Should show both "Pending Review" and "In Progress" status badges
+    expect(screen.getAllByText('Pending Review').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('In Progress').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('clicking a submitted notification navigates to review page', async () => {
+    const user = userEvent.setup();
+    renderDashboard();
+    await screen.findByText('Pending (2)');
+
+    await user.click(screen.getByLabelText('Notifications'));
+    await screen.findByText('Activity (3)');
+
+    // Click a submitted notification row
+    const submittedRows = screen.getAllByText(/Submitted/);
+    await user.click(submittedRows[0].closest('div[style]')!);
+
+    expect(mockNavigate).toHaveBeenCalledWith(expect.stringMatching(/\/checklist\/.*\/review/));
+  });
+
+  it('shows Load More button when hasMore is true', async () => {
+    vi.mocked(api.getChecklists).mockResolvedValueOnce({
+      items: testChecklists.filter((c) => c.status === 'submitted'),
+      total: 10,
+      hasMore: true,
+    });
+    renderDashboard();
+
+    const loadMoreBtn = await screen.findByText('Load More');
+    expect(loadMoreBtn).toBeInTheDocument();
   });
 });

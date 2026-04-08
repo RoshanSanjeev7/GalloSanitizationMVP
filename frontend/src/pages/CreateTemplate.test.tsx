@@ -110,11 +110,11 @@ describe('CreateTemplate', () => {
     const select = screen.getByRole('combobox');
     await user.selectOptions(select, 'line-1');
 
-    const createButton = screen.getByText('Create Template');
-    expect(createButton).toBeDisabled();
+    const createButtons = screen.getAllByText('Create Template');
+    expect(createButtons[0]).toBeDisabled();
   });
 
-  it('Create button enabled when title is set', async () => {
+  it('Create button enabled when all fields are filled', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
 
@@ -126,8 +126,29 @@ describe('CreateTemplate', () => {
     await user.selectOptions(select, 'line-1');
 
     await user.type(screen.getByPlaceholderText(/Weekly Deep Clean/), 'My Template');
+    await user.type(screen.getByPlaceholderText('e.g. Filler'), 'Test Machine');
+    await user.type(screen.getByPlaceholderText('e.g. Prep'), 'Test Category');
+    await user.type(screen.getByPlaceholderText('Enter task description...'), 'Test Task');
 
-    const createButton = screen.getByText('Create Template');
-    expect(createButton).not.toBeDisabled();
+    const createButtons = screen.getAllByText('Create Template');
+    expect(createButtons[0]).not.toBeDisabled();
+  });
+
+  it('Create button disabled when machine name is empty', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Line 91/)).toBeInTheDocument();
+    });
+
+    const select = screen.getByRole('combobox');
+    await user.selectOptions(select, 'line-1');
+
+    // Fill title only — machine/category/task are empty
+    await user.type(screen.getByPlaceholderText(/Weekly Deep Clean/), 'My Template');
+
+    const createButtons = screen.getAllByText('Create Template');
+    expect(createButtons[0]).toBeDisabled();
   });
 });

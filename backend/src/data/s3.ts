@@ -33,6 +33,13 @@ export async function getImageUrl(key: string): Promise<string> {
   return getSignedUrl(s3, command, { expiresIn: 3600 });
 }
 
+export async function getImageUrls(keys: string[]): Promise<Record<string, string>> {
+  const entries = await Promise.all(
+    keys.map(async (key) => [key, await getImageUrl(key)] as const),
+  );
+  return Object.fromEntries(entries);
+}
+
 export async function deleteImage(key: string): Promise<void> {
   await s3.send(
     new DeleteObjectCommand({

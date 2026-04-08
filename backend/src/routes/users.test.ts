@@ -55,7 +55,7 @@ describe('Users routes', () => {
       expect(res.status).toBe(401);
     });
 
-    it('returns users without password field', async () => {
+    it('returns paginated response with items, total, hasMore', async () => {
       const user = makeUser({ id: 'u1', name: 'Alice', email: 'alice@test.com', password: 'secret' });
       mockedGetAllUsers.mockResolvedValue([user]);
 
@@ -64,9 +64,30 @@ describe('Users routes', () => {
         .set('Authorization', `Bearer ${operatorToken}`);
 
       expect(res.status).toBe(200);
-      expect(res.body).toHaveLength(1);
-      expect(res.body[0]).not.toHaveProperty('password');
-      expect(res.body[0].name).toBe('Alice');
+      expect(res.body).toHaveProperty('items');
+      expect(res.body).toHaveProperty('total');
+      expect(res.body).toHaveProperty('hasMore');
+      expect(res.body.items).toHaveLength(1);
+      expect(res.body.items[0]).not.toHaveProperty('password');
+      expect(res.body.items[0].name).toBe('Alice');
+      expect(res.body.total).toBe(1);
+      expect(res.body.hasMore).toBe(false);
+    });
+
+    it('paginates users with limit and offset', async () => {
+      const users = Array.from({ length: 5 }, (_, i) =>
+        makeUser({ id: `u${i}`, name: `User ${i}`, email: `user${i}@test.com` }),
+      );
+      mockedGetAllUsers.mockResolvedValue(users);
+
+      const res = await request(app)
+        .get('/api/users?limit=2&offset=1')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.items).toHaveLength(2);
+      expect(res.body.total).toBe(5);
+      expect(res.body.hasMore).toBe(true);
     });
   });
 

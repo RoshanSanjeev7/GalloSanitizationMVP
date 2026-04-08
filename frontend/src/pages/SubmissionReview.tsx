@@ -21,6 +21,8 @@ export default function SubmissionReview() {
   const [reviewedNotes, setReviewedNotes] = useState<Record<number, boolean>>({});
   const [photoMenu, setPhotoMenu] = useState<string | null>(null);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [version, setVersion] = useState<number | undefined>();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const imageUrls = useImageUrlsForMachines(id, machines);
 
@@ -46,17 +48,27 @@ export default function SubmissionReview() {
       api.getChecklist(id).then((data) => {
         setChecklist(data);
         setMachines(data.machines);
+        setVersion(data.version);
       });
     }
   }, [id]);
 
   const handleApprove = async () => {
     if (!id) return;
-    if (editMode) {
-      await api.updateChecklistItems(id, machines);
+    try {
+      if (editMode) {
+        const result = await api.updateChecklistItems(id, machines, version);
+        setVersion(result.version);
+      }
+      await api.approveChecklist(id);
+      navigate('/admin');
+    } catch (err: unknown) {
+      if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+        setSaveError('This checklist has been modified by another user. Please reload.');
+      } else {
+        throw err;
+      }
     }
-    await api.approveChecklist(id);
-    navigate('/admin');
   };
 
   const handleDeny = async () => {
@@ -67,12 +79,23 @@ export default function SubmissionReview() {
 
   const handleSaveEdits = async () => {
     if (!id) return;
-    await api.updateChecklistItems(id, buildMachines());
-    setEditMode(false);
-    // Reload to get fresh data
-    const data = await api.getChecklist(id);
-    setChecklist(data);
-    setMachines(data.machines);
+    try {
+      setSaveError(null);
+      const result = await api.updateChecklistItems(id, buildMachines(), version);
+      setVersion(result.version);
+      setEditMode(false);
+      // Reload to get fresh data
+      const data = await api.getChecklist(id);
+      setChecklist(data);
+      setMachines(data.machines);
+      setVersion(data.version);
+    } catch (err: unknown) {
+      if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+        setSaveError('This checklist has been modified by another user. Please reload.');
+      } else {
+        throw err;
+      }
+    }
   };
 
   const itemKey = (catIdx: number, itemIdx: number) =>

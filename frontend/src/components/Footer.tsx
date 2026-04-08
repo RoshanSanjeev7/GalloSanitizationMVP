@@ -28,7 +28,7 @@ export default function Footer({ role, onAddChecklist }: FooterProps) {
         </button>
       ) : (
         <Link to="/templates/create" style={{ fontWeight: 600 }}>
-          + Create Template
+          Edit Templates
         </Link>
       )}
       <button onClick={handleLogout}>&rarr; Log Out</button>

@@ -1,6 +1,16 @@
 import { v4 as uuid } from 'uuid';
-import type { User, Line, Template, MachineTemplate } from '../types/index.js';
-import { getAllUsers, putUser, putLine, putTemplate } from './dynamo.js';
+import type { User, Line, Template, Checklist, ChecklistItem, MachineTemplate } from '../types/index.js';
+import { getAllUsers, putUser, putLine, putTemplate, putChecklist } from './dynamo.js';
+
+/** Wraps a put call to silently ignore ConditionalCheckFailedException (item already exists). */
+async function putSafe(fn: () => Promise<void>): Promise<void> {
+  try {
+    await fn();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ConditionalCheckFailedException') return;
+    throw err;
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /*  Machine definitions (shared by Line 91 & Line 92 templates)       */
@@ -631,18 +641,18 @@ export async function seedIfEmpty(): Promise<void> {
     role: 'operator',
   };
 
-  await putUser(admin);
-  await putUser(operator1);
-  await putUser(operator2);
+  await putSafe(() => putUser(admin));
+  await putSafe(() => putUser(operator1));
+  await putSafe(() => putUser(operator2));
 
   /* ---- Lines ---- */
   const line91: Line = { id: uuid(), name: 'Line 91' };
   const line92: Line = { id: uuid(), name: 'Line 92' };
   const line93: Line = { id: uuid(), name: 'Line 93' };
 
-  await putLine(line91);
-  await putLine(line92);
-  await putLine(line93);
+  await putSafe(() => putLine(line91));
+  await putSafe(() => putLine(line92));
+  await putSafe(() => putLine(line93));
 
   /* ---- Templates ---- */
   const template91: Template = {
@@ -666,9 +676,225 @@ export async function seedIfEmpty(): Promise<void> {
     machines: machines93,
   };
 
-  await putTemplate(template91);
-  await putTemplate(template92);
-  await putTemplate(template93);
+  await putSafe(() => putTemplate(template91));
+  await putSafe(() => putTemplate(template92));
+  await putSafe(() => putTemplate(template93));
+
+  /* ---- Helper to build checklist items from a template ---- */
+  function buildItems(
+    template: Template,
+    completedPercentage: number,
+    contributors: { name: string; time: string }[],
+  ) {
+    return template.machines.map((m) => ({
+      name: m.name,
+      categories: m.categories.map((c) => ({
+        name: c.name,
+        items: c.tasks.map((t, idx): ChecklistItem => {
+          const shouldComplete = idx / c.tasks.length < completedPercentage;
+          const contributor = contributors[idx % contributors.length];
+          return {
+            description: t.description,
+            machine: t.machine,
+            completed: shouldComplete ? true : null,
+            completedBy: shouldComplete ? contributor.name : null,
+            completedAt: shouldComplete ? contributor.time : null,
+            issue: null,
+            images: [],
+          };
+        }),
+      })),
+    }));
+  }
+
+  /* ---- Seed Checklists ---- */
+  const seedChecklists: Checklist[] = [
+    // Line 91 — Approved, March 25, both operators
+    {
+      id: uuid(), templateId: template91.id, lineId: line91.id, lineName: 'Line 91',
+      operatorId: operator1.id, operatorName: 'Gabriel Sanchez',
+      status: 'approved',
+      startTime: '2026-03-25T06:30:00.000Z', endTime: '2026-03-25T10:45:00.000Z',
+      submittedAt: '2026-03-25T10:45:00.000Z', updatedAt: '2026-03-25T10:30:00.000Z',
+      version: 3,
+      machines: buildItems(template91, 1.0, [
+        { name: 'Gabriel Sanchez', time: '2026-03-25T08:00:00.000Z' },
+        { name: 'Marcus Rivera', time: '2026-03-25T09:15:00.000Z' },
+      ]),
+    },
+    // Line 92 — Approved, March 26, single operator
+    {
+      id: uuid(), templateId: template92.id, lineId: line92.id, lineName: 'Line 92',
+      operatorId: operator2.id, operatorName: 'Marcus Rivera',
+      status: 'approved',
+      startTime: '2026-03-26T07:00:00.000Z', endTime: '2026-03-26T11:30:00.000Z',
+      submittedAt: '2026-03-26T11:30:00.000Z', updatedAt: '2026-03-26T11:00:00.000Z',
+      version: 2,
+      machines: buildItems(template92, 1.0, [
+        { name: 'Marcus Rivera', time: '2026-03-26T09:30:00.000Z' },
+      ]),
+    },
+    // Line 93 — Approved, March 28, both operators
+    {
+      id: uuid(), templateId: template93.id, lineId: line93.id, lineName: 'Line 93',
+      operatorId: operator1.id, operatorName: 'Gabriel Sanchez',
+      status: 'approved',
+      startTime: '2026-03-28T06:00:00.000Z', endTime: '2026-03-28T09:30:00.000Z',
+      submittedAt: '2026-03-28T09:30:00.000Z', updatedAt: '2026-03-28T09:00:00.000Z',
+      version: 4,
+      machines: buildItems(template93, 1.0, [
+        { name: 'Gabriel Sanchez', time: '2026-03-28T07:00:00.000Z' },
+        { name: 'Marcus Rivera', time: '2026-03-28T08:15:00.000Z' },
+      ]),
+    },
+    // Line 91 — Approved, March 31, single operator
+    {
+      id: uuid(), templateId: template91.id, lineId: line91.id, lineName: 'Line 91',
+      operatorId: operator2.id, operatorName: 'Marcus Rivera',
+      status: 'approved',
+      startTime: '2026-03-31T07:30:00.000Z', endTime: '2026-03-31T11:00:00.000Z',
+      submittedAt: '2026-03-31T11:00:00.000Z', updatedAt: '2026-03-31T10:45:00.000Z',
+      version: 2,
+      machines: buildItems(template91, 1.0, [
+        { name: 'Marcus Rivera', time: '2026-03-31T09:00:00.000Z' },
+      ]),
+    },
+    // Line 93 — Denied, April 1, both operators (incomplete)
+    {
+      id: uuid(), templateId: template93.id, lineId: line93.id, lineName: 'Line 93',
+      operatorId: operator2.id, operatorName: 'Marcus Rivera',
+      status: 'denied',
+      startTime: '2026-04-01T06:30:00.000Z', endTime: '2026-04-01T09:00:00.000Z',
+      submittedAt: '2026-04-01T09:00:00.000Z', updatedAt: '2026-04-01T08:45:00.000Z',
+      version: 2,
+      machines: buildItems(template93, 0.6, [
+        { name: 'Marcus Rivera', time: '2026-04-01T07:30:00.000Z' },
+        { name: 'Gabriel Sanchez', time: '2026-04-01T08:00:00.000Z' },
+      ]),
+    },
+    // Line 92 — Submitted (pending review), April 3, both operators
+    {
+      id: uuid(), templateId: template92.id, lineId: line92.id, lineName: 'Line 92',
+      operatorId: operator1.id, operatorName: 'Gabriel Sanchez',
+      status: 'submitted',
+      startTime: '2026-04-03T06:00:00.000Z', endTime: '2026-04-03T10:30:00.000Z',
+      submittedAt: '2026-04-03T10:30:00.000Z', updatedAt: '2026-04-03T10:15:00.000Z',
+      version: 3,
+      machines: buildItems(template92, 0.9, [
+        { name: 'Gabriel Sanchez', time: '2026-04-03T08:00:00.000Z' },
+        { name: 'Marcus Rivera', time: '2026-04-03T09:00:00.000Z' },
+      ]),
+    },
+    // Line 91 — Submitted (pending review), April 5, single operator
+    {
+      id: uuid(), templateId: template91.id, lineId: line91.id, lineName: 'Line 91',
+      operatorId: operator2.id, operatorName: 'Marcus Rivera',
+      status: 'submitted',
+      startTime: '2026-04-05T07:00:00.000Z', endTime: '2026-04-05T11:15:00.000Z',
+      submittedAt: '2026-04-05T11:15:00.000Z', updatedAt: '2026-04-05T11:00:00.000Z',
+      version: 2,
+      machines: buildItems(template91, 0.85, [
+        { name: 'Marcus Rivera', time: '2026-04-05T09:30:00.000Z' },
+      ]),
+    },
+    // Line 93 — Submitted (pending review), April 7, both operators
+    {
+      id: uuid(), templateId: template93.id, lineId: line93.id, lineName: 'Line 93',
+      operatorId: operator1.id, operatorName: 'Gabriel Sanchez',
+      status: 'submitted',
+      startTime: '2026-04-07T06:30:00.000Z', endTime: '2026-04-07T10:00:00.000Z',
+      submittedAt: '2026-04-07T10:00:00.000Z', updatedAt: '2026-04-07T09:45:00.000Z',
+      version: 3,
+      machines: buildItems(template93, 0.95, [
+        { name: 'Gabriel Sanchez', time: '2026-04-07T07:30:00.000Z' },
+        { name: 'Marcus Rivera', time: '2026-04-07T08:45:00.000Z' },
+      ]),
+    },
+    // Line 91 — In Progress, April 8, both operators working
+    {
+      id: uuid(), templateId: template91.id, lineId: line91.id, lineName: 'Line 91',
+      operatorId: operator1.id, operatorName: 'Gabriel Sanchez',
+      status: 'in_progress',
+      startTime: '2026-04-08T06:00:00.000Z', endTime: null,
+      submittedAt: null, updatedAt: '2026-04-08T08:30:00.000Z',
+      version: 5,
+      machines: buildItems(template91, 0.4, [
+        { name: 'Gabriel Sanchez', time: '2026-04-08T07:00:00.000Z' },
+        { name: 'Marcus Rivera', time: '2026-04-08T07:45:00.000Z' },
+      ]),
+    },
+    // Line 92 — In Progress, April 8, single operator
+    {
+      id: uuid(), templateId: template92.id, lineId: line92.id, lineName: 'Line 92',
+      operatorId: operator2.id, operatorName: 'Marcus Rivera',
+      status: 'in_progress',
+      startTime: '2026-04-08T07:30:00.000Z', endTime: null,
+      submittedAt: null, updatedAt: '2026-04-08T09:00:00.000Z',
+      version: 3,
+      machines: buildItems(template92, 0.25, [
+        { name: 'Marcus Rivera', time: '2026-04-08T08:00:00.000Z' },
+      ]),
+    },
+  ];
+
+  // Generate additional historical checklists to demonstrate pagination
+  const allLines = [
+    { line: line91, template: template91 },
+    { line: line92, template: template92 },
+    { line: line93, template: template93 },
+  ];
+  const operators = [
+    { user: operator1, name: 'Gabriel Sanchez' },
+    { user: operator2, name: 'Marcus Rivera' },
+  ];
+  const statuses: Array<'approved' | 'submitted' | 'in_progress' | 'denied'> = [
+    'approved', 'approved', 'approved', 'submitted', 'denied',
+  ];
+
+  // Generate checklists from Feb 1 to Mar 24 (before the hand-written ones start Mar 25)
+  for (let day = 1; day <= 45; day++) {
+    const dateOffset = day;
+    const date = new Date(2026, 1, dateOffset); // Feb 1 onwards
+    if (date >= new Date(2026, 2, 25)) break; // Stop before Mar 25
+
+    const lineInfo = allLines[day % 3];
+    const op = operators[day % 2];
+    const status = statuses[day % statuses.length];
+    const startHour = 6 + (day % 3);
+    const start = new Date(date);
+    start.setHours(startHour, 0, 0, 0);
+    const end = new Date(start);
+    end.setHours(startHour + 4, 30, 0, 0);
+    const isComplete = status !== 'in_progress';
+    const completionPct = status === 'approved' ? 1.0 : status === 'submitted' ? 0.9 : status === 'denied' ? 0.5 : 0.3;
+
+    const contrib = day % 3 === 0
+      ? [
+          { name: operators[0].name, time: new Date(start.getTime() + 3600000).toISOString() },
+          { name: operators[1].name, time: new Date(start.getTime() + 7200000).toISOString() },
+        ]
+      : [{ name: op.name, time: new Date(start.getTime() + 5400000).toISOString() }];
+
+    seedChecklists.push({
+      id: uuid(),
+      templateId: lineInfo.template.id,
+      lineId: lineInfo.line.id,
+      lineName: lineInfo.line.name,
+      operatorId: op.user.id,
+      operatorName: op.name,
+      status,
+      startTime: start.toISOString(),
+      endTime: isComplete ? end.toISOString() : null,
+      submittedAt: isComplete ? end.toISOString() : null,
+      updatedAt: new Date(end.getTime() - 1800000).toISOString(),
+      version: 2,
+      machines: buildItems(lineInfo.template, completionPct, contrib),
+    });
+  }
+
+  for (const cl of seedChecklists) {
+    await putSafe(() => putChecklist(cl));
+  }
 
   console.log('Database seeded successfully!');
   console.log('Demo credentials:');

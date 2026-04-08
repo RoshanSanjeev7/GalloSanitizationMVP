@@ -8,11 +8,17 @@ vi.mock('../data/seed-dynamo.js', () => ({
 vi.mock('../data/dynamo.js', () => ({
   getChecklist: vi.fn(),
   putChecklist: vi.fn(),
+  getUser: vi.fn().mockResolvedValue({ id: 'op-1', name: 'Test User', email: 'test@test.com', password: 'x', role: 'operator' }),
 }));
 
 vi.mock('../data/s3.js', () => ({
   uploadImage: vi.fn().mockResolvedValue('mock-key'),
   getImageUrl: vi.fn().mockResolvedValue('https://presigned-url.example.com/image.jpg'),
+  getImageUrls: vi.fn().mockImplementation(async (keys: string[]) => {
+    const { getImageUrl: mockGetUrl } = await import('../data/s3.js');
+    const entries = await Promise.all(keys.map(async (k: string) => [k, await mockGetUrl(k)]));
+    return Object.fromEntries(entries);
+  }),
   deleteImage: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -157,6 +163,61 @@ describe('Image routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.url).toBe(url);
       expect(mockedGetImageUrl).toHaveBeenCalledWith('cl-1/0-0-0/12345-photo.png');
+    });
+  });
+
+  // ── POST /api/checklists/:id/image-urls (batch) ──────────────────
+
+  describe('POST /api/checklists/:id/image-urls', () => {
+    it('returns presigned URLs for all provided keys', async () => {
+      mockedGetImageUrl
+        .mockResolvedValueOnce('https://url1.example.com')
+        .mockResolvedValueOnce('https://url2.example.com');
+
+      const res = await request(app)
+        .post('/api/checklists/cl-1/image-urls')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ keys: ['key1.jpg', 'key2.jpg'] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.urls).toEqual({
+        'key1.jpg': 'https://url1.example.com',
+        'key2.jpg': 'https://url2.example.com',
+      });
+      expect(mockedGetImageUrl).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns 400 for empty keys array', async () => {
+      const res = await request(app)
+        .post('/api/checklists/cl-1/image-urls')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ keys: [] });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toBe('keys array required');
+    });
+
+    it('returns 400 when keys is not provided', async () => {
+      const res = await request(app)
+        .post('/api/checklists/cl-1/image-urls')
+        .set('Authorization', `Bearer ${token}`)
+        .send({});
+
+      expect(res.status).toBe(400);
+    });
+
+    it('caps at 50 keys', async () => {
+      const keys = Array.from({ length: 60 }, (_, i) => `key${i}.jpg`);
+      mockedGetImageUrl.mockResolvedValue('https://url.example.com');
+
+      const res = await request(app)
+        .post('/api/checklists/cl-1/image-urls')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ keys });
+
+      expect(res.status).toBe(200);
+      expect(Object.keys(res.body.urls)).toHaveLength(50);
+      expect(mockedGetImageUrl).toHaveBeenCalledTimes(50);
     });
   });
 

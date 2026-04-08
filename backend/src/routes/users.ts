@@ -14,9 +14,17 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', async (req, res) => {
+  const limit = Math.max(1, parseInt(req.query.limit as string, 10) || 100);
+  const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+
   const users = await getAllUsers();
   const usersPublic = users.map(({ password, ...rest }) => rest);
-  res.json(usersPublic);
+
+  const total = usersPublic.length;
+  const items = usersPublic.slice(offset, offset + limit);
+  const hasMore = offset + limit < total;
+
+  res.json({ items, total, hasMore });
 });
 
 router.post('/', adminOnly, async (req: AuthRequest, res) => {

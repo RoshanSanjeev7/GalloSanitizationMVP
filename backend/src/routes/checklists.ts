@@ -9,7 +9,6 @@ import {
   getLine,
   getUser,
   getTemplatesByLineId,
-  getAllTemplates,
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 import type { Checklist } from '../types/index.js';
@@ -19,23 +18,92 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', async (req: AuthRequest, res) => {
-  const { status, operatorId, lineId } = req.query as Record<string, string>;
-  let checklists = await queryChecklists({
-    status: status || undefined,
-    operatorId: operatorId || undefined,
-    lineId: lineId || undefined,
-  });
+  const { status, operatorId, lineId, search, date } = req.query as Record<string, string>;
+  const limit = Math.max(1, parseInt(req.query.limit as string, 10) || 50);
+  const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+
+  // Handle comma-separated statuses (e.g., 'approved,denied' for the completed tab)
+  let checklists: Checklist[];
+  if (status && status.includes(',')) {
+    const statuses = status.split(',');
+    const results = await Promise.all(
+      statuses.map((s) =>
+        queryChecklists({
+          status: s.trim(),
+          operatorId: operatorId || undefined,
+          lineId: lineId || undefined,
+        }),
+      ),
+    );
+    checklists = results.flat();
+  } else {
+    checklists = await queryChecklists({
+      status: status || undefined,
+      operatorId: operatorId || undefined,
+      lineId: lineId || undefined,
+    });
+  }
 
   checklists.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
-  res.json(checklists);
+
+  // Apply search filter (case-insensitive match on operatorName or lineName)
+  if (search) {
+    const searchLower = search.toLowerCase();
+    checklists = checklists.filter(
+      (c) =>
+        c.operatorName.toLowerCase().includes(searchLower) ||
+        c.lineName.toLowerCase().includes(searchLower),
+    );
+  }
+
+  // Apply date filter (YYYY-MM-DD format, matches startTime date portion)
+  if (date) {
+    checklists = checklists.filter((c) => c.startTime.startsWith(date));
+  }
+
+  const total = checklists.length;
+  const items = checklists.slice(offset, offset + limit);
+  const hasMore = offset + limit < total;
+
+  res.json({ items, total, hasMore });
 });
 
-router.get('/:id', async (req, res) => {
+router.post('/mark-all-viewed', adminOnly, async (req: AuthRequest, res) => {
+  const [submitted, inProgress] = await Promise.all([
+    queryChecklists({ status: 'submitted' }),
+    queryChecklists({ status: 'in_progress' }),
+  ]);
+  const unviewed = [...submitted, ...inProgress].filter((c) => !c.viewedAt);
+  const user = await getUser(req.userId!);
+  const viewerName = user?.name || 'Admin';
+  const now = new Date().toISOString();
+
+  await Promise.all(
+    unviewed.map((c) => {
+      c.viewedAt = now;
+      c.viewedBy = viewerName;
+      return putChecklist(c);
+    }),
+  );
+
+  res.json({ marked: unviewed.length });
+});
+
+router.get('/:id', async (req: AuthRequest, res) => {
   const checklist = await getChecklist(req.params.id as string);
   if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
     return;
   }
+
+  // Auto-mark as viewed when admin first opens a submitted or in_progress checklist
+  if (req.userRole === 'admin' && (checklist.status === 'submitted' || checklist.status === 'in_progress') && !checklist.viewedAt) {
+    const user = await getUser(req.userId!);
+    checklist.viewedAt = new Date().toISOString();
+    checklist.viewedBy = user?.name || 'Admin';
+    await putChecklist(checklist);
+  }
+
   res.json(checklist);
 });
 
@@ -54,13 +122,10 @@ router.post('/', async (req: AuthRequest, res) => {
     return;
   }
 
-  let templates = await getTemplatesByLineId(lineId);
-  if (templates.length === 0) {
-    templates = await getAllTemplates();
-  }
+  const templates = await getTemplatesByLineId(lineId);
   const template = templates[0];
   if (!template) {
-    res.status(400).json({ error: 'No template available for this line' });
+    res.status(400).json({ error: 'No template available for this line. Ask an admin to create one.' });
     return;
   }
 
@@ -76,6 +141,7 @@ router.post('/', async (req: AuthRequest, res) => {
     endTime: null,
     submittedAt: null,
     updatedAt: null,
+    version: 1,
     machines: template.machines.map(m => ({
       name: m.name,
       categories: m.categories.map(c => ({
@@ -98,7 +164,7 @@ router.post('/', async (req: AuthRequest, res) => {
 });
 
 router.put('/:id/items', async (req: AuthRequest, res) => {
-  const { machines } = req.body;
+  const { machines, version } = req.body;
   const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
@@ -113,11 +179,41 @@ router.put('/:id/items', async (req: AuthRequest, res) => {
     return;
   }
 
+  // Optimistic concurrency: reject if version doesn't match
+  if (version !== undefined && checklist.version !== version) {
+    res.status(409).json({ error: 'Checklist has been modified by another user. Please refresh.' });
+    return;
+  }
+
+  // Detect new comments by comparing old and new machines
   if (Array.isArray(machines)) {
+    const oldItems = checklist.machines.flatMap(m => m.categories.flatMap(c => c.items));
+    const newItems = machines.flatMap((m: any) => m.categories.flatMap((c: any) => c.items));
+    const oldComments = new Set(oldItems.map((i: any) => i.issue).filter(Boolean));
+    const newComments = newItems.map((i: any) => i.issue).filter(Boolean);
+    const addedComments = newComments.filter((c: string) => !oldComments.has(c));
+
+    if (addedComments.length > 0) {
+      if (!checklist.activities) checklist.activities = [];
+      const user = await getUser(req.userId!);
+      checklist.activities.push({
+        type: 'comment',
+        by: user?.name || 'Unknown',
+        at: new Date().toISOString(),
+        detail: addedComments[0],
+      });
+      // Reset viewedAt so admin sees it as new activity
+      checklist.viewedAt = null;
+      checklist.viewedBy = null;
+    }
+
     checklist.machines = machines;
   }
 
   checklist.updatedAt = new Date().toISOString();
+  if (version !== undefined) {
+    checklist.version = version + 1;
+  }
   await putChecklist(checklist);
   res.json(checklist);
 });
@@ -174,6 +270,16 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
 
   await deleteChecklistDynamo(req.params.id as string);
   res.status(204).send();
+});
+
+// PDF status — check if a cached PDF is available
+router.get('/:id/pdf/status', adminOnly, async (req, res) => {
+  const checklist = await getChecklist(req.params.id as string);
+  if (!checklist) {
+    res.status(404).json({ error: 'Checklist not found' });
+    return;
+  }
+  res.json({ ready: !!checklist.pdfKey, url: checklist.pdfKey || null });
 });
 
 /**

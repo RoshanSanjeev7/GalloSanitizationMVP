@@ -8,7 +8,7 @@ import SubmissionReview from './SubmissionReview';
 vi.mock('../services/api', () => ({
   default: {
     getChecklist: vi.fn(),
-    updateChecklistItems: vi.fn().mockResolvedValue(undefined),
+    updateChecklistItems: vi.fn().mockResolvedValue({ version: 2 }),
     approveChecklist: vi.fn().mockResolvedValue(undefined),
     denyChecklist: vi.fn().mockResolvedValue(undefined),
     uploadImages: vi.fn().mockResolvedValue({ images: ['img-1'] }),
@@ -176,7 +176,7 @@ describe('SubmissionReview', () => {
     await user.click(saveButtons[0]);
 
     await waitFor(() => {
-      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array));
+      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array), 1);
     });
   });
 

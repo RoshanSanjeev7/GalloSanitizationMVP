@@ -26,10 +26,10 @@ describe('Footer', () => {
     expect(onAddChecklist).toHaveBeenCalledTimes(1);
   });
 
-  it('renders "+ Create Template" link for admin role', () => {
+  it('renders "Edit Templates" link for admin role', () => {
     renderWithProviders(<Footer role="admin" />);
-    const createLink = screen.getByRole('link', { name: /create template/i });
-    expect(createLink).toBeInTheDocument();
+    const editLink = screen.getByRole('link', { name: /edit templates/i });
+    expect(editLink).toBeInTheDocument();
   });
 
   it('renders "Log Out" button', () => {
