@@ -7,6 +7,7 @@ import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
+import LoadingBar from '../components/LoadingBar';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'in_progress' | 'submitted' | 'completed';
@@ -19,6 +20,7 @@ export default function OperatorDashboard() {
   const [tab, setTab] = useState<Tab>('in_progress');
   const [showModal, setShowModal] = useState(false);
   const [selectedLine, setSelectedLine] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -26,6 +28,7 @@ export default function OperatorDashboard() {
   }, [user]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [cls, lns] = await Promise.all([
         api.getChecklists(),
@@ -35,6 +38,8 @@ export default function OperatorDashboard() {
       setLines(lns);
     } catch {
       // 401 handled by api interceptor
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -90,6 +95,7 @@ export default function OperatorDashboard() {
 
   return (
     <div className="page-container">
+      {loading && <LoadingBar />}
       <div className="main-content">
         <div className={d.dashHeader}>
           <div>
