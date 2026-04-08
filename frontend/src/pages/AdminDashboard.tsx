@@ -7,6 +7,7 @@ import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
+import LoadingBar from '../components/LoadingBar';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'submitted' | 'approved' | 'in_progress';
@@ -21,6 +22,7 @@ export default function AdminDashboard() {
   const [lineFilter, setLineFilter] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -28,6 +30,7 @@ export default function AdminDashboard() {
   }, [user]);
 
   const loadData = async () => {
+    setLoading(true);
     try {
       const [cls, lns] = await Promise.all([
         api.getChecklists(),
@@ -37,6 +40,8 @@ export default function AdminDashboard() {
       setLines(lns);
     } catch {
       // 401 handled by api interceptor
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -105,6 +110,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="page-container">
+      {loading && <LoadingBar />}
       <div className="main-content">
         <div className={d.dashHeader}>
           <div>
