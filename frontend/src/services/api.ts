@@ -170,6 +170,13 @@ async function createTemplate(templateData: {
   });
 }
 
+async function updateTemplate(id: string, data: { title?: string; lineId?: string; machines?: MachineTemplate[] }): Promise<Template> {
+  return request<Template>(`/templates/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
 async function deleteTemplate(id: string): Promise<void> {
   await request(`/templates/${id}`, { method: 'DELETE' });
 }
@@ -336,6 +343,7 @@ const api = {
   getTemplates,
   getTemplate,
   createTemplate,
+  updateTemplate,
   deleteTemplate,
   getChecklists,
   getChecklist,

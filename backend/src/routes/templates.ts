@@ -40,6 +40,23 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
   res.status(201).json(template);
 });
 
+router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
+  const template = await getTemplate(req.params.id as string);
+
+  if (!template) {
+    res.status(404).json({ error: 'Template not found' });
+    return;
+  }
+
+  const { title, lineId, machines } = req.body;
+  if (title) template.title = title;
+  if (lineId) template.lineId = lineId;
+  if (machines) template.machines = machines;
+
+  await putTemplate(template);
+  res.json(template);
+});
+
 router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
   const template = await getTemplate(req.params.id as string);
 
