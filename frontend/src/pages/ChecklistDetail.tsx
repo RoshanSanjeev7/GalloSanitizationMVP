@@ -27,7 +27,7 @@ export default function ChecklistDetail() {
   if (!checklist) {
     return (
       <div className="page-container">
-        <div className="main-content"><Spinner label="Loading checklist..." /></div>
+        <div className="main-content"><Spinner label="Loading checklist..." delay={0} /></div>
       </div>
     );
   }
