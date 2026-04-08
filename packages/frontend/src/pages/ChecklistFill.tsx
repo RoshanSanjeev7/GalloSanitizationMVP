@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
 import Modal from '../components/Modal';
+import { formatStamp } from '../utils/checklist';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistFill.module.css';
 
@@ -200,11 +201,6 @@ export default function ChecklistFill() {
   }
 
   const currentMachine = machines[activeMachine];
-
-  const formatStamp = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  };
 
   return (
     <div className="page-container">
