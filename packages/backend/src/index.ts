@@ -27,11 +27,13 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/checklists', checklistRoutes);
 app.use('/api/checklists', imageRoutes);
 
-// Seed on startup, then listen
-seedIfEmpty().then(() => {
-  app.listen(config.port, () => {
-    console.log(`Backend running on http://localhost:${config.port}`);
+// Seed on startup, then listen (skip in test environment)
+if (!process.env.VITEST) {
+  seedIfEmpty().then(() => {
+    app.listen(config.port, () => {
+      console.log(`Backend running on http://localhost:${config.port}`);
+    });
   });
-});
+}
 
 export { app };
