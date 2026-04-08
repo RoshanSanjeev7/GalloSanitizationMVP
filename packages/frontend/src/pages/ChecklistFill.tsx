@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
 import Modal from '../components/Modal';
-import { formatStamp } from '../utils/checklist';
+import { formatStamp, itemKey as getItemKey, collapseKey as getCollapseKey, updateMachineItem } from '../utils/checklist';
+import { useImageUrlsForMachines } from '../hooks/useImageUrls';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistFill.module.css';
 
@@ -15,11 +16,11 @@ export default function ChecklistFill() {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [showComment, setShowComment] = useState<Record<string, boolean>>({});
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [photoMenu, setPhotoMenu] = useState<string | null>(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const imageUrls = useImageUrlsForMachines(id, machines, activeMachine);
 
   const currentUser = api.getStoredUser();
 
@@ -36,35 +37,22 @@ export default function ChecklistFill() {
 
   const setItemStatus = (catIdx: number, itemIdx: number, completed: boolean) => {
     setMachines((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeMachine) return m;
+      updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => {
+        const newStatus = item.completed === completed ? null : completed;
         return {
-          ...m,
-          categories: m.categories.map((c, ci) => {
-            if (ci !== catIdx) return c;
-            return {
-              ...c,
-              items: c.items.map((item, ii) => {
-                if (ii !== itemIdx) return item;
-                const newStatus = item.completed === completed ? null : completed;
-                return {
-                  ...item,
-                  completed: newStatus,
-                  completedBy: newStatus !== null ? (currentUser?.name || 'Unknown') : null,
-                  completedAt: newStatus !== null ? new Date().toISOString() : null,
-                };
-              }),
-            };
-          }),
+          ...item,
+          completed: newStatus,
+          completedBy: newStatus !== null ? (currentUser?.name || 'Unknown') : null,
+          completedAt: newStatus !== null ? new Date().toISOString() : null,
         };
       })
     );
   };
 
   const itemKey = (catIdx: number, itemIdx: number) =>
-    `${activeMachine}-${catIdx}-${itemIdx}`;
+    getItemKey(activeMachine, catIdx, itemIdx);
 
-  const collapseKey = (catIdx: number) => `${activeMachine}-${catIdx}`;
+  const collapseKey = (catIdx: number) => getCollapseKey(activeMachine, catIdx);
 
   const toggleCollapse = (catIdx: number) => {
     const key = collapseKey(catIdx);
@@ -97,73 +85,19 @@ export default function ChecklistFill() {
     }));
   };
 
-  const loadImageUrl = async (imageKey: string) => {
-    if (!id) return;
-    const url = await api.getImageUrl(id, imageKey);
-    setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
-  };
-
-  useEffect(() => {
-    if (!machines.length) return;
-    const machine = machines[activeMachine];
-    if (!machine) return;
-    const keys = machine.categories.flatMap(c => c.items.flatMap(i => i.images || []));
-    const missing = keys.filter(k => !imageUrls[k]);
-    missing.forEach(k => loadImageUrl(k));
-  }, [machines, activeMachine]);
-
   const handlePhotoUpload = async (catIdx: number, itemIdx: number, files: FileList) => {
     if (!id) return;
     const key = itemKey(catIdx, itemIdx);
     setUploading((prev) => ({ ...prev, [key]: true }));
-
     const result = await api.uploadImages(id, activeMachine, catIdx, itemIdx, Array.from(files));
-
-    setMachines((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeMachine) return m;
-        return {
-          ...m,
-          categories: m.categories.map((c, ci) => {
-            if (ci !== catIdx) return c;
-            return {
-              ...c,
-              items: c.items.map((item, ii) => {
-                if (ii !== itemIdx) return item;
-                return { ...item, images: result.images };
-              }),
-            };
-          }),
-        };
-      })
-    );
-
+    setMachines((prev) => updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => ({ ...item, images: result.images })));
     setUploading((prev) => ({ ...prev, [key]: false }));
   };
 
   const handlePhotoDelete = async (catIdx: number, itemIdx: number, imageKey: string) => {
     if (!id) return;
-
     const result = await api.deleteImage(id, imageKey, activeMachine, catIdx, itemIdx);
-
-    setMachines((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeMachine) return m;
-        return {
-          ...m,
-          categories: m.categories.map((c, ci) => {
-            if (ci !== catIdx) return c;
-            return {
-              ...c,
-              items: c.items.map((item, ii) => {
-                if (ii !== itemIdx) return item;
-                return { ...item, images: result.images };
-              }),
-            };
-          }),
-        };
-      })
-    );
+    setMachines((prev) => updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => ({ ...item, images: result.images })));
   };
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

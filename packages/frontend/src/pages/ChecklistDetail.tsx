@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import api, { type Checklist } from '../services/api';
 import type { RootState } from '../store';
-import { STATUS_LABELS, formatTime, formatFullDate, formatDateTime, statusColor, statusIcon } from '../utils/checklist';
+import { STATUS_LABELS, formatTime, formatFullDate, formatDateTime, formatStamp, statusColor, statusIcon, collapseKey as getCollapseKey } from '../utils/checklist';
+import { useImageUrlsForMachines } from '../hooks/useImageUrls';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistDetail.module.css';
 import sr from '../styles/sidebar.module.css';
@@ -15,24 +16,12 @@ export default function ChecklistDetail() {
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [activeMachine, setActiveMachine] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-
-  const loadImageUrl = async (imageKey: string) => {
-    if (!id) return;
-    const url = await api.getImageUrl(id, imageKey);
-    setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
-  };
 
   useEffect(() => {
     if (id) api.getChecklist(id).then(setChecklist);
   }, [id]);
 
-  useEffect(() => {
-    if (!checklist) return;
-    const keys = checklist.machines.flatMap(m => m.categories.flatMap(c => c.items.flatMap(i => i.images || [])));
-    const missing = keys.filter(k => !imageUrls[k]);
-    missing.forEach(k => loadImageUrl(k));
-  }, [checklist]);
+  const imageUrls = useImageUrlsForMachines(id, checklist?.machines || []);
 
   if (!checklist) {
     return (
@@ -49,7 +38,7 @@ export default function ChecklistDetail() {
 
   const currentMachine = checklist.machines[activeMachine];
 
-  const collapseKey = (catIdx: number) => `${activeMachine}-${catIdx}`;
+  const collapseKey = (catIdx: number) => getCollapseKey(activeMachine, catIdx);
 
   const toggleCollapse = (catIdx: number) => {
     const key = collapseKey(catIdx);
@@ -165,7 +154,7 @@ export default function ChecklistDetail() {
                                 <span className={cl.fillStamp}>
                                   {item.completedBy}
                                   {item.completedAt
-                                    ? ` at ${new Date(item.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+                                    ? ` at ${formatStamp(item.completedAt)}`
                                     : ''}
                                 </span>
                               )}
