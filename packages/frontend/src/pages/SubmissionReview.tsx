@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
-import { formatTime, formatFullDate, formatStamp, statusColor, statusIcon } from '../utils/checklist';
+import { formatTime, formatFullDate, formatStamp, statusColor, statusIcon, STATUS_LABELS, itemKey as getItemKey, collapseKey as getCollapseKey, updateMachineItem } from '../utils/checklist';
+import { useImageUrlsForMachines } from '../hooks/useImageUrls';
 import cl from '../styles/checklist.module.css';
 import s from '../styles/sidebar.module.css';
 import fillStyles from './ChecklistFill.module.css';
@@ -17,76 +18,24 @@ export default function SubmissionReview() {
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
   const [showComment, setShowComment] = useState<Record<string, boolean>>({});
   const [reviewedNotes, setReviewedNotes] = useState<Record<number, boolean>>({});
-  const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [photoMenu, setPhotoMenu] = useState<string | null>(null);
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
-
-  const loadImageUrl = async (imageKey: string) => {
-    if (!id) return;
-    const url = await api.getImageUrl(id, imageKey);
-    setImageUrls((prev) => ({ ...prev, [imageKey]: url }));
-  };
-
-  useEffect(() => {
-    if (!machines.length) return;
-    const keys = machines.flatMap(m => m.categories.flatMap(c => c.items.flatMap(i => i.images || [])));
-    const missing = keys.filter(k => !imageUrls[k]);
-    missing.forEach(k => loadImageUrl(k));
-  }, [machines]);
+  const imageUrls = useImageUrlsForMachines(id, machines);
 
   const handlePhotoUpload = async (catIdx: number, itemIdx: number, files: FileList) => {
     if (!id) return;
     const key = itemKey(catIdx, itemIdx);
     setUploading((prev) => ({ ...prev, [key]: true }));
-
     const result = await api.uploadImages(id, activeMachine, catIdx, itemIdx, Array.from(files));
-
-    setMachines((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeMachine) return m;
-        return {
-          ...m,
-          categories: m.categories.map((c, ci) => {
-            if (ci !== catIdx) return c;
-            return {
-              ...c,
-              items: c.items.map((item, ii) => {
-                if (ii !== itemIdx) return item;
-                return { ...item, images: result.images };
-              }),
-            };
-          }),
-        };
-      })
-    );
-
+    setMachines((prev) => updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => ({ ...item, images: result.images })));
     setUploading((prev) => ({ ...prev, [key]: false }));
   };
 
   const handlePhotoDelete = async (catIdx: number, itemIdx: number, imageKey: string) => {
     if (!id) return;
-
     const result = await api.deleteImage(id, imageKey, activeMachine, catIdx, itemIdx);
-
-    setMachines((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeMachine) return m;
-        return {
-          ...m,
-          categories: m.categories.map((c, ci) => {
-            if (ci !== catIdx) return c;
-            return {
-              ...c,
-              items: c.items.map((item, ii) => {
-                if (ii !== itemIdx) return item;
-                return { ...item, images: result.images };
-              }),
-            };
-          }),
-        };
-      })
-    );
+    setMachines((prev) => updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => ({ ...item, images: result.images })));
   };
 
   const currentUser = api.getStoredUser();
@@ -126,30 +75,17 @@ export default function SubmissionReview() {
   };
 
   const itemKey = (catIdx: number, itemIdx: number) =>
-    `${activeMachine}-${catIdx}-${itemIdx}`;
+    getItemKey(activeMachine, catIdx, itemIdx);
 
   const setItemStatus = (catIdx: number, itemIdx: number, completed: boolean) => {
     setMachines((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeMachine) return m;
+      updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => {
+        const newStatus = item.completed === completed ? null : completed;
         return {
-          ...m,
-          categories: m.categories.map((c, ci) => {
-            if (ci !== catIdx) return c;
-            return {
-              ...c,
-              items: c.items.map((item, ii) => {
-                if (ii !== itemIdx) return item;
-                const newStatus = item.completed === completed ? null : completed;
-                return {
-                  ...item,
-                  completed: newStatus,
-                  completedBy: newStatus !== null ? (currentUser?.name || 'Admin') : null,
-                  completedAt: newStatus !== null ? new Date().toISOString() : null,
-                };
-              }),
-            };
-          }),
+          ...item,
+          completed: newStatus,
+          completedBy: newStatus !== null ? (currentUser?.name || 'Admin') : null,
+          completedAt: newStatus !== null ? new Date().toISOString() : null,
         };
       })
     );
@@ -166,24 +102,7 @@ export default function SubmissionReview() {
   };
 
   const deleteComment = (catIdx: number, itemIdx: number) => {
-    setMachines((prev) =>
-      prev.map((m, mi) => {
-        if (mi !== activeMachine) return m;
-        return {
-          ...m,
-          categories: m.categories.map((c, ci) => {
-            if (ci !== catIdx) return c;
-            return {
-              ...c,
-              items: c.items.map((item, ii) => {
-                if (ii !== itemIdx) return item;
-                return { ...item, issue: null };
-              }),
-            };
-          }),
-        };
-      })
-    );
+    setMachines((prev) => updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => ({ ...item, issue: null })));
   };
 
   const buildMachines = (): ChecklistMachine[] => {
@@ -222,8 +141,6 @@ export default function SubmissionReview() {
   const end = checklist.endTime ? new Date(checklist.endTime) : null;
   const durationMs = end ? end.getTime() - start.getTime() : 0;
   const durationMin = Math.round(durationMs / 60000);
-
-  const formatDate = formatFullDate;
 
   const machineStats = machines.map((m) => {
     const items = m.categories.flatMap((c) => c.items);
@@ -279,7 +196,7 @@ export default function SubmissionReview() {
 
   const currentMachine = machines[activeMachine];
 
-  const collapseKey = (catIdx: number) => `${activeMachine}-${catIdx}`;
+  const collapseKey = (catIdx: number) => getCollapseKey(activeMachine, catIdx);
 
   const toggleCollapse = (catIdx: number) => {
     const key = collapseKey(catIdx);
@@ -324,7 +241,7 @@ export default function SubmissionReview() {
           {checklist.lineName} - {editMode ? 'Edit Submission' : 'Submission Review'}
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
-          {formatDate(start)} - {formatTime(start)}
+          {formatFullDate(start)} - {formatTime(start)}
         </p>
 
         <select
@@ -568,7 +485,7 @@ export default function SubmissionReview() {
                                 <span className={cl.fillStamp}>
                                   {item.completedBy}
                                   {item.completedAt
-                                    ? ` at ${new Date(item.completedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`
+                                    ? ` at ${formatStamp(item.completedAt)}`
                                     : ''}
                                 </span>
                               )}
@@ -668,7 +585,7 @@ export default function SubmissionReview() {
               <div className={s.summaryRow}>
                 <span className={s.label}>Status</span>
                 <span className={s.value} style={{ textTransform: 'capitalize' }}>
-                  {checklist.status === 'submitted' ? 'Submitted' : checklist.status}
+                  {STATUS_LABELS[checklist.status] || checklist.status}
                 </span>
               </div>
             </div>
