@@ -17,9 +17,9 @@
   transition: all 0.15s;
 }
 
-.role-toggle button.active {
-  background-color: var(--primary);
-  color: var(--white);
+.role-toggle-active {
+  background-color: var(--primary) !important;
+  color: var(--white) !important;
 }
 
 .user-row {

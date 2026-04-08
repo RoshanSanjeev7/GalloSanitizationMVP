@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api, { type UserPublic } from '../services/api';
 import Avatar from '../components/Avatar';
+import Modal from '../components/Modal';
 import s from './RoleAssignment.module.css';
 
 export default function RoleAssignment() {
@@ -12,6 +13,7 @@ export default function RoleAssignment() {
   const [role, setRole] = useState<'operator' | 'admin'>('operator');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
 
   useEffect(() => {
     loadUsers();
@@ -45,6 +47,17 @@ export default function RoleAssignment() {
       setError((err as Error).message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async (userId: string) => {
+    try {
+      await api.deleteUser(userId);
+      setDeleteTarget(null);
+      await loadUsers();
+    } catch (err) {
+      setError((err as Error).message);
+      setDeleteTarget(null);
     }
   };
 
@@ -95,13 +108,13 @@ export default function RoleAssignment() {
             <label className="form-label">Role</label>
             <div className={s.roleToggle}>
               <button
-                className={role === 'operator' ? 'active' : ''}
+                className={role === 'operator' ? s.roleToggleActive : ''}
                 onClick={() => setRole('operator')}
               >
                 Operator
               </button>
               <button
-                className={role === 'admin' ? 'active' : ''}
+                className={role === 'admin' ? s.roleToggleActive : ''}
                 onClick={() => setRole('admin')}
               >
                 Administrator
@@ -128,26 +141,55 @@ export default function RoleAssignment() {
                   <p>{u.email}</p>
                 </div>
               </div>
-              <div className={s.roleToggle} style={{ width: 180 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div className={s.roleToggle} style={{ width: 180 }}>
+                  <button
+                    className={u.role === 'operator' ? s.roleToggleActive : ''}
+                    onClick={() => handleRoleChange(u.id, 'operator')}
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                  >
+                    Operator
+                  </button>
+                  <button
+                    className={u.role === 'admin' ? s.roleToggleActive : ''}
+                    onClick={() => handleRoleChange(u.id, 'admin')}
+                    style={{ padding: '6px 12px', fontSize: 12 }}
+                  >
+                    Admin
+                  </button>
+                </div>
                 <button
-                  className={u.role === 'operator' ? 'active' : ''}
-                  onClick={() => handleRoleChange(u.id, 'operator')}
-                  style={{ padding: '6px 12px', fontSize: 12 }}
+                  className="btn btn-red-outline btn-sm"
+                  style={{ padding: '6px 10px', fontSize: 11 }}
+                  onClick={() => setDeleteTarget(u)}
                 >
-                  Operator
-                </button>
-                <button
-                  className={u.role === 'admin' ? 'active' : ''}
-                  onClick={() => handleRoleChange(u.id, 'admin')}
-                  style={{ padding: '6px 12px', fontSize: 12 }}
-                >
-                  Admin
+                  Delete
                 </button>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {deleteTarget && (
+        <Modal onClose={() => setDeleteTarget(null)}>
+          <h2>Delete User</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+            Are you sure you want to delete <strong>{deleteTarget.name}</strong> ({deleteTarget.email})?
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+            This action cannot be undone.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-outline btn-sm" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </button>
+            <button className="btn btn-red-outline btn-sm" onClick={() => handleDelete(deleteTarget.id)}>
+              Delete
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

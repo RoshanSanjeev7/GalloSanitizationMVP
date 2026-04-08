@@ -128,6 +128,13 @@ async function getLines(): Promise<Line[]> {
   return request<Line[]>('/lines');
 }
 
+async function createLine(name: string): Promise<Line> {
+  return request<Line>('/lines', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+}
+
 // ─── Templates ──────────────────────────────────────────────────────
 export interface TaskTemplate {
   description: string;
@@ -149,6 +156,8 @@ export interface Template {
   title: string;
   lineId: string;
   machines: MachineTemplate[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 async function getTemplates(): Promise<Template[]> {
@@ -340,6 +349,7 @@ const api = {
   updateUserRole,
   deleteUser,
   getLines,
+  createLine,
   getTemplates,
   getTemplate,
   createTemplate,
