@@ -7,7 +7,7 @@ import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
-import LoadingBar from '../components/LoadingBar';
+import Spinner from '../components/Spinner';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'in_progress' | 'submitted' | 'completed';
@@ -95,7 +95,6 @@ export default function OperatorDashboard() {
 
   return (
     <div className="page-container">
-      {loading && <LoadingBar />}
       <div className="main-content">
         <div className={d.dashHeader}>
           <div>
@@ -122,7 +121,8 @@ export default function OperatorDashboard() {
           ))}
         </div>
 
-        <div className={d.dashList}>
+        {loading && <Spinner label="Loading checklists..." />}
+        {!loading && <div className={d.dashList}>
           {filtered.map((cl) => (
             <div
               key={cl.id}
@@ -149,7 +149,7 @@ export default function OperatorDashboard() {
               No checklists found
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       <Footer role="operator" onAddChecklist={() => setShowModal(true)} />

@@ -7,7 +7,7 @@ import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
-import LoadingBar from '../components/LoadingBar';
+import Spinner from '../components/Spinner';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'submitted' | 'approved' | 'in_progress';
@@ -110,7 +110,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="page-container">
-      {loading && <LoadingBar />}
       <div className="main-content">
         <div className={d.dashHeader}>
           <div>
@@ -169,7 +168,8 @@ export default function AdminDashboard() {
           ))}
         </div>
 
-        <div className={d.dashList}>
+        {loading && <Spinner label="Loading checklists..." />}
+        {!loading && <div className={d.dashList}>
           {filtered.map((cl) => (
             <div
               key={cl.id}
@@ -209,7 +209,7 @@ export default function AdminDashboard() {
               No checklists found
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       <Footer role="admin" />

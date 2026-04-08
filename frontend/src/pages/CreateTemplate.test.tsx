@@ -8,7 +8,9 @@ import CreateTemplate from './CreateTemplate';
 vi.mock('../services/api', () => ({
   default: {
     getLines: vi.fn(),
+    getTemplates: vi.fn(),
     createTemplate: vi.fn().mockResolvedValue({ id: 'tpl-1', title: 'Test', lineId: 'line-1', machines: [] }),
+    updateTemplate: vi.fn().mockResolvedValue({ id: 'tpl-1', title: 'Test', lineId: 'line-1', machines: [] }),
     getStoredUser: vi.fn().mockReturnValue(null),
   },
 }));
@@ -36,22 +38,21 @@ const adminState = {
 
 beforeEach(() => {
   vi.mocked(api.getLines).mockResolvedValue(testLines);
+  vi.mocked(api.getTemplates).mockResolvedValue([]);
   mockNavigate.mockClear();
 });
 
 afterEach(cleanup);
 
 describe('CreateTemplate', () => {
-  it('renders form with title input and line selector', async () => {
+  it('renders form with line selector', async () => {
     renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('Deep Clean Checklist')).toBeInTheDocument();
+      expect(screen.getByText('Select a Line')).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Template Title')).toBeInTheDocument();
-    expect(screen.getByText('Assign to Line')).toBeInTheDocument();
-    expect(screen.getByText('Select a line...')).toBeInTheDocument();
+    expect(screen.getByText('Choose a line...')).toBeInTheDocument();
   });
 
   it('loads lines on mount', async () => {
@@ -62,10 +63,25 @@ describe('CreateTemplate', () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByText('Line 91')).toBeInTheDocument();
+      expect(screen.getByText(/Line 91/)).toBeInTheDocument();
     });
 
-    expect(screen.getByText('Line 93')).toBeInTheDocument();
+    expect(screen.getByText(/Line 93/)).toBeInTheDocument();
+  });
+
+  it('shows template form after selecting a line', async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Line 91/)).toBeInTheDocument();
+    });
+
+    const select = screen.getByRole('combobox');
+    await user.selectOptions(select, 'line-1');
+
+    expect(screen.getByPlaceholderText(/Weekly Deep Clean/)).toBeInTheDocument();
+    expect(screen.getByText('Machines')).toBeInTheDocument();
   });
 
   it('Add Machine button adds a machine tab', async () => {
@@ -73,11 +89,13 @@ describe('CreateTemplate', () => {
     renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
 
     await waitFor(() => {
-      expect(screen.getByText('Machine 1')).toBeInTheDocument();
+      expect(screen.getByText(/Line 91/)).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText('+ Add Machine'));
+    const select = screen.getByRole('combobox');
+    await user.selectOptions(select, 'line-1');
 
+    await user.click(screen.getByText('+ Add Machine'));
     expect(screen.getByText('Machine 2')).toBeInTheDocument();
   });
 
@@ -86,10 +104,9 @@ describe('CreateTemplate', () => {
     renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
 
     await waitFor(() => {
-      expect(screen.getByText('Line 91')).toBeInTheDocument();
+      expect(screen.getByText(/Line 91/)).toBeInTheDocument();
     });
 
-    // Select a line but leave title empty
     const select = screen.getByRole('combobox');
     await user.selectOptions(select, 'line-1');
 
@@ -97,32 +114,18 @@ describe('CreateTemplate', () => {
     expect(createButton).toBeDisabled();
   });
 
-  it('Create button disabled when no line selected', async () => {
+  it('Create button enabled when title is set', async () => {
     const user = userEvent.setup();
     renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('Deep Clean Checklist')).toBeInTheDocument();
+      expect(screen.getByText(/Line 91/)).toBeInTheDocument();
     });
 
-    // Set title but leave line unselected
-    await user.type(screen.getByPlaceholderText('Deep Clean Checklist'), 'My Template');
-
-    const createButton = screen.getByText('Create Template');
-    expect(createButton).toBeDisabled();
-  });
-
-  it('Create button enabled when both title and line are set', async () => {
-    const user = userEvent.setup();
-    renderWithProviders(<CreateTemplate />, { preloadedState: adminState });
-
-    await waitFor(() => {
-      expect(screen.getByText('Line 91')).toBeInTheDocument();
-    });
-
-    await user.type(screen.getByPlaceholderText('Deep Clean Checklist'), 'My Template');
     const select = screen.getByRole('combobox');
     await user.selectOptions(select, 'line-1');
+
+    await user.type(screen.getByPlaceholderText(/Weekly Deep Clean/), 'My Template');
 
     const createButton = screen.getByText('Create Template');
     expect(createButton).not.toBeDisabled();
