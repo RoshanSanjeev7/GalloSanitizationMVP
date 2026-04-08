@@ -1,0 +1,234 @@
+version: "2"
+type: backend
+tech_stack:
+  - TypeScript
+  - Express.js
+  - DynamoDB (via LocalStack)
+  - S3 (via LocalStack)
+  - PDFKit
+  - JWT (jsonwebtoken)
+  - React 18 + Vite (frontend)
+  - Redux Toolkit (frontend state)
+features:
+  - name: Authentication
+    description: Login with email/password, JWT token issuance, get current user
+    files:
+      - packages/backend/src/routes/auth.ts
+      - packages/backend/src/middleware/auth.ts
+    endpoints:
+      - method: POST
+        path: /api/auth/login
+        description: Authenticate user with email and password, returns JWT token
+        auth_required: false
+        request_schema:
+          body:
+            email: string
+            password: string
+        response_schema:
+          "200": "{ user: User, token: string }"
+          "400": "Email and password required"
+          "401": "Invalid credentials"
+      - method: GET
+        path: /api/auth/me
+        description: Get current authenticated user profile
+        auth_required: true
+        response_schema:
+          "200": User
+          "404": "User not found"
+    depends_on: []
+
+  - name: User Management
+    description: CRUD operations for users, admin-only for create/update/delete
+    files:
+      - packages/backend/src/routes/users.ts
+      - packages/backend/src/data/dynamo.ts
+    endpoints:
+      - method: GET
+        path: /api/users
+        description: List all users (passwords excluded)
+        auth_required: true
+        response_schema:
+          "200": "User[]"
+      - method: POST
+        path: /api/users
+        description: Create a new user (admin only)
+        auth_required: true
+        request_schema:
+          body:
+            name: string
+            email: string
+            password: string
+            role: string
+        response_schema:
+          "201": User
+          "400": "Missing required fields"
+          "409": "Email already exists"
+      - method: PUT
+        path: /api/users/:id
+        description: Update user role (admin only)
+        auth_required: true
+        request_schema:
+          body:
+            role: string
+        response_schema:
+          "200": User
+          "404": "User not found"
+      - method: DELETE
+        path: /api/users/:id
+        description: Delete a user (admin only)
+        auth_required: true
+        response_schema:
+          "204": "No content"
+          "404": "User not found"
+    depends_on:
+      - Authentication
+
+  - name: Production Lines
+    description: Read-only listing of production lines
+    files:
+      - packages/backend/src/routes/lines.ts
+    endpoints:
+      - method: GET
+        path: /api/lines
+        description: List all production lines
+        auth_required: true
+        response_schema:
+          "200": "Line[]"
+    depends_on:
+      - Authentication
+
+  - name: Checklist Templates
+    description: CRUD for checklist templates, admin-only for create/delete
+    files:
+      - packages/backend/src/routes/templates.ts
+    endpoints:
+      - method: GET
+        path: /api/templates
+        description: List all checklist templates
+        auth_required: true
+        response_schema:
+          "200": "Template[]"
+      - method: GET
+        path: /api/templates/:id
+        description: Get a single template by ID
+        auth_required: true
+        response_schema:
+          "200": Template
+          "404": "Template not found"
+      - method: POST
+        path: /api/templates
+        description: Create a new template (admin only)
+        auth_required: true
+        request_schema:
+          body:
+            title: string
+            lineId: string
+            machines: "Machine[]"
+        response_schema:
+          "201": Template
+          "400": "Missing required fields"
+      - method: DELETE
+        path: /api/templates/:id
+        description: Delete a template (admin only)
+        auth_required: true
+        response_schema:
+          "204": "No content"
+          "404": "Template not found"
+    depends_on:
+      - Authentication
+
+  - name: Checklists Management
+    description: Full checklist lifecycle - create, fill, submit, approve/deny, delete, PDF export
+    files:
+      - packages/backend/src/routes/checklists.ts
+      - packages/backend/src/data/dynamo.ts
+    endpoints:
+      - method: GET
+        path: /api/checklists
+        description: List checklists with optional filters (status, operatorId, lineId)
+        auth_required: true
+        request_schema:
+          query:
+            status: string (optional)
+            operatorId: string (optional)
+            lineId: string (optional)
+        response_schema:
+          "200": "Checklist[]"
+      - method: GET
+        path: /api/checklists/:id
+        description: Get a single checklist by ID
+        auth_required: true
+        response_schema:
+          "200": Checklist
+          "404": "Checklist not found"
+      - method: POST
+        path: /api/checklists
+        description: Create a new checklist for a production line
+        auth_required: true
+        request_schema:
+          body:
+            lineId: string
+        response_schema:
+          "201": Checklist
+          "404": "Line not found or User not found"
+          "400": "No template available"
+      - method: PUT
+        path: /api/checklists/:id/items
+        description: Update checklist items (machines array)
+        auth_required: true
+        request_schema:
+          body:
+            machines: "Machine[]"
+        response_schema:
+          "200": Checklist
+          "400": "Cannot update items on this checklist"
+          "404": "Checklist not found"
+      - method: POST
+        path: /api/checklists/:id/submit
+        description: Submit a checklist for review
+        auth_required: true
+        response_schema:
+          "200": Checklist
+          "404": "Checklist not found"
+      - method: POST
+        path: /api/checklists/:id/approve
+        description: Approve a submitted checklist (admin only)
+        auth_required: true
+        response_schema:
+          "200": Checklist
+          "404": "Checklist not found"
+      - method: POST
+        path: /api/checklists/:id/deny
+        description: Deny a submitted checklist (admin only)
+        auth_required: true
+        response_schema:
+          "200": Checklist
+          "404": "Checklist not found"
+      - method: DELETE
+        path: /api/checklists/:id
+        description: Delete a checklist (admin only)
+        auth_required: true
+        response_schema:
+          "204": "No content"
+          "404": "Checklist not found"
+      - method: GET
+        path: /api/checklists/:id/pdf
+        description: Export checklist as PDF (admin only)
+        auth_required: true
+        response_schema:
+          "200": "application/pdf"
+          "404": "Checklist not found"
+    depends_on:
+      - Authentication
+      - Production Lines
+      - Checklist Templates
+known_limitations:
+  - issue: Passwords stored in plaintext (no hashing)
+    location: packages/backend/src/routes/auth.ts
+    impact: Security risk - passwords visible in database
+  - issue: No input validation on checklist item updates
+    location: packages/backend/src/routes/checklists.ts
+    impact: Malformed machine data could be saved
+  - issue: No rate limiting on login endpoint
+    location: packages/backend/src/routes/auth.ts
+    impact: Vulnerable to brute force attacks

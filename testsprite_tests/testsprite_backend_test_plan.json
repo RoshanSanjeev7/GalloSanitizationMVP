@@ -1,0 +1,62 @@
+[
+  {
+    "id": "TC001",
+    "title": "post api auth login with valid and invalid credentials",
+    "description": "Test the POST /api/auth/login endpoint with valid email and password to receive a 200 response with user and token. Also test with missing email or password to receive 400 error, and with invalid credentials to receive 401 error."
+  },
+  {
+    "id": "TC002",
+    "title": "get api auth me with valid and invalid token",
+    "description": "Test the GET /api/auth/me endpoint with a valid Bearer token to receive 200 with user profile, and with invalid or missing token to verify proper authorization handling and 404 if user not found."
+  },
+  {
+    "id": "TC003",
+    "title": "post api users create user admin only",
+    "description": "Test the POST /api/users endpoint to create a new user with admin token and valid data to receive 201 with created user. Also test missing required fields to get 400 error, duplicate email to get 409 error, and operator token to get 403 forbidden."
+  },
+  {
+    "id": "TC004",
+    "title": "get api users list all users admin only",
+    "description": "Test the GET /api/users endpoint with admin token to receive 200 with list of users excluding passwords. Verify unauthorized access is denied."
+  },
+  {
+    "id": "TC005",
+    "title": "put api users update user role admin only",
+    "description": "Test the PUT /api/users/:id endpoint with admin token and valid role update to receive 200 with updated user. Test non-existent user id to receive 404 error."
+  },
+  {
+    "id": "TC006",
+    "title": "delete api users delete user admin only",
+    "description": "Test the DELETE /api/users/:id endpoint with admin token to delete a user and receive 204 no content. Test non-existent user id to receive 404 error."
+  },
+  {
+    "id": "TC007",
+    "title": "get api lines list production lines authenticated",
+    "description": "Test the GET /api/lines endpoint with valid token to receive 200 with list of production lines. Test without token or with invalid token to receive 401 unauthorized."
+  },
+  {
+    "id": "TC008",
+    "title": "post api templates create and delete admin only",
+    "description": "Test the POST /api/templates endpoint with admin token and valid data to create a template and receive 201. Test missing required fields to get 400 error. Test DELETE /api/templates/:id with admin token to delete template and receive 204. Test non-existent id to get 404."
+  },
+  {
+    "id": "TC009",
+    "title": "get api templates list and get by id authenticated",
+    "description": "Test GET /api/templates to list all templates with valid token receiving 200. Test GET /api/templates/:id with existing id to get 200 and with unknown id to get 404."
+  },
+  {
+    "id": "TC010",
+    "title": "post api checklists create and manage checklist lifecycle",
+    "description": "Test POST /api/checklists with operator token and valid lineId to create checklist receiving 201. Test invalid lineId or no template available to get 404 or 400 errors. Test PUT /api/checklists/:id/items to update machines, POST /api/checklists/:id/submit to submit checklist, POST /api/checklists/:id/approve and /deny with admin token, DELETE /api/checklists/:id to delete checklist, and GET /api/checklists/:id/pdf to export PDF with proper authorization and error handling."
+  },
+  {
+    "id": "TC011",
+    "title": "put api checklists items update checklist items",
+    "description": "Test PUT /api/checklists/:id/items endpoint. First login as operator (gsanchez@gallo.com / operator123) and create a checklist via POST /api/checklists with a valid lineId. Then update the machines array on the in_progress checklist as operator and verify 200 with updated machines. Next login as admin (ymartinez@gallo.com / admin123), submit the checklist via POST /api/checklists/:id/submit, then verify admin can update items on the submitted checklist receiving 200. Then verify operator cannot update items on the submitted checklist receiving 400 with error 'Cannot update items on this checklist'. Also test updating a non-existent checklist id to receive 404. Clean up by deleting the checklist with admin token."
+  },
+  {
+    "id": "TC012",
+    "title": "get api checklists pdf export checklist as pdf",
+    "description": "Test GET /api/checklists/:id/pdf endpoint. First login as operator (gsanchez@gallo.com / operator123) and create a checklist via POST /api/checklists with a valid lineId, then submit it via POST /api/checklists/:id/submit. Login as admin (ymartinez@gallo.com / admin123) and export the checklist as PDF via GET /api/checklists/:id/pdf. Verify response status is 200 and content-type header contains 'application/pdf'. Then verify operator cannot export PDF by calling GET /api/checklists/:id/pdf with operator token expecting 403 forbidden. Also test exporting a non-existent checklist id expecting 404. Clean up by deleting the checklist with admin token."
+  }
+]

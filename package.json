@@ -6,13 +6,13 @@
     "node": ">=24.0.0"
   },
   "workspaces": [
-    "packages/backend",
-    "packages/frontend"
+    "backend",
+    "frontend"
   ],
   "scripts": {
-    "dev": "npm run dev --workspace=packages/backend & npm run dev --workspace=packages/frontend",
-    "dev:backend": "npm run dev --workspace=packages/backend",
-    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "dev": "npm run dev --workspace=backend & npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",
     "test:e2e": "npx playwright test",
@@ -21,7 +21,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "localstack:up": "docker compose up -d",
     "localstack:down": "docker compose down",
-    "localstack:seed": "npm run seed:dynamo --workspace=packages/backend",
+    "localstack:seed": "npm run seed:dynamo --workspace=backend",
     "dev:local": "docker compose up -d && sleep 3 && npm run localstack:seed && npm run dev"
   },
   "devDependencies": {
