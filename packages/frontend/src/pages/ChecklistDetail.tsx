@@ -3,9 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import api, { type Checklist } from '../services/api';
 import type { RootState } from '../store';
+import { STATUS_LABELS, formatTime, formatFullDate, formatDateTime, statusColor, statusIcon } from '../utils/checklist';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistDetail.module.css';
-import sr from './SubmissionReview.module.css';
+import sr from '../styles/sidebar.module.css';
 
 export default function ChecklistDetail() {
   const { id } = useParams<{ id: string }>();
@@ -45,30 +46,6 @@ export default function ChecklistDetail() {
   const end = checklist.endTime ? new Date(checklist.endTime) : null;
   const durationMs = end ? end.getTime() - start.getTime() : 0;
   const durationMin = Math.round(durationMs / 60000);
-
-  const formatDate = (d: Date) =>
-    d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
-  const formatTime = (d: Date) =>
-    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-
-  const formatDateTime = (d: Date) =>
-    `${d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })}, ${formatTime(d)}`;
-
-  const formatFullDate = (d: Date) =>
-    d.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
-
-  const statusLabel: Record<string, string> = {
-    in_progress: 'In Progress',
-    submitted: 'Submitted',
-    approved: 'Approved',
-    denied: 'Denied',
-  };
 
   const currentMachine = checklist.machines[activeMachine];
 
@@ -135,7 +112,7 @@ export default function ChecklistDetail() {
         </div>
 
         <h2 style={{ marginBottom: 2 }}>
-          {checklist.lineName} - {statusLabel[checklist.status] || checklist.status}
+          {checklist.lineName} - {STATUS_LABELS[checklist.status] || checklist.status}
         </h2>
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
           {formatFullDate(start)} - {formatTime(start)}
@@ -224,9 +201,9 @@ export default function ChecklistDetail() {
                           </div>
                           <span
                             className={cl.fillTaskStatus}
-                            style={{ color: item.completed === true ? 'var(--green)' : item.completed === false ? 'var(--red)' : 'var(--text-muted)' }}
+                            style={{ color: statusColor(item.completed) }}
                           >
-                            {item.completed === true ? '\u2713' : item.completed === false ? '\u2717' : '\u2014'}
+                            {statusIcon(item.completed)}
                           </span>
                         </div>
                       ))}
@@ -265,7 +242,7 @@ export default function ChecklistDetail() {
                 <div className={sr.summaryRow}>
                   <span className={sr.label}>Status</span>
                   <span className={sr.value} style={{ textTransform: 'capitalize' }}>
-                    {statusLabel[checklist.status] || checklist.status}
+                    {STATUS_LABELS[checklist.status] || checklist.status}
                   </span>
                 </div>
               </div>
@@ -338,7 +315,7 @@ export default function ChecklistDetail() {
                           className={s.printTaskIcon}
                           style={{ color: item.completed === true ? '#16a34a' : item.completed === false ? '#dc2626' : '#9ca3af' }}
                         >
-                          {item.completed === true ? '\u2713' : item.completed === false ? '\u2717' : '\u2014'}
+                          {statusIcon(item.completed)}
                         </span>
                         <div className={s.printTaskInfo}>
                           <span className={s.printTaskText}>{item.description}</span>
@@ -358,7 +335,6 @@ export default function ChecklistDetail() {
                           {item.images && item.images.length > 0 && (
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                               {item.images.map((imgKey) => {
-                                if (!imageUrls[imgKey]) loadImageUrl(imgKey);
                                 return (
                                   <img
                                     key={imgKey}

@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
+import { formatTime, formatFullDate, formatStamp, statusColor, statusIcon } from '../utils/checklist';
 import cl from '../styles/checklist.module.css';
-import s from './SubmissionReview.module.css';
+import s from '../styles/sidebar.module.css';
 import fillStyles from './ChecklistFill.module.css';
 
 export default function SubmissionReview() {
@@ -222,16 +223,7 @@ export default function SubmissionReview() {
   const durationMs = end ? end.getTime() - start.getTime() : 0;
   const durationMin = Math.round(durationMs / 60000);
 
-  const formatTime = (d: Date) =>
-    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-
-  const formatDate = (d: Date) =>
-    d.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
+  const formatDate = formatFullDate;
 
   const machineStats = machines.map((m) => {
     const items = m.categories.flatMap((c) => c.items);
@@ -294,10 +286,6 @@ export default function SubmissionReview() {
     setCollapsed((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const formatStamp = (iso: string) => {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  };
 
   return (
     <div className="page-container">
@@ -593,7 +581,6 @@ export default function SubmissionReview() {
                               {item.images && item.images.length > 0 && (
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                                   {item.images.map((imgKey) => {
-                                    if (!imageUrls[imgKey]) loadImageUrl(imgKey);
                                     return (
                                       <img
                                         key={imgKey}
@@ -617,9 +604,9 @@ export default function SubmissionReview() {
                           </div>
                           <span
                             className={cl.fillTaskStatus}
-                            style={{ color: item.completed === true ? 'var(--green)' : item.completed === false ? 'var(--red)' : 'var(--text-muted)' }}
+                            style={{ color: statusColor(item.completed) }}
                           >
-                            {item.completed === true ? '\u2713' : item.completed === false ? '\u2717' : '\u2014'}
+                            {statusIcon(item.completed)}
                           </span>
                         </div>
                       );
