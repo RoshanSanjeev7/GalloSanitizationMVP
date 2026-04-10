@@ -1,0 +1,35 @@
+.container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.avatars {
+  display: flex;
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  margin-left: -8px;
+  position: relative;
+}
+
+.avatar:last-child {
+  margin-left: 0;
+}
+
+.label {
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  white-space: nowrap;
+}
