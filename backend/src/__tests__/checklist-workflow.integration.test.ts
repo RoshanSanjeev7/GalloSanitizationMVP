@@ -13,6 +13,13 @@ vi.mock('../data/dynamo.js', () => ({
   queryChecklists: vi.fn().mockResolvedValue([]),
   getChecklist: vi.fn().mockResolvedValue(undefined),
   putChecklist: vi.fn().mockResolvedValue(undefined),
+  conditionalPutChecklist: vi.fn().mockResolvedValue(undefined),
+  conditionalStatusTransition: vi.fn().mockResolvedValue(undefined),
+  conditionalDeleteChecklist: vi.fn().mockResolvedValue(undefined),
+  markChecklistViewed: vi.fn().mockResolvedValue(undefined),
+  updateChecklistMachine: vi.fn().mockResolvedValue(undefined),
+  appendChecklistImages: vi.fn().mockResolvedValue(undefined),
+  removeChecklistImage: vi.fn().mockResolvedValue(undefined),
   deleteChecklist: vi.fn().mockResolvedValue(undefined),
   getLine: vi.fn().mockResolvedValue(undefined),
   getUser: vi.fn().mockResolvedValue(undefined),
@@ -21,6 +28,8 @@ vi.mock('../data/dynamo.js', () => ({
   getUserByEmail: vi.fn().mockResolvedValue(undefined),
   getAllUsers: vi.fn().mockResolvedValue([]),
   putUser: vi.fn().mockResolvedValue(undefined),
+  createUserWithEmailLock: vi.fn().mockResolvedValue(undefined),
+  deleteUserWithEmailLock: vi.fn().mockResolvedValue(undefined),
   deleteUser: vi.fn().mockResolvedValue(undefined),
   getAllLines: vi.fn().mockResolvedValue([]),
   putLine: vi.fn().mockResolvedValue(undefined),
@@ -42,6 +51,8 @@ import { app } from '../index.js';
 import {
   getChecklist,
   putChecklist,
+  conditionalPutChecklist,
+  conditionalStatusTransition,
   getLine,
   getUser,
   getTemplatesByLineId,
@@ -57,6 +68,8 @@ import {
 
 const mockedGetChecklist = vi.mocked(getChecklist);
 const mockedPutChecklist = vi.mocked(putChecklist);
+const mockedConditionalPutChecklist = vi.mocked(conditionalPutChecklist);
+const mockedConditionalStatusTransition = vi.mocked(conditionalStatusTransition);
 const mockedGetLine = vi.mocked(getLine);
 const mockedGetUser = vi.mocked(getUser);
 const mockedGetTemplatesByLineId = vi.mocked(getTemplatesByLineId);
@@ -110,9 +123,6 @@ describe('Checklist workflow integration', () => {
   it('step 2: operator updates items (200, updatedAt set)', async () => {
     mockedGetChecklist.mockResolvedValueOnce({ ...currentChecklist });
     mockedGetUser.mockResolvedValueOnce(operatorUser);
-    mockedPutChecklist.mockImplementationOnce(async (cl) => {
-      currentChecklist = { ...cl } as Checklist;
-    });
 
     const updatedMachines = [
       {
@@ -152,14 +162,12 @@ describe('Checklist workflow integration', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.updatedAt).toBeTruthy();
+    expect(conditionalPutChecklist).toHaveBeenCalledOnce();
     currentChecklist = res.body as Checklist;
   });
 
   it('step 3: operator submits the checklist (200, status submitted, submittedAt set)', async () => {
     mockedGetChecklist.mockResolvedValueOnce({ ...currentChecklist });
-    mockedPutChecklist.mockImplementationOnce(async (cl) => {
-      currentChecklist = { ...cl } as Checklist;
-    });
 
     const res = await request(app)
       .post(`/api/checklists/${currentChecklist.id}/submit`)
@@ -169,15 +177,13 @@ describe('Checklist workflow integration', () => {
     expect(res.body.status).toBe('submitted');
     expect(res.body.submittedAt).toBeTruthy();
     expect(res.body.endTime).toBeTruthy();
+    expect(conditionalStatusTransition).toHaveBeenCalled();
     currentChecklist = res.body as Checklist;
   });
 
   it('step 4: admin can update items on a submitted checklist (200)', async () => {
     mockedGetChecklist.mockResolvedValueOnce({ ...currentChecklist });
     mockedGetUser.mockResolvedValueOnce(adminUser);
-    mockedPutChecklist.mockImplementationOnce(async (cl) => {
-      currentChecklist = { ...cl } as Checklist;
-    });
 
     const adminEditMachines = [
       {
@@ -235,9 +241,6 @@ describe('Checklist workflow integration', () => {
 
   it('step 6: admin approves the checklist (200, status approved)', async () => {
     mockedGetChecklist.mockResolvedValueOnce({ ...currentChecklist });
-    mockedPutChecklist.mockImplementationOnce(async (cl) => {
-      currentChecklist = { ...cl } as Checklist;
-    });
 
     const res = await request(app)
       .post(`/api/checklists/${currentChecklist.id}/approve`)
@@ -245,6 +248,7 @@ describe('Checklist workflow integration', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('approved');
+    expect(conditionalStatusTransition).toHaveBeenCalled();
     currentChecklist = res.body as Checklist;
   });
 

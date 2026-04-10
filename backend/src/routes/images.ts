@@ -1,15 +1,27 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
+import crypto from 'node:crypto';
 import { uploadImage, getImageUrl, getImageUrls, deleteImage } from '../data/s3.js';
-import { getChecklist, putChecklist, getUser } from '../data/dynamo.js';
+import { getChecklist, getUser, appendChecklistImages, removeChecklistImage } from '../data/dynamo.js';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, WebP, and HEIC are allowed.'));
+    }
+  },
+});
 
 router.use(authMiddleware);
 
-// Upload images for a checklist item
 router.post(
   '/:id/images',
   upload.array('images', 10),
@@ -49,41 +61,57 @@ router.post(
       return;
     }
 
+    // Per-item limit: 20 images
+    if ((item.images?.length || 0) + files.length > 20) {
+      res.status(400).json({ error: 'Maximum 20 images per item' });
+      return;
+    }
+
+    // Per-checklist limit: 200 images
+    const totalImages = checklist.machines.flatMap(m =>
+      m.categories.flatMap(c => c.items.flatMap(i => i.images || []))
+    ).length;
+    if (totalImages + files.length > 200) {
+      res.status(400).json({ error: 'Maximum 200 images per checklist' });
+      return;
+    }
+
+    // Upload to S3 with unique keys (timestamp + random suffix prevents collisions)
     const newKeys: string[] = [];
     for (const file of files) {
-      const timestamp = Date.now();
-      const key = `${id}/${machineIdx}-${catIdx}-${itemIdx}/${timestamp}-${file.originalname}`;
+      const uniqueId = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
+      const key = `${id}/${machineIdx}-${catIdx}-${itemIdx}/${uniqueId}-${file.originalname}`;
       await uploadImage(key, file.buffer, file.mimetype);
       newKeys.push(key);
     }
 
-    if (!item.images) item.images = [];
-    item.images.push(...newKeys);
-
-    // Track image upload activity
-    if (!checklist.activities) checklist.activities = [];
+    // Atomically append image keys (no read-modify-write race)
     const uploader = await getUser(req.userId!);
-    checklist.activities.push({
-      type: 'image',
+    const activity = {
+      type: 'image' as const,
       by: uploader?.name || 'Unknown',
       at: new Date().toISOString(),
       detail: `${files.length} photo${files.length > 1 ? 's' : ''} added`,
-    });
-    // Reset viewedAt so admin sees new activity
-    checklist.viewedAt = null;
-    checklist.viewedBy = null;
+    };
 
-    await putChecklist(checklist);
+    await appendChecklistImages(id, machineIdx, catIdx, itemIdx, newKeys, activity);
 
-    res.json({ images: item.images });
+    // Return updated images array
+    res.json({ images: [...(item.images || []), ...newKeys] });
   }
 );
 
-// Batch get presigned URLs for multiple images
 router.post('/:id/image-urls', async (req: AuthRequest, res) => {
+  const id = req.params.id as string;
   const { keys } = req.body;
   if (!Array.isArray(keys) || keys.length === 0) {
     res.status(400).json({ error: 'keys array required' });
+    return;
+  }
+  // Verify ownership: all keys must belong to this checklist
+  const invalid = keys.filter((k: string) => !k.startsWith(`${id}/`));
+  if (invalid.length > 0) {
+    res.status(403).json({ error: 'Access denied to requested image keys' });
     return;
   }
   const cappedKeys = keys.slice(0, 50);
@@ -103,10 +131,15 @@ router.get('/:id/images/*', async (req: AuthRequest, res) => {
   res.json({ url });
 });
 
-// Delete an image from a checklist item
 router.delete('/:id/images', async (req: AuthRequest, res) => {
   const id = req.params.id as string;
   const { key, machineIdx, catIdx, itemIdx } = req.body;
+
+  // Verify key ownership
+  if (typeof key !== 'string' || !key.startsWith(`${id}/`)) {
+    res.status(403).json({ error: 'Access denied to this image key' });
+    return;
+  }
 
   const checklist = await getChecklist(id);
   if (!checklist) {
@@ -121,10 +154,10 @@ router.delete('/:id/images', async (req: AuthRequest, res) => {
   }
 
   await deleteImage(key);
-  item.images = (item.images || []).filter((k: string) => k !== key);
-  await putChecklist(checklist);
+  const remainingImages = (item.images || []).filter((k: string) => k !== key);
+  await removeChecklistImage(id, machineIdx, catIdx, itemIdx, remainingImages);
 
-  res.json({ images: item.images });
+  res.json({ images: remainingImages });
 });
 
 export default router;

@@ -22,7 +22,10 @@ export default function ChecklistFill() {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error' | 'conflict'>('idle');
   const [version, setVersion] = useState<number | undefined>();
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const savingRef = useRef(false);
+  const savePromiseRef = useRef<Promise<void> | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const imageUrls = useImageUrlsForMachines(id, machines, activeMachine);
 
@@ -115,23 +118,27 @@ export default function ChecklistFill() {
     }
     if (!id) return;
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    saveTimeoutRef.current = setTimeout(async () => {
+    saveTimeoutRef.current = setTimeout(() => {
       if (savingRef.current) return;
       savingRef.current = true;
       setSaveStatus('saving');
-      try {
-        const result = await api.updateChecklistItems(id, buildMachines(), version);
-        setVersion(result.version);
-        setSaveStatus('saved');
-      } catch (err: unknown) {
-        if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
-          setSaveStatus('conflict');
-        } else {
-          setSaveStatus('error');
+      const p = (async () => {
+        try {
+          const result = await api.updateChecklistItems(id, buildMachines(), version);
+          setVersion(result.version);
+          setSaveStatus('saved');
+        } catch (err: unknown) {
+          if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+            setSaveStatus('conflict');
+          } else {
+            setSaveStatus('error');
+          }
+        } finally {
+          savingRef.current = false;
+          savePromiseRef.current = null;
         }
-      } finally {
-        savingRef.current = false;
-      }
+      })();
+      savePromiseRef.current = p;
     }, 500);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -139,11 +146,27 @@ export default function ChecklistFill() {
   }, [machines, commentInputs, showComment]);
 
   const confirmSubmit = async () => {
-    if (!id) return;
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    await api.updateChecklistItems(id, buildMachines(), version);
-    await api.submitChecklist(id);
-    navigate('/');
+    if (!id || submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      // Cancel pending auto-save and wait for any in-flight save
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (savePromiseRef.current) await savePromiseRef.current;
+      // Final save + submit
+      await api.updateChecklistItems(id, buildMachines(), version);
+      await api.submitChecklist(id);
+      navigate('/');
+    } catch (err: unknown) {
+      setSubmitting(false);
+      if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+        setSubmitError('This checklist was modified by another user. Please reload.');
+      } else if (err instanceof Error && (err as Error & { status?: number }).status === 404) {
+        setSubmitError('This checklist has been deleted.');
+      } else {
+        setSubmitError('Submit failed. Please try again.');
+      }
+    }
   };
 
   if (!checklist || machines.length === 0) {
@@ -162,7 +185,11 @@ export default function ChecklistFill() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <button className="back-link" style={{ marginBottom: 0 }} onClick={async () => {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-            if (id) await api.updateChecklistItems(id, buildMachines(), version);
+            try {
+              if (id) await api.updateChecklistItems(id, buildMachines(), version);
+            } catch {
+              // Best effort save on back navigation
+            }
             navigate('/');
           }}>
             &larr; Back
@@ -171,7 +198,7 @@ export default function ChecklistFill() {
             {saveStatus === 'saving' && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Saving...</span>}
             {saveStatus === 'saved' && <span style={{ fontSize: 12, color: 'var(--success)' }}>Saved</span>}
             {saveStatus === 'error' && <span style={{ fontSize: 12, color: 'var(--error)' }}>Save failed</span>}
-            <button className="btn btn-primary btn-sm" onClick={() => setShowSubmitConfirm(true)}>
+            <button className="btn btn-primary btn-sm" onClick={() => setShowSubmitConfirm(true)} disabled={submitting || saveStatus === 'saving'}>
               Submit Checklist
             </button>
           </div>
@@ -407,7 +434,7 @@ export default function ChecklistFill() {
         )}
 
         <div className="action-buttons" style={{ marginBottom: 40, marginTop: 16 }}>
-          <button className="btn btn-primary" onClick={() => setShowSubmitConfirm(true)}>
+          <button className="btn btn-primary" onClick={() => setShowSubmitConfirm(true)} disabled={submitting || saveStatus === 'saving'}>
             Submit Checklist
           </button>
         </div>
@@ -426,12 +453,17 @@ export default function ChecklistFill() {
             <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
               Are you sure you want to submit this checklist for review?
             </p>
+            {submitError && (
+              <div style={{ padding: '8px 12px', marginBottom: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+                {submitError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button className="btn btn-outline btn-sm" onClick={() => setShowSubmitConfirm(false)}>
                 Cancel
               </button>
-              <button className="btn btn-primary btn-sm" onClick={confirmSubmit}>
-                Submit
+              <button className="btn btn-primary btn-sm" onClick={confirmSubmit} disabled={submitting}>
+                {submitting ? 'Submitting...' : 'Submit'}
               </button>
             </div>
           </Modal>

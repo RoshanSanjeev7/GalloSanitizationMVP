@@ -4,22 +4,52 @@ import PDFDocument from 'pdfkit';
 import {
   getChecklist,
   putChecklist,
-  deleteChecklist as deleteChecklistDynamo,
+  conditionalPutChecklist,
+  conditionalStatusTransition,
+  conditionalDeleteChecklist,
+  markChecklistViewed,
+  updateChecklistMachine,
+  getAllUsers,
   queryChecklists,
   getLine,
   getUser,
   getTemplatesByLineId,
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
-import type { Checklist } from '../types/index.js';
+import type { Checklist, ChecklistMachine, Activity } from '../types/index.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
+// Validate that a machines payload has the expected structure
+function validateMachines(machines: unknown): machines is ChecklistMachine[] {
+  if (!Array.isArray(machines)) return false;
+  return machines.every(
+    (m: unknown) =>
+      typeof m === 'object' && m !== null &&
+      typeof (m as any).name === 'string' &&
+      Array.isArray((m as any).categories) &&
+      (m as any).categories.every(
+        (c: unknown) =>
+          typeof c === 'object' && c !== null &&
+          typeof (c as any).name === 'string' &&
+          Array.isArray((c as any).items) &&
+          (c as any).items.every(
+            (i: unknown) =>
+              typeof i === 'object' && i !== null &&
+              typeof (i as any).description === 'string' &&
+              ((i as any).completed === null || typeof (i as any).completed === 'boolean') &&
+              ((i as any).issue === null || (i as any).issue === undefined || typeof (i as any).issue === 'string') &&
+              (!(i as any).images || Array.isArray((i as any).images)),
+          ),
+      ),
+  );
+}
+
 router.get('/', async (req: AuthRequest, res) => {
   const { status, operatorId, lineId, search, date } = req.query as Record<string, string>;
-  const limit = Math.max(1, parseInt(req.query.limit as string, 10) || 50);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
   const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
 
   // Handle comma-separated statuses (e.g., 'approved,denied' for the completed tab)
@@ -73,20 +103,49 @@ router.post('/mark-all-viewed', adminOnly, async (req: AuthRequest, res) => {
     queryChecklists({ status: 'submitted' }),
     queryChecklists({ status: 'in_progress' }),
   ]);
-  const unviewed = [...submitted, ...inProgress].filter((c) => !c.viewedAt);
+  const unviewed = [...submitted, ...inProgress].filter((c) => !c.viewedAt).slice(0, 500);
   const user = await getUser(req.userId!);
   const viewerName = user?.name || 'Admin';
   const now = new Date().toISOString();
 
-  await Promise.all(
-    unviewed.map((c) => {
-      c.viewedAt = now;
-      c.viewedBy = viewerName;
-      return putChecklist(c);
-    }),
-  );
+  // Process in batches of 25
+  const batchSize = 25;
+  let count = 0;
+  for (let i = 0; i < unviewed.length; i += batchSize) {
+    const batch = unviewed.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (c) => {
+        try {
+          await markChecklistViewed(c.id, now, viewerName);
+          count++;
+        } catch {
+          // Skip individual failures silently
+        }
+      }),
+    );
+  }
 
-  res.json({ marked: unviewed.length });
+  res.json({ marked: count });
+});
+
+router.get('/notifications', adminOnly, async (req: AuthRequest, res) => {
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+  const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+
+  const [submitted, inProgress] = await Promise.all([
+    queryChecklists({ status: 'submitted' }),
+    queryChecklists({ status: 'in_progress' }),
+  ]);
+
+  const combined = [...submitted, ...inProgress];
+  combined.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
+  const unviewedCount = combined.filter((c) => !c.viewedAt).length;
+  const total = combined.length;
+  const items = combined.slice(offset, offset + limit);
+  const hasMore = offset + limit < total;
+
+  res.json({ items, total, unviewedCount, hasMore });
 });
 
 router.get('/:id', async (req: AuthRequest, res) => {
@@ -99,9 +158,9 @@ router.get('/:id', async (req: AuthRequest, res) => {
   // Auto-mark as viewed when admin first opens a submitted or in_progress checklist
   if (req.userRole === 'admin' && (checklist.status === 'submitted' || checklist.status === 'in_progress') && !checklist.viewedAt) {
     const user = await getUser(req.userId!);
+    await markChecklistViewed(checklist.id, new Date().toISOString(), user?.name || 'Admin');
     checklist.viewedAt = new Date().toISOString();
     checklist.viewedBy = user?.name || 'Admin';
-    await putChecklist(checklist);
   }
 
   res.json(checklist);
@@ -163,6 +222,66 @@ router.post('/', async (req: AuthRequest, res) => {
   res.status(201).json(checklist);
 });
 
+router.put('/:id/machines/:machineIdx', async (req: AuthRequest, res) => {
+  const machineIdx = parseInt(req.params.machineIdx as string, 10);
+  const { machine, version } = req.body;
+  const checklist = await getChecklist(req.params.id as string);
+
+  if (!checklist) {
+    res.status(404).json({ error: 'Checklist not found' });
+    return;
+  }
+
+  const isAdmin = req.userRole === 'admin';
+
+  if (checklist.status !== 'in_progress' && !(isAdmin && checklist.status === 'submitted')) {
+    res.status(400).json({ error: 'Cannot update items on this checklist' });
+    return;
+  }
+
+  if (isNaN(machineIdx) || machineIdx < 0 || machineIdx >= checklist.machines.length) {
+    res.status(400).json({ error: 'Invalid machine index' });
+    return;
+  }
+
+  // Detect new comments by comparing old machine items vs new machine items
+  const activities: Activity[] = [];
+  const oldItems = checklist.machines[machineIdx].categories.flatMap(c => c.items);
+  const newItems = machine.categories.flatMap((c: any) => c.items);
+  const oldComments = new Set(oldItems.map((i: any) => i.issue).filter(Boolean));
+  const newComments = newItems.map((i: any) => i.issue).filter(Boolean);
+  const addedComments = newComments.filter((c: string) => !oldComments.has(c));
+
+  if (addedComments.length > 0) {
+    const user = await getUser(req.userId!);
+    activities.push({
+      type: 'comment',
+      by: user?.name || 'Unknown',
+      at: new Date().toISOString(),
+      detail: addedComments[0],
+    });
+  }
+
+  try {
+    await updateChecklistMachine(
+      checklist.id,
+      machineIdx,
+      machine,
+      version,
+      new Date().toISOString(),
+      activities.length > 0 ? activities : undefined,
+    );
+    const newVersion = version + 1;
+    res.json({ version: newVersion });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+      res.status(409).json({ error: 'Checklist has been modified by another user. Please refresh.' });
+      return;
+    }
+    throw err;
+  }
+});
+
 router.put('/:id/items', async (req: AuthRequest, res) => {
   const { machines, version } = req.body;
   const checklist = await getChecklist(req.params.id as string);
@@ -179,13 +298,19 @@ router.put('/:id/items', async (req: AuthRequest, res) => {
     return;
   }
 
-  // Optimistic concurrency: reject if version doesn't match
+  // Optimistic concurrency: fast-fail if version doesn't match
   if (version !== undefined && checklist.version !== version) {
     res.status(409).json({ error: 'Checklist has been modified by another user. Please refresh.' });
     return;
   }
 
-  // Detect new comments by comparing old and new machines
+  const expectedVersion = checklist.version;
+
+  // Validate and detect new comments by comparing old and new machines
+  if (Array.isArray(machines) && !validateMachines(machines)) {
+    res.status(400).json({ error: 'Invalid machines structure' });
+    return;
+  }
   if (Array.isArray(machines)) {
     const oldItems = checklist.machines.flatMap(m => m.categories.flatMap(c => c.items));
     const newItems = machines.flatMap((m: any) => m.categories.flatMap((c: any) => c.items));
@@ -211,10 +336,17 @@ router.put('/:id/items', async (req: AuthRequest, res) => {
   }
 
   checklist.updatedAt = new Date().toISOString();
-  if (version !== undefined) {
-    checklist.version = version + 1;
+
+  try {
+    await conditionalPutChecklist(checklist, expectedVersion);
+    checklist.version = expectedVersion + 1;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+      res.status(409).json({ error: 'Checklist has been modified by another user. Please refresh.' });
+      return;
+    }
+    throw err;
   }
-  await putChecklist(checklist);
   res.json(checklist);
 });
 
@@ -222,7 +354,12 @@ router.post('/:id/submit', async (req: AuthRequest, res) => {
   const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
-    res.status(404).json({ error: 'Checklist not found' });
+    res.status(404).json({ error: 'Checklist not found or has been deleted' });
+    return;
+  }
+
+  if (checklist.status !== 'in_progress') {
+    res.status(400).json({ error: 'Only in-progress checklists can be submitted' });
     return;
   }
 
@@ -230,46 +367,87 @@ router.post('/:id/submit', async (req: AuthRequest, res) => {
   checklist.status = 'submitted';
   checklist.endTime = now;
   checklist.submittedAt = now;
-  await putChecklist(checklist);
-  res.json(checklist);
+
+  try {
+    await conditionalStatusTransition(checklist, 'in_progress', checklist.version);
+    checklist.version = checklist.version + 1;
+    res.json(checklist);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+      res.status(409).json({ error: 'This checklist was already submitted or modified. Please refresh.' });
+      return;
+    }
+    throw err;
+  }
 });
 
 router.post('/:id/approve', adminOnly, async (req: AuthRequest, res) => {
   const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
-    res.status(404).json({ error: 'Checklist not found' });
+    res.status(404).json({ error: 'Checklist not found or has been deleted' });
+    return;
+  }
+
+  if (checklist.status !== 'submitted') {
+    res.status(400).json({ error: 'Only submitted checklists can be approved' });
     return;
   }
 
   checklist.status = 'approved';
-  await putChecklist(checklist);
-  res.json(checklist);
+
+  try {
+    await conditionalStatusTransition(checklist, 'submitted', checklist.version);
+    checklist.version = checklist.version + 1;
+    res.json(checklist);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+      res.status(409).json({ error: 'This checklist has already been reviewed by another admin.' });
+      return;
+    }
+    throw err;
+  }
 });
 
 router.post('/:id/deny', adminOnly, async (req: AuthRequest, res) => {
   const checklist = await getChecklist(req.params.id as string);
 
   if (!checklist) {
-    res.status(404).json({ error: 'Checklist not found' });
+    res.status(404).json({ error: 'Checklist not found or has been deleted' });
+    return;
+  }
+
+  if (checklist.status !== 'submitted') {
+    res.status(400).json({ error: 'Only submitted checklists can be denied' });
     return;
   }
 
   checklist.status = 'denied';
-  await putChecklist(checklist);
-  res.json(checklist);
+
+  try {
+    await conditionalStatusTransition(checklist, 'submitted', checklist.version);
+    checklist.version = checklist.version + 1;
+    res.json(checklist);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+      res.status(409).json({ error: 'This checklist has already been reviewed by another admin.' });
+      return;
+    }
+    throw err;
+  }
 });
 
 router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
-  const checklist = await getChecklist(req.params.id as string);
-
-  if (!checklist) {
-    res.status(404).json({ error: 'Checklist not found' });
-    return;
+  try {
+    await conditionalDeleteChecklist(req.params.id as string);
+    res.status(204).send();
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
+      res.status(404).json({ error: 'Checklist not found' });
+      return;
+    }
+    throw err;
   }
-
-  await deleteChecklistDynamo(req.params.id as string);
-  res.status(204).send();
 });
 
 // PDF status — check if a cached PDF is available

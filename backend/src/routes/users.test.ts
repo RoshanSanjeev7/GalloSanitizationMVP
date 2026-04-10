@@ -12,6 +12,8 @@ vi.mock('../data/dynamo.js', () => ({
   putUser: vi.fn(),
   getUser: vi.fn(),
   deleteUser: vi.fn(),
+  createUserWithEmailLock: vi.fn().mockResolvedValue(undefined),
+  deleteUserWithEmailLock: vi.fn().mockResolvedValue(undefined),
   // Other dynamo functions the app may import at startup
   getAllLines: vi.fn().mockResolvedValue([]),
   getAllTemplates: vi.fn().mockResolvedValue([]),
@@ -21,6 +23,13 @@ vi.mock('../data/dynamo.js', () => ({
   getChecklistsByStatus: vi.fn().mockResolvedValue([]),
   queryChecklists: vi.fn().mockResolvedValue([]),
   putChecklist: vi.fn(),
+  conditionalPutChecklist: vi.fn().mockResolvedValue(undefined),
+  conditionalStatusTransition: vi.fn().mockResolvedValue(undefined),
+  conditionalDeleteChecklist: vi.fn().mockResolvedValue(undefined),
+  markChecklistViewed: vi.fn().mockResolvedValue(undefined),
+  updateChecklistMachine: vi.fn().mockResolvedValue(undefined),
+  appendChecklistImages: vi.fn().mockResolvedValue(undefined),
+  removeChecklistImage: vi.fn().mockResolvedValue(undefined),
   deleteChecklist: vi.fn(),
   getTemplate: vi.fn(),
   putTemplate: vi.fn(),
@@ -28,9 +37,22 @@ vi.mock('../data/dynamo.js', () => ({
   getLine: vi.fn(),
   putLine: vi.fn(),
   getTemplatesByLineId: vi.fn().mockResolvedValue([]),
+  docClient: {},
 }));
 
-import { getAllUsers, getUserByEmail, putUser, getUser, deleteUser } from '../data/dynamo.js';
+vi.mock('../data/s3.js', () => ({
+  uploadImage: vi.fn().mockResolvedValue('mock-key'),
+  getImageUrl: vi.fn().mockResolvedValue('https://example.com/image.jpg'),
+  getImageUrls: vi.fn().mockResolvedValue({}),
+  deleteImage: vi.fn().mockResolvedValue(undefined),
+  getSignedImageUrl: vi.fn().mockResolvedValue('https://example.com/signed.jpg'),
+}));
+
+vi.mock('../data/sqs.js', () => ({
+  sendPdfGenerationMessage: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { getAllUsers, getUserByEmail, putUser, getUser, deleteUser, createUserWithEmailLock, deleteUserWithEmailLock } from '../data/dynamo.js';
 import { app } from '../index.js';
 
 const mockedGetAllUsers = vi.mocked(getAllUsers);
@@ -38,6 +60,8 @@ const mockedGetUserByEmail = vi.mocked(getUserByEmail);
 const mockedPutUser = vi.mocked(putUser);
 const mockedGetUser = vi.mocked(getUser);
 const mockedDeleteUser = vi.mocked(deleteUser);
+const mockedCreateUserWithEmailLock = vi.mocked(createUserWithEmailLock);
+const mockedDeleteUserWithEmailLock = vi.mocked(deleteUserWithEmailLock);
 
 describe('Users routes', () => {
   const adminToken = makeAdminToken();
@@ -114,7 +138,9 @@ describe('Users routes', () => {
     });
 
     it('returns 409 when email already exists', async () => {
-      mockedGetUserByEmail.mockResolvedValue(makeUser({ email: 'dup@test.com' }));
+      const txError = new Error('Transaction cancelled');
+      txError.name = 'TransactionCanceledException';
+      mockedCreateUserWithEmailLock.mockRejectedValueOnce(txError);
 
       const res = await request(app)
         .post('/api/users')
@@ -126,9 +152,6 @@ describe('Users routes', () => {
     });
 
     it('returns 201 and creates user on success', async () => {
-      mockedGetUserByEmail.mockResolvedValue(undefined);
-      mockedPutUser.mockResolvedValue(undefined);
-
       const res = await request(app)
         .post('/api/users')
         .set('Authorization', `Bearer ${adminToken}`)
@@ -138,7 +161,7 @@ describe('Users routes', () => {
       expect(res.body).toHaveProperty('id');
       expect(res.body.name).toBe('Bob');
       expect(res.body).not.toHaveProperty('password');
-      expect(mockedPutUser).toHaveBeenCalledOnce();
+      expect(mockedCreateUserWithEmailLock).toHaveBeenCalledOnce();
     });
   });
 
@@ -197,14 +220,13 @@ describe('Users routes', () => {
     it('returns 204 on successful deletion', async () => {
       const user = makeUser({ id: 'u1' });
       mockedGetUser.mockResolvedValue(user);
-      mockedDeleteUser.mockResolvedValue(undefined);
 
       const res = await request(app)
         .delete('/api/users/u1')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(204);
-      expect(mockedDeleteUser).toHaveBeenCalledWith('u1');
+      expect(mockedDeleteUserWithEmailLock).toHaveBeenCalledWith('u1', user.email);
     });
   });
 });

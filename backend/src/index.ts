@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
+import rateLimit from 'express-rate-limit';
 import { config } from './config/env.js';
 import { seedIfEmpty } from './data/seed-dynamo.js';
 import authRoutes from './routes/auth.js';
@@ -12,18 +14,53 @@ import imageRoutes from './routes/images.js';
 const app = express();
 
 app.use(cors({ origin: config.frontendOrigin, credentials: true }));
-app.use(express.json());
+app.use(compression());
+app.use(express.json({ limit: '1mb' }));
+
+// ─── RATE LIMITING ─────────────────────────────────────────────────
+// Skip rate limiting in development/test to avoid breaking E2E tests.
+// In production, these protect against brute force and API abuse.
+const isProduction = process.env.NODE_ENV === 'production';
+
+if (isProduction) {
+  const globalLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later' },
+  });
+  app.use(globalLimiter);
+}
+
+const loginLimiter = isProduction
+  ? rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: 10,
+      message: { error: 'Too many login attempts, please try again later' },
+    })
+  : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
+
+const checklistCreateLimiter = isProduction
+  ? rateLimit({
+      windowMs: 60 * 1000,
+      max: 5,
+      message: { error: 'Too many checklists created, please slow down' },
+    })
+  : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
 
 // Health check
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
-// Routes
+// Routes with targeted rate limiters
+app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/lines', lineRoutes);
 app.use('/api/templates', templateRoutes);
+app.post('/api/checklists', checklistCreateLimiter);
 app.use('/api/checklists', checklistRoutes);
 app.use('/api/checklists', imageRoutes);
 

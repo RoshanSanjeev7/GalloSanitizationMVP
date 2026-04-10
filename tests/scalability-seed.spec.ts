@@ -22,12 +22,16 @@ test.describe('Scalability: Seed Safety', () => {
 
   test('seeded lines appear in admin line filter', async ({ page }) => {
     await login(page, ADMIN);
-    // Wait for data to load (lines fetch is async)
-    await page.waitForTimeout(1000);
 
     // The line filter select contains "All Lines" as first option
     const lineSelect = page.locator('select:has(option:has-text("All Lines"))').first();
     await expect(lineSelect).toBeVisible();
+
+    // Wait for lines to load into the dropdown (more than just "All Lines")
+    await expect(async () => {
+      const optionTexts = await lineSelect.locator('option').allTextContents();
+      expect(optionTexts.length).toBeGreaterThan(1);
+    }).toPass({ timeout: 10000 });
 
     // Options inside a closed <select> are hidden, so check their count/text via evaluate
     const optionTexts = await lineSelect.locator('option').allTextContents();

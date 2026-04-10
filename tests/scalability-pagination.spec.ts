@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { ADMIN, OPERATOR, login } from './helpers';
 
 test.describe('Scalability: Server-Side Pagination & Filtering', () => {
-  test('admin dashboard shows count only on active tab', async ({ page }) => {
+  test('admin dashboard shows counts on all tabs', async ({ page }) => {
     await login(page, ADMIN);
     // Default tab is "Pending" — it should show a count like "Pending (N)"
     const pendingTab = page.locator('button:has-text("Pending")');
@@ -10,10 +10,18 @@ test.describe('Scalability: Server-Side Pagination & Filtering', () => {
     const pendingText = await pendingTab.textContent();
     expect(pendingText).toMatch(/Pending \(\d+\)/);
 
-    // Inactive tabs should NOT show counts
+    // All tabs now show counts
     const inProgressTab = page.locator('button:has-text("In Progress")');
     const inProgressText = await inProgressTab.textContent();
-    expect(inProgressText?.trim()).toBe('In Progress');
+    expect(inProgressText).toMatch(/In Progress \(\d+\)/);
+
+    const approvedTab = page.locator('button:has-text("Approved")');
+    const approvedText = await approvedTab.textContent();
+    expect(approvedText).toMatch(/Approved \(\d+\)/);
+
+    const allTab = page.locator('button:has-text("All")');
+    const allText = await allTab.textContent();
+    expect(allText).toMatch(/All \(\d+\)/);
   });
 
   test('admin tab switching loads new data from server', async ({ page }) => {

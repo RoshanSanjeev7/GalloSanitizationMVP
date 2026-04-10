@@ -23,6 +23,8 @@ export default function SubmissionReview() {
   const [uploading, setUploading] = useState<Record<string, boolean>>({});
   const [saveError, setSaveError] = useState<string | null>(null);
   const [version, setVersion] = useState<number | undefined>();
+  const [actionInProgress, setActionInProgress] = useState<'approve' | 'deny' | 'saving' | null>(null);
+  const [deleted, setDeleted] = useState(false);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const imageUrls = useImageUrlsForMachines(id, machines);
 
@@ -54,7 +56,9 @@ export default function SubmissionReview() {
   }, [id]);
 
   const handleApprove = async () => {
-    if (!id) return;
+    if (!id || actionInProgress) return;
+    setActionInProgress('approve');
+    setSaveError(null);
     try {
       if (editMode) {
         const result = await api.updateChecklistItems(id, machines, version);
@@ -63,38 +67,61 @@ export default function SubmissionReview() {
       await api.approveChecklist(id);
       navigate('/admin');
     } catch (err: unknown) {
-      if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+      setActionInProgress(null);
+      const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
+      if (status === 409) {
         setSaveError('This checklist has been modified by another user. Please reload.');
+      } else if (status === 404) {
+        setDeleted(true);
       } else {
-        throw err;
+        setSaveError('Failed to approve. Please try again.');
       }
     }
   };
 
   const handleDeny = async () => {
-    if (!id) return;
-    await api.denyChecklist(id);
-    navigate('/admin');
+    if (!id || actionInProgress) return;
+    setActionInProgress('deny');
+    setSaveError(null);
+    try {
+      await api.denyChecklist(id);
+      navigate('/admin');
+    } catch (err: unknown) {
+      setActionInProgress(null);
+      const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
+      if (status === 409) {
+        setSaveError('This checklist has already been reviewed by another admin.');
+      } else if (status === 404) {
+        setDeleted(true);
+      } else {
+        setSaveError('Failed to deny. Please try again.');
+      }
+    }
   };
 
   const handleSaveEdits = async () => {
-    if (!id) return;
+    if (!id || actionInProgress) return;
+    setActionInProgress('saving');
     try {
       setSaveError(null);
       const result = await api.updateChecklistItems(id, buildMachines(), version);
       setVersion(result.version);
       setEditMode(false);
-      // Reload to get fresh data
       const data = await api.getChecklist(id);
       setChecklist(data);
       setMachines(data.machines);
       setVersion(data.version);
     } catch (err: unknown) {
-      if (err instanceof Error && (err as Error & { status?: number }).status === 409) {
+      const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
+      if (status === 409) {
         setSaveError('This checklist has been modified by another user. Please reload.');
+      } else if (status === 404) {
+        setDeleted(true);
       } else {
-        throw err;
+        setSaveError('Failed to save. Please try again.');
       }
+    } finally {
+      setActionInProgress(null);
     }
   };
 
@@ -151,6 +178,20 @@ export default function SubmissionReview() {
     return (
       <div className="page-container">
         <div className="main-content"><Spinner label="Loading review..." delay={0} /></div>
+      </div>
+    );
+  }
+
+  if (deleted) {
+    return (
+      <div className="page-container">
+        <div className="main-content" style={{ textAlign: 'center', paddingTop: 80 }}>
+          <h2>Checklist Deleted</h2>
+          <p style={{ color: 'var(--text-muted)', marginBottom: 20 }}>This checklist has been deleted by another admin.</p>
+          <button className="btn btn-primary" onClick={() => navigate('/admin')}>
+            Back to Dashboard
+          </button>
+        </div>
       </div>
     );
   }
@@ -238,11 +279,11 @@ export default function SubmissionReview() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {editMode ? (
               <>
-                <button className="btn btn-outline btn-sm" onClick={() => setEditMode(false)}>
+                <button className="btn btn-outline btn-sm" disabled={actionInProgress !== null} onClick={() => setEditMode(false)}>
                   Cancel
                 </button>
-                <button className="btn btn-green btn-sm" onClick={handleSaveEdits}>
-                  Save Changes
+                <button className="btn btn-green btn-sm" disabled={actionInProgress !== null} onClick={handleSaveEdits}>
+                  {actionInProgress === 'saving' ? 'Saving...' : 'Save Changes'}
                 </button>
               </>
             ) : (
@@ -250,11 +291,11 @@ export default function SubmissionReview() {
                 <button className="btn btn-outline btn-sm" onClick={() => setEditMode(true)}>
                   Edit Checklist
                 </button>
-                <button className="btn btn-red-outline btn-sm" onClick={handleDeny}>
-                  Deny
+                <button className="btn btn-red-outline btn-sm" disabled={actionInProgress !== null} onClick={handleDeny}>
+                  {actionInProgress === 'deny' ? 'Denying...' : 'Deny'}
                 </button>
-                <button className="btn btn-green btn-sm" onClick={handleApprove}>
-                  Approve
+                <button className="btn btn-green btn-sm" disabled={actionInProgress !== null} onClick={handleApprove}>
+                  {actionInProgress === 'approve' ? 'Approving...' : 'Approve'}
                 </button>
               </>
             )}
@@ -267,6 +308,15 @@ export default function SubmissionReview() {
         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 20 }}>
           {formatFullDate(start)} - {formatTime(start)}
         </p>
+
+        {saveError && (
+          <div style={{ padding: '12px 16px', marginBottom: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 14, color: '#dc2626' }}>
+            {saveError}
+            {saveError.includes('reload') && (
+              <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => { setSaveError(null); window.location.reload(); }}>Reload</button>
+            )}
+          </div>
+        )}
 
         <select
           className="form-select"
@@ -559,20 +609,20 @@ export default function SubmissionReview() {
             <div className="action-buttons">
               {editMode ? (
                 <>
-                  <button className="btn btn-outline" onClick={() => setEditMode(false)}>
+                  <button className="btn btn-outline" disabled={actionInProgress !== null} onClick={() => setEditMode(false)}>
                     Cancel
                   </button>
-                  <button className="btn btn-green" onClick={handleSaveEdits}>
-                    Save Changes
+                  <button className="btn btn-green" disabled={actionInProgress !== null} onClick={handleSaveEdits}>
+                    {actionInProgress === 'saving' ? 'Saving...' : 'Save Changes'}
                   </button>
                 </>
               ) : (
                 <>
-                  <button className="btn btn-red-outline" onClick={handleDeny}>
-                    Deny
+                  <button className="btn btn-red-outline" disabled={actionInProgress !== null} onClick={handleDeny}>
+                    {actionInProgress === 'deny' ? 'Denying...' : 'Deny'}
                   </button>
-                  <button className="btn btn-green" onClick={handleApprove}>
-                    Approve
+                  <button className="btn btn-green" disabled={actionInProgress !== null} onClick={handleApprove}>
+                    {actionInProgress === 'approve' ? 'Approving...' : 'Approve'}
                   </button>
                 </>
               )}

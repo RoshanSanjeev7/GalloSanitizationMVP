@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { ADMIN, OPERATOR, login } from './helpers';
 
 test.describe('Scalability: JWT Token Improvements', () => {
-  test('login returns JWT with 1-hour expiry', async ({ page }) => {
+  test('login returns JWT with 8-hour expiry', async ({ page }) => {
     await login(page, OPERATOR);
 
     // Read the token from localStorage
@@ -17,11 +17,11 @@ test.describe('Scalability: JWT Token Improvements', () => {
     expect(payload.role).toBe('operator');
     expect(payload.exp).toBeDefined();
 
-    // Verify expiry is ~1 hour from now (not 24h)
+    // Verify expiry is ~8 hours from now
     const expiresIn = payload.exp * 1000 - Date.now();
-    const oneHourMs = 60 * 60 * 1000;
-    expect(expiresIn).toBeLessThanOrEqual(oneHourMs + 5000); // 1h + 5s tolerance
-    expect(expiresIn).toBeGreaterThan(oneHourMs - 60000); // At least 59 minutes
+    const eightHoursMs = 8 * 60 * 60 * 1000;
+    expect(expiresIn).toBeLessThanOrEqual(eightHoursMs + 5000); // 8h + 5s tolerance
+    expect(expiresIn).toBeGreaterThan(eightHoursMs - 60000); // At least 7h 59m
   });
 
   test('refresh endpoint returns new valid token', async ({ request }) => {

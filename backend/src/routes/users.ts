@@ -6,6 +6,8 @@ import {
   putUser,
   getUser,
   deleteUser as deleteUserDynamo,
+  createUserWithEmailLock,
+  deleteUserWithEmailLock,
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 
@@ -14,7 +16,7 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', async (req, res) => {
-  const limit = Math.max(1, parseInt(req.query.limit as string, 10) || 100);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 100));
   const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
 
   const users = await getAllUsers();
@@ -35,14 +37,16 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
     return;
   }
 
-  const existing = await getUserByEmail(email);
-  if (existing) {
-    res.status(409).json({ error: 'Email already exists' });
-    return;
-  }
-
   const user = { id: uuid(), name, email, password, role };
-  await putUser(user);
+  try {
+    await createUserWithEmailLock(user);
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === 'TransactionCanceledException') {
+      res.status(409).json({ error: 'Email already exists' });
+      return;
+    }
+    throw err;
+  }
 
   const { password: _, ...userPublic } = user;
   res.status(201).json(userPublic);
@@ -57,6 +61,16 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
     return;
   }
 
+  // Prevent demoting the last admin
+  if (role && role !== 'admin' && user.role === 'admin') {
+    const allUsers = await getAllUsers();
+    const adminCount = allUsers.filter(u => u.role === 'admin').length;
+    if (adminCount <= 1) {
+      res.status(400).json({ error: 'Cannot demote the last admin' });
+      return;
+    }
+  }
+
   if (role) user.role = role;
   await putUser(user);
 
@@ -65,14 +79,34 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
 });
 
 router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
-  const user = await getUser(req.params.id as string);
+  // Prevent self-deletion
+  if (req.userId === req.params.id) {
+    res.status(400).json({ error: 'Cannot delete your own account' });
+    return;
+  }
 
+  const user = await getUser(req.params.id as string);
   if (!user) {
     res.status(404).json({ error: 'User not found' });
     return;
   }
 
-  await deleteUserDynamo(req.params.id as string);
+  // Prevent deleting the last admin
+  if (user.role === 'admin') {
+    const allUsers = await getAllUsers();
+    const adminCount = allUsers.filter(u => u.role === 'admin').length;
+    if (adminCount <= 1) {
+      res.status(400).json({ error: 'Cannot delete the last admin' });
+      return;
+    }
+  }
+
+  try {
+    await deleteUserWithEmailLock(user.id, user.email);
+  } catch (err: unknown) {
+    // Fallback to simple delete if email lock doesn't exist (legacy users)
+    await deleteUserDynamo(user.id);
+  }
   res.status(204).send();
 });
 

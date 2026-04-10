@@ -18,10 +18,10 @@ test.describe('Scalability: Batch Image URLs', () => {
 
     const id = items[0].id;
 
-    // Call batch endpoint with fake keys — should return URLs (or empty if keys don't exist in S3)
+    // Call batch endpoint with fake keys prefixed by checklist ID — should return URLs (or empty if keys don't exist in S3)
     const batchRes = await request.post(`/api/checklists/${id}/image-urls`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { keys: ['test-key-1.jpg', 'test-key-2.jpg'] },
+      data: { keys: [`${id}/test-key-1.jpg`, `${id}/test-key-2.jpg`] },
     });
     expect(batchRes.status()).toBe(200);
     const body = await batchRes.json();
