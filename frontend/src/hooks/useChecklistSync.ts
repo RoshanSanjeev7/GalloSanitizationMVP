@@ -31,11 +31,9 @@ export function useChecklistSync(
       setMachines((prev) =>
         updateMachineItem(prev, msg.machineIdx, msg.catIdx, msg.itemIdx, (item) => ({
           ...item,
-          [msg.field]: msg.value,
-          ...(msg.field === 'completed' ? {
-            completedBy: msg.value !== null ? msg.by : null,
-            completedAt: msg.value !== null ? msg.at : null,
-          } : {}),
+          completed: msg.completed !== undefined ? msg.completed : item.completed,
+          completedBy: msg.completedBy !== undefined ? msg.completedBy : item.completedBy,
+          completedAt: msg.completedAt !== undefined ? msg.completedAt : item.completedAt,
         })),
       );
     });
