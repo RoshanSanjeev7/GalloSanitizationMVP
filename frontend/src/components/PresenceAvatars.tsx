@@ -2,7 +2,7 @@ import s from './PresenceAvatars.module.css';
 
 interface PresenceUser {
   name: string;
-  [key: string]: unknown;
+  [key: string]: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 }
 
 interface Props {
