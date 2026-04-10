@@ -4,6 +4,7 @@ import compression from 'compression';
 import rateLimit from 'express-rate-limit';
 import { config } from './config/env.js';
 import { seedIfEmpty } from './data/seed-dynamo.js';
+import { createBroadcaster } from './ws/broadcaster.js';
 import authRoutes from './routes/auth.js';
 import userRoutes from './routes/users.js';
 import lineRoutes from './routes/lines.js';
@@ -66,10 +67,16 @@ app.use('/api/checklists', imageRoutes);
 
 // Seed on startup (skip in test and production environments), then listen
 if (!process.env.VITEST) {
-  const startServer = () => {
-    app.listen(config.port, () => {
+  const startServer = async () => {
+    const server = app.listen(config.port, () => {
       console.log(`Backend running on http://localhost:${config.port}`);
     });
+
+    // Initialize WebSocket broadcaster
+    const broadcaster = await createBroadcaster(config.wsMode);
+    broadcaster.init(server);
+    app.set('broadcaster', broadcaster);
+    console.log(`WebSocket mode: ${config.wsMode}`);
   };
 
   if (process.env.NODE_ENV === 'production') {

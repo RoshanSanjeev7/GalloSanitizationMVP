@@ -17,6 +17,11 @@ import {
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 import type { Checklist, ChecklistMachine, Activity } from '../types/index.js';
+import type { WebSocketBroadcaster } from '../ws/broadcaster.js';
+
+function getBroadcaster(req: AuthRequest): WebSocketBroadcaster | null {
+  return req.app.get('broadcaster') || null;
+}
 
 const router = Router();
 
@@ -273,6 +278,30 @@ router.put('/:id/machines/:machineIdx', async (req: AuthRequest, res) => {
     );
     const newVersion = version + 1;
     res.json({ version: newVersion });
+
+    // Broadcast diffs for changed items
+    const bc = getBroadcaster(req);
+    if (bc) {
+      const oldCats = checklist.machines[machineIdx].categories;
+      const newCats = machine.categories;
+      const user = activities.length > 0 ? activities[0].by : (await getUser(req.userId!))?.name || 'Unknown';
+      for (let ci = 0; ci < newCats.length; ci++) {
+        const oldCat = oldCats[ci];
+        const newCat = newCats[ci];
+        if (!oldCat || !newCat) continue;
+        for (let ii = 0; ii < newCat.items.length; ii++) {
+          const oldItem = oldCat.items[ii];
+          const newItem = newCat.items[ii];
+          if (!oldItem || !newItem) continue;
+          if (oldItem.completed !== newItem.completed) {
+            bc.broadcastToChecklist(checklist.id, { type: 'item_update', checklistId: checklist.id, machineIdx, catIdx: ci, itemIdx: ii, completed: newItem.completed, completedBy: newItem.completedBy, completedAt: newItem.completedAt, by: user, at: new Date().toISOString() }, req.userId).catch(() => {});
+          }
+          if (oldItem.issue !== newItem.issue) {
+            bc.broadcastToChecklist(checklist.id, { type: 'comment_update', checklistId: checklist.id, machineIdx, catIdx: ci, itemIdx: ii, issue: newItem.issue, by: user, at: new Date().toISOString() }, req.userId).catch(() => {});
+          }
+        }
+      }
+    }
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
       res.status(409).json({ error: 'Checklist has been modified by another user. Please refresh.' });
@@ -372,6 +401,8 @@ router.post('/:id/submit', async (req: AuthRequest, res) => {
     await conditionalStatusTransition(checklist, 'in_progress', checklist.version);
     checklist.version = checklist.version + 1;
     res.json(checklist);
+    const bc = getBroadcaster(req);
+    if (bc) bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'submitted', by: checklist.operatorName, at: checklist.submittedAt }, req.userId).catch(() => {});
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
       res.status(409).json({ error: 'This checklist was already submitted or modified. Please refresh.' });
@@ -400,6 +431,8 @@ router.post('/:id/approve', adminOnly, async (req: AuthRequest, res) => {
     await conditionalStatusTransition(checklist, 'submitted', checklist.version);
     checklist.version = checklist.version + 1;
     res.json(checklist);
+    const bc = getBroadcaster(req);
+    if (bc) { const u = await getUser(req.userId!); bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'approved', by: u?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {}); }
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
       res.status(409).json({ error: 'This checklist has already been reviewed by another admin.' });
@@ -428,6 +461,8 @@ router.post('/:id/deny', adminOnly, async (req: AuthRequest, res) => {
     await conditionalStatusTransition(checklist, 'submitted', checklist.version);
     checklist.version = checklist.version + 1;
     res.json(checklist);
+    const bc = getBroadcaster(req);
+    if (bc) { const u = await getUser(req.userId!); bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'denied', by: u?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {}); }
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
       res.status(409).json({ error: 'This checklist has already been reviewed by another admin.' });
@@ -441,6 +476,8 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
   try {
     await conditionalDeleteChecklist(req.params.id as string);
     res.status(204).send();
+    const bc = getBroadcaster(req);
+    if (bc) bc.broadcastToChecklist(req.params.id as string, { type: 'checklist_deleted', checklistId: req.params.id }, req.userId).catch(() => {});
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
       res.status(404).json({ error: 'Checklist not found' });

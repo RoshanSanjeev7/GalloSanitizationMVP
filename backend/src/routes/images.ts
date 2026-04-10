@@ -4,6 +4,11 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
 import crypto from 'node:crypto';
 import { uploadImage, getImageUrl, getImageUrls, deleteImage } from '../data/s3.js';
 import { getChecklist, getUser, appendChecklistImages, removeChecklistImage } from '../data/dynamo.js';
+import type { WebSocketBroadcaster } from '../ws/broadcaster.js';
+
+function getBroadcaster(req: AuthRequest): WebSocketBroadcaster | null {
+  return req.app.get('broadcaster') || null;
+}
 
 const router = Router();
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
@@ -98,6 +103,8 @@ router.post(
 
     // Return updated images array
     res.json({ images: [...(item.images || []), ...newKeys] });
+    const bc = getBroadcaster(req);
+    if (bc) bc.broadcastToChecklist(id, { type: 'image_update', checklistId: id, machineIdx, catIdx, itemIdx, images: [...(item.images || []), ...newKeys], by: uploader?.name || 'Unknown', at: new Date().toISOString() }, req.userId).catch(() => {});
   }
 );
 
@@ -158,6 +165,8 @@ router.delete('/:id/images', async (req: AuthRequest, res) => {
   await removeChecklistImage(id, machineIdx, catIdx, itemIdx, remainingImages);
 
   res.json({ images: remainingImages });
+  const bc = getBroadcaster(req);
+  if (bc) bc.broadcastToChecklist(id, { type: 'image_update', checklistId: id, machineIdx, catIdx, itemIdx, images: remainingImages, by: 'System', at: new Date().toISOString() }, req.userId).catch(() => {});
 });
 
 export default router;
