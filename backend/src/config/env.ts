@@ -20,10 +20,13 @@ export const config = {
   },
   s3Bucket: process.env.S3_BUCKET || 'checklist-images',
   sqsQueueUrl: process.env.SQS_QUEUE_URL || 'http://localhost:4566/000000000000/pdf-generation-queue',
+  wsMode: (process.env.WS_MODE || 'local') as 'local' | 'apigw',
+  apiGatewayEndpoint: process.env.APIGW_WS_ENDPOINT || undefined,
   tables: {
     users: process.env.DYNAMODB_TABLE_USERS || 'SanitizationUsers',
     lines: process.env.DYNAMODB_TABLE_LINES || 'SanitizationLines',
     templates: process.env.DYNAMODB_TABLE_TEMPLATES || 'SanitizationTemplates',
     checklists: process.env.DYNAMODB_TABLE_CHECKLISTS || 'SanitizationChecklists',
+    connections: process.env.DYNAMODB_TABLE_CONNECTIONS || 'SanitizationConnections',
   },
 };

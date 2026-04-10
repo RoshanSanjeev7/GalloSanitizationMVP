@@ -82,6 +82,32 @@ awslocal dynamodb create-table \
     }
   ]'
 
+# WebSocket connections table
+awslocal dynamodb create-table \
+  --table-name SanitizationConnections \
+  --attribute-definitions \
+    AttributeName=connectionId,AttributeType=S \
+    AttributeName=checklistId,AttributeType=S \
+    AttributeName=channel,AttributeType=S \
+  --key-schema AttributeName=connectionId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "checklistId-index",
+      "KeySchema": [{"AttributeName": "checklistId", "KeyType": "HASH"}],
+      "Projection": {"ProjectionType": "ALL"}
+    },
+    {
+      "IndexName": "channel-index",
+      "KeySchema": [{"AttributeName": "channel", "KeyType": "HASH"}],
+      "Projection": {"ProjectionType": "ALL"}
+    }
+  ]'
+
+awslocal dynamodb update-time-to-live \
+  --table-name SanitizationConnections \
+  --time-to-live-specification Enabled=true,AttributeName=ttl
+
 echo "Creating S3 bucket..."
 awslocal s3 mb s3://checklist-images
 
