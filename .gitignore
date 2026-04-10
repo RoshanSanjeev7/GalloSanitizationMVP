@@ -10,3 +10,4 @@ backend/venv
 backend/instance
 playwright-report/
 test-results/
+.superpowers/
