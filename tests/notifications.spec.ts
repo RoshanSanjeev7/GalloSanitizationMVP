@@ -85,9 +85,11 @@ test.describe('Admin Notification Bell', () => {
       await markAllBtn.click();
       await page.waitForTimeout(500);
 
-      // Submitted items should now show "Viewed"
-      const viewedCount = await page.locator('text=Viewed').count();
-      expect(viewedCount).toBeGreaterThan(0);
+      // Submitted items should now show "Viewed" (wait for UI to update)
+      await expect(async () => {
+        const viewedCount = await page.locator('text=Viewed').count();
+        expect(viewedCount).toBeGreaterThan(0);
+      }).toPass({ timeout: 5000 });
     }
   });
 
