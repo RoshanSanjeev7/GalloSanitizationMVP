@@ -8,6 +8,8 @@ import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
+import { usePresenceSummary } from '../hooks/usePresenceSummary';
+import PresenceAvatars from '../components/PresenceAvatars';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'submitted' | 'approved' | 'in_progress';
@@ -48,6 +50,7 @@ export default function AdminDashboard() {
   const notifRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController | null>(null);
+  const { presenceMap } = usePresenceSummary();
 
   const fetchNotifications = useCallback(async (offset = 0, append = false) => {
     const [submitted, inProgress] = await Promise.all([
@@ -531,6 +534,9 @@ export default function AdminDashboard() {
                 </span>
               </div>
               <div className={d.dashRowRight}>
+                {presenceMap[cl.id] && presenceMap[cl.id].length > 0 && (
+                  <PresenceAvatars users={presenceMap[cl.id]} />
+                )}
                 <StatusBadge status={cl.status} />
                 <span className={d.dashRowChevron}>&rsaquo;</span>
               </div>

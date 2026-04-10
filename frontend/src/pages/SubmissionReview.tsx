@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api, { type Checklist, type ChecklistMachine } from '../services/api';
 import { formatTime, formatFullDate, formatStamp, statusColor, statusIcon, STATUS_LABELS, itemKey as getItemKey, collapseKey as getCollapseKey, updateMachineItem } from '../utils/checklist';
 import { useImageUrlsForMachines } from '../hooks/useImageUrls';
+import { useChecklistSync } from '../hooks/useChecklistSync';
+import PresenceAvatars from '../components/PresenceAvatars';
 import cl from '../styles/checklist.module.css';
 import s from '../styles/sidebar.module.css';
 import fillStyles from './ChecklistFill.module.css';
@@ -54,6 +56,8 @@ export default function SubmissionReview() {
       });
     }
   }, [id]);
+
+  const { presence, isDeleted: wsIsDeleted, statusChanged } = useChecklistSync(id, machines, setMachines, setVersion);
 
   const handleApprove = async () => {
     if (!id || actionInProgress) return;
@@ -182,7 +186,7 @@ export default function SubmissionReview() {
     );
   }
 
-  if (deleted) {
+  if (deleted || wsIsDeleted) {
     return (
       <div className="page-container">
         <div className="main-content" style={{ textAlign: 'center', paddingTop: 80 }}>
@@ -315,6 +319,12 @@ export default function SubmissionReview() {
             {saveError.includes('reload') && (
               <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => { setSaveError(null); window.location.reload(); }}>Reload</button>
             )}
+          </div>
+        )}
+        {statusChanged && (
+          <div style={{ padding: '12px 16px', marginBottom: 12, background: '#dbeafe', border: '1px solid #93c5fd', borderRadius: 8, fontSize: 14 }}>
+            This checklist was {statusChanged.status} by {statusChanged.by}.
+            <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => navigate('/admin')}>Go to Dashboard</button>
           </div>
         )}
 
@@ -662,6 +672,12 @@ export default function SubmissionReview() {
                   {STATUS_LABELS[checklist.status] || checklist.status}
                 </span>
               </div>
+              {presence.length > 0 && (
+                <div className={s.summaryRow}>
+                  <span className={s.label}>Currently Viewing</span>
+                  <span className={s.value}><PresenceAvatars users={presence} /></span>
+                </div>
+              )}
             </div>
 
             <div className={s.completionPanel}>

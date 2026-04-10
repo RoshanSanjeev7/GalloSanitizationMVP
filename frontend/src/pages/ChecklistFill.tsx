@@ -4,6 +4,9 @@ import api, { type Checklist, type ChecklistMachine } from '../services/api';
 import Modal from '../components/Modal';
 import { formatStamp, itemKey as getItemKey, collapseKey as getCollapseKey, updateMachineItem } from '../utils/checklist';
 import { useImageUrlsForMachines } from '../hooks/useImageUrls';
+import { useChecklistSync } from '../hooks/useChecklistSync';
+import PresenceAvatars from '../components/PresenceAvatars';
+import { wsClient } from '../services/websocket';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistFill.module.css';
 import Spinner from '../components/Spinner';
@@ -28,6 +31,7 @@ export default function ChecklistFill() {
   const savePromiseRef = useRef<Promise<void> | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const imageUrls = useImageUrlsForMachines(id, machines, activeMachine);
+  const { presence, isDeleted, statusChanged } = useChecklistSync(id, machines, setMachines, setVersion);
 
   const currentUser = api.getStoredUser();
 
@@ -145,6 +149,10 @@ export default function ChecklistFill() {
     };
   }, [machines, commentInputs, showComment]);
 
+  useEffect(() => {
+    if (id) wsClient.machineChange(id, activeMachine);
+  }, [id, activeMachine]);
+
   const confirmSubmit = async () => {
     if (!id || submitting) return;
     setSubmitting(true);
@@ -198,6 +206,7 @@ export default function ChecklistFill() {
             {saveStatus === 'saving' && <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>Saving...</span>}
             {saveStatus === 'saved' && <span style={{ fontSize: 12, color: 'var(--success)' }}>Saved</span>}
             {saveStatus === 'error' && <span style={{ fontSize: 12, color: 'var(--error)' }}>Save failed</span>}
+            <PresenceAvatars users={presence} label />
             <button className="btn btn-primary btn-sm" onClick={() => setShowSubmitConfirm(true)} disabled={submitting || saveStatus === 'saving'}>
               Submit Checklist
             </button>
@@ -207,6 +216,18 @@ export default function ChecklistFill() {
         {saveStatus === 'conflict' && (
           <div style={{ padding: '12px 16px', marginBottom: 12, background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, fontSize: 14 }}>
             This checklist has been modified by another user. <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => { setSaveStatus('idle'); loadChecklist(); }}>Reload</button>
+          </div>
+        )}
+        {statusChanged && (
+          <div style={{ padding: '12px 16px', marginBottom: 12, background: '#dbeafe', border: '1px solid #93c5fd', borderRadius: 8, fontSize: 14 }}>
+            This checklist was {statusChanged.status} by {statusChanged.by}.
+            <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => navigate('/')}>Go to Dashboard</button>
+          </div>
+        )}
+        {isDeleted && (
+          <div style={{ padding: '12px 16px', marginBottom: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 14, color: '#dc2626' }}>
+            This checklist has been deleted.
+            <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => navigate('/')}>Go to Dashboard</button>
           </div>
         )}
 
