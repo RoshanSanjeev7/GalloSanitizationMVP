@@ -7,7 +7,7 @@ test.describe('Checklist Lifecycle (create → fill → submit → approve)', ()
     await login(page, OPERATOR);
     await page.click('button:has-text("Add Checklist")');
     await expect(page.locator('h2:has-text("New Checklist")')).toBeVisible();
-    await page.locator('select.form-select').last().selectOption({ index: 1 });
+    await page.locator('select.form-select').last().selectOption({ label: 'Line 91' });
     await page.locator('button:has-text("Create")').click();
     await expect(page.locator('h2:has-text("New Checklist")')).not.toBeVisible();
     await page.waitForTimeout(500);
@@ -58,7 +58,7 @@ test.describe('Checklist Lifecycle (create → fill → submit → approve)', ()
     await login(page, OPERATOR);
     await page.click('button:has-text("Add Checklist")');
     await expect(page.locator('h2:has-text("New Checklist")')).toBeVisible();
-    await page.locator('select.form-select').last().selectOption({ index: 1 });
+    await page.locator('select.form-select').last().selectOption({ label: 'Line 91' });
     await page.locator('button:has-text("Create")').click();
     await expect(page.locator('h2:has-text("New Checklist")')).not.toBeVisible();
     await page.waitForTimeout(500);

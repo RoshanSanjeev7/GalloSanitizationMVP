@@ -5,6 +5,7 @@ import {
   getTemplate,
   putTemplate,
   deleteTemplate as deleteTemplateDynamo,
+  queryChecklists,
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 
@@ -57,6 +58,24 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
 
   await putTemplate(template);
   res.json(template);
+});
+
+// Check for active checklists before deleting (returns warning, not error)
+router.get('/:id/check-delete', adminOnly, async (req: AuthRequest, res) => {
+  const template = await getTemplate(req.params.id as string);
+  if (!template) {
+    res.status(404).json({ error: 'Template not found' });
+    return;
+  }
+
+  const inProgress = await queryChecklists({ status: 'in_progress' });
+  const activeCount = inProgress.filter(c => c.templateId === template.id).length;
+
+  if (activeCount > 0) {
+    res.json({ warning: `${activeCount} checklist${activeCount > 1 ? 's are' : ' is'} in progress using this template`, count: activeCount });
+  } else {
+    res.json({ warning: null, count: 0 });
+  }
 });
 
 router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {

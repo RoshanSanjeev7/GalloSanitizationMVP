@@ -26,7 +26,7 @@ async function refreshTokenIfNeeded(): Promise<void> {
   try {
     const payload = JSON.parse(atob(token.split('.')[1]));
     const expiresAt = payload.exp * 1000;
-    if (expiresAt - Date.now() > 10 * 60 * 1000) return; // More than 10min left
+    if (expiresAt - Date.now() > 30 * 60 * 1000) return; // More than 30min left
   } catch {
     return;
   }
@@ -62,6 +62,8 @@ async function requestWithRetry<T = unknown>(endpoint: string, options: RequestI
     try {
       return await request<T>(endpoint, options);
     } catch (err: unknown) {
+      // Don't retry aborted requests
+      if (err instanceof Error && err.name === 'AbortError') throw err;
       const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
       const isRetryable = !status || status >= 500;
       const isLast = attempt === maxRetries - 1;
@@ -307,10 +309,16 @@ export interface ChecklistResponse {
   hasMore: boolean;
 }
 
-async function getChecklists(params: Record<string, string> = {}): Promise<ChecklistResponse> {
+async function getChecklists(params: Record<string, string> = {}, signal?: AbortSignal): Promise<ChecklistResponse> {
   const query = new URLSearchParams(params).toString();
   const endpoint = query ? `/checklists?${query}` : '/checklists';
-  return requestWithRetry<ChecklistResponse>(endpoint);
+  return requestWithRetry<ChecklistResponse>(endpoint, signal ? { signal } : {});
+}
+
+async function getNotifications(params: Record<string, string> = {}): Promise<ChecklistResponse & { unviewedCount: number }> {
+  const query = new URLSearchParams(params).toString();
+  const endpoint = query ? `/checklists/notifications?${query}` : '/checklists/notifications';
+  return requestWithRetry<ChecklistResponse & { unviewedCount: number }>(endpoint);
 }
 
 async function getChecklist(id: string): Promise<Checklist> {
@@ -332,6 +340,18 @@ async function updateChecklistItems(
   return request<Checklist>(`/checklists/${id}/items`, {
     method: 'PUT',
     body: JSON.stringify({ machines, ...(version !== undefined ? { version } : {}) }),
+  });
+}
+
+async function updateChecklistMachine(
+  id: string,
+  machineIdx: number,
+  machine: ChecklistMachine,
+  version?: number,
+): Promise<{ version: number }> {
+  return request<{ version: number }>(`/checklists/${id}/machines/${machineIdx}`, {
+    method: 'PUT',
+    body: JSON.stringify({ machine, ...(version !== undefined ? { version } : {}) }),
   });
 }
 
@@ -450,9 +470,11 @@ const api = {
   updateTemplate,
   deleteTemplate,
   getChecklists,
+  getNotifications,
   getChecklist,
   createChecklist,
   updateChecklistItems,
+  updateChecklistMachine,
   submitChecklist,
   approveChecklist,
   denyChecklist,

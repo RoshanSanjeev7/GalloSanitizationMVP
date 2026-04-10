@@ -24,7 +24,7 @@ router.post('/login', async (req, res) => {
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     config.jwtSecret,
-    { expiresIn: '1h' }
+    { expiresIn: '8h' }
   );
 
   const { password: _, ...userPublic } = user;
@@ -41,7 +41,7 @@ router.post('/refresh', authMiddleware, async (req: AuthRequest, res) => {
   const token = jwt.sign(
     { userId: user.id, role: user.role },
     config.jwtSecret,
-    { expiresIn: '1h' },
+    { expiresIn: '8h' },
   );
 
   const { password: _, ...userPublic } = user;

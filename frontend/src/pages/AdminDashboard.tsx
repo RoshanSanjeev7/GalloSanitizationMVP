@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
 import api, { type Checklist, type Line } from '../services/api';
@@ -13,6 +13,7 @@ import d from '../styles/dashboard.module.css';
 type Tab = 'all' | 'submitted' | 'approved' | 'in_progress';
 
 const PAGE_LIMIT = 20;
+const NOTIF_PAGE_SIZE = 20;
 
 function statusParamsForTab(tab: Tab): Record<string, string> {
   if (tab === 'submitted') return { status: 'submitted' };
@@ -24,6 +25,7 @@ function statusParamsForTab(tab: Tab): Record<string, string> {
 export default function AdminDashboard() {
   const user = useSelector((s: RootState) => s.auth.user);
   const navigate = useNavigate();
+  const location = useLocation();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
   const [tab, setTab] = useState<Tab>('submitted');
@@ -40,17 +42,27 @@ export default function AdminDashboard() {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [notifications, setNotifications] = useState<Checklist[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [notifHasMore, setNotifHasMore] = useState(false);
+  const [notifTotal, setNotifTotal] = useState(0);
+  const [notifLoadingMore, setNotifLoadingMore] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const abortRef = useRef<AbortController | null>(null);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (offset = 0, append = false) => {
     const [submitted, inProgress] = await Promise.all([
-      api.getChecklists({ status: 'submitted', limit: '50' }),
-      api.getChecklists({ status: 'in_progress', limit: '50' }),
+      api.getChecklists({ status: 'submitted', limit: String(NOTIF_PAGE_SIZE), offset: String(offset) }),
+      api.getChecklists({ status: 'in_progress', limit: String(NOTIF_PAGE_SIZE), offset: String(offset) }),
     ]);
     const all = [...submitted.items, ...inProgress.items];
     all.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
-    setNotifications(all);
+    if (append) {
+      setNotifications((prev) => [...prev, ...all]);
+    } else {
+      setNotifications(all);
+    }
+    setNotifTotal(submitted.total + inProgress.total);
+    setNotifHasMore(submitted.hasMore || inProgress.hasMore);
   }, []);
 
   const fetchCounts = useCallback(async () => {
@@ -75,6 +87,7 @@ export default function AdminDashboard() {
     currentLineFilter: string,
     append: boolean,
     currentDate?: string,
+    signal?: AbortSignal,
   ) => {
     const params: Record<string, string> = {
       limit: String(PAGE_LIMIT),
@@ -85,7 +98,8 @@ export default function AdminDashboard() {
     if (currentLineFilter) params.lineId = currentLineFilter;
     if (currentDate) params.date = currentDate;
 
-    const res = await api.getChecklists(params);
+    const res = await api.getChecklists(params, signal);
+    if (signal?.aborted) return;
     if (append) {
       setChecklists((prev) => [...prev, ...res.items]);
     } else {
@@ -116,15 +130,18 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
     loadData(tab);
-  }, [user]);
+  }, [user, location.key]);
 
   const handleTabChange = (newTab: Tab) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setTab(newTab);
     setOffset(0);
     setChecklists([]);
     setLoading(true);
-    fetchChecklists(newTab, 0, search, lineFilter, false, dateFilter)
-      .catch(() => {})
+    fetchChecklists(newTab, 0, search, lineFilter, false, dateFilter, controller.signal)
+      .catch((err) => { if (err?.name !== 'AbortError') console.error(err); })
       .finally(() => setLoading(false));
   };
 
@@ -132,29 +149,38 @@ export default function AdminDashboard() {
     setSearch(value);
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       setOffset(0);
       setLoading(true);
-      fetchChecklists(tab, 0, value, lineFilter, false, dateFilter)
-        .catch(() => {})
+      fetchChecklists(tab, 0, value, lineFilter, false, dateFilter, controller.signal)
+        .catch((err) => { if (err?.name !== 'AbortError') console.error(err); })
         .finally(() => setLoading(false));
     }, 300);
   };
 
   const handleLineFilterChange = (value: string) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setLineFilter(value);
     setOffset(0);
     setLoading(true);
-    fetchChecklists(tab, 0, search, value, false, dateFilter)
-      .catch(() => {})
+    fetchChecklists(tab, 0, search, value, false, dateFilter, controller.signal)
+      .catch((err) => { if (err?.name !== 'AbortError') console.error(err); })
       .finally(() => setLoading(false));
   };
 
   const handleDateFilterChange = (value: string) => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     setDateFilter(value);
     setOffset(0);
     setLoading(true);
-    fetchChecklists(tab, 0, search, lineFilter, false, value)
-      .catch(() => {})
+    fetchChecklists(tab, 0, search, lineFilter, false, value, controller.signal)
+      .catch((err) => { if (err?.name !== 'AbortError') console.error(err); })
       .finally(() => setLoading(false));
   };
 
@@ -219,6 +245,23 @@ export default function AdminDashboard() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showNotifications]);
 
+  // Auto-refresh polling every 30 seconds
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetchCounts();
+      fetchNotifications();
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [user, fetchCounts, fetchNotifications]);
+
+  // Cleanup AbortController on unmount
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
+
   const unviewedCount = notifications.filter((n) => !n.viewedAt).length;
 
   if (!user) return null;
@@ -234,7 +277,13 @@ export default function AdminDashboard() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <div ref={notifRef} style={{ position: 'relative' }}>
               <button
-                onClick={() => setShowNotifications((v) => !v)}
+                onClick={() => {
+                  const opening = !showNotifications;
+                  setShowNotifications(opening);
+                  if (opening) {
+                    fetchNotifications(0, false);
+                  }
+                }}
                 aria-label="Notifications"
                 style={{
                   width: 40, height: 40, borderRadius: '50%', border: '1px solid #e5e5e5',
@@ -363,6 +412,25 @@ export default function AdminDashboard() {
                     </div>
                     );
                   })}
+                  {notifHasMore && (
+                    <button
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const newOffset = notifications.length;
+                        setNotifLoadingMore(true);
+                        await fetchNotifications(newOffset, true);
+                        setNotifLoadingMore(false);
+                      }}
+                      style={{
+                        width: '100%', padding: '10px', textAlign: 'center',
+                        background: 'none', border: 'none', borderTop: '1px solid #eee',
+                        fontSize: 12, color: 'var(--primary, #5B2333)', fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {notifLoadingMore ? 'Loading...' : `Load more (${notifTotal - notifications.length} remaining)`}
+                    </button>
+                  )}
                 </div>
               )}
             </div>

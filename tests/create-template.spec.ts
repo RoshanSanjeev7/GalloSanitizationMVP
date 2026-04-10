@@ -4,7 +4,7 @@ import { ADMIN, login } from './helpers';
 test.describe('Create Template', () => {
   test.beforeEach(async ({ page }) => {
     await login(page, ADMIN);
-    await page.click('text=Create Template');
+    await page.click('text=Edit Templates');
     await page.waitForURL('/templates/create');
     await expect(page.locator('text=Select a Line')).toBeVisible({ timeout: 10000 });
   });
@@ -28,7 +28,7 @@ test.describe('Create Template', () => {
     await page.fill('input[placeholder*="Prep"]', 'Test Category');
     await page.fill('input[placeholder*="task description"]', 'Test task');
 
-    const saveBtn = page.locator('button:has-text("Save Changes"), button:has-text("Create Template")');
+    const saveBtn = page.locator('button:has-text("Save Changes"), button:has-text("Create Template")').first();
     await expect(saveBtn).toBeEnabled();
   });
 

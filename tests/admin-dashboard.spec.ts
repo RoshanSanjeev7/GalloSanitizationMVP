@@ -46,8 +46,8 @@ test.describe('Admin Dashboard', () => {
     }
   });
 
-  test('create template link navigates correctly', async ({ page }) => {
-    await page.click('text=Create Template');
+  test('edit templates link navigates correctly', async ({ page }) => {
+    await page.click('text=Edit Templates');
     await expect(page).toHaveURL('/templates/create');
   });
 });

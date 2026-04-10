@@ -835,6 +835,19 @@ export async function seedIfEmpty(): Promise<void> {
         { name: 'Marcus Rivera', time: '2026-04-08T08:00:00.000Z' },
       ]),
     },
+    // Line 92 — Submitted, fully completed, April 9, both operators
+    {
+      id: uuid(), templateId: template92.id, lineId: line92.id, lineName: 'Line 92',
+      operatorId: operator1.id, operatorName: 'Gabriel Sanchez',
+      status: 'submitted',
+      startTime: '2026-04-09T06:00:00.000Z', endTime: '2026-04-09T10:30:00.000Z',
+      submittedAt: '2026-04-09T10:30:00.000Z', updatedAt: '2026-04-09T10:15:00.000Z',
+      version: 4,
+      machines: buildItems(template92, 1.0, [
+        { name: 'Gabriel Sanchez', time: '2026-04-09T07:30:00.000Z' },
+        { name: 'Marcus Rivera', time: '2026-04-09T08:45:00.000Z' },
+      ]),
+    },
   ];
 
   // Generate additional historical checklists to demonstrate pagination

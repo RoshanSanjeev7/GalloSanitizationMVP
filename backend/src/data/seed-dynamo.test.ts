@@ -25,7 +25,7 @@ describe('seedIfEmpty', () => {
     expect(putUser).toHaveBeenCalledTimes(3); // admin + 2 operators
     expect(putLine).toHaveBeenCalledTimes(3); // Line 91, 92, 93
     expect(putTemplate).toHaveBeenCalledTimes(3); // one template per line
-    expect(putChecklist).toHaveBeenCalledTimes(10); // 10 seed checklists
+    expect(putChecklist).toHaveBeenCalledTimes(56); // 11 hand-written + 45 generated historical checklists
   });
 
   it('skips seeding when users already exist', async () => {

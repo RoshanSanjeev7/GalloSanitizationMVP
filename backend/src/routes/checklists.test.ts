@@ -11,6 +11,11 @@ vi.mock('../data/dynamo.js', () => ({
   queryChecklists: vi.fn().mockResolvedValue([]),
   getChecklist: vi.fn().mockResolvedValue(undefined),
   putChecklist: vi.fn().mockResolvedValue(undefined),
+  conditionalPutChecklist: vi.fn().mockResolvedValue(undefined),
+  conditionalStatusTransition: vi.fn().mockResolvedValue(undefined),
+  conditionalDeleteChecklist: vi.fn().mockResolvedValue(undefined),
+  markChecklistViewed: vi.fn().mockResolvedValue(undefined),
+  updateChecklistMachine: vi.fn().mockResolvedValue(undefined),
   deleteChecklist: vi.fn().mockResolvedValue(undefined),
   getLine: vi.fn().mockResolvedValue(undefined),
   getUser: vi.fn().mockResolvedValue(undefined),
@@ -20,6 +25,8 @@ vi.mock('../data/dynamo.js', () => ({
   getUserByEmail: vi.fn().mockResolvedValue(undefined),
   getAllUsers: vi.fn().mockResolvedValue([]),
   putUser: vi.fn().mockResolvedValue(undefined),
+  createUserWithEmailLock: vi.fn().mockResolvedValue(undefined),
+  deleteUserWithEmailLock: vi.fn().mockResolvedValue(undefined),
   deleteUser: vi.fn().mockResolvedValue(undefined),
   getAllLines: vi.fn().mockResolvedValue([]),
   putLine: vi.fn().mockResolvedValue(undefined),
@@ -29,6 +36,8 @@ vi.mock('../data/dynamo.js', () => ({
   getAllChecklists: vi.fn().mockResolvedValue([]),
   getChecklistsByOperator: vi.fn().mockResolvedValue([]),
   getChecklistsByStatus: vi.fn().mockResolvedValue([]),
+  appendChecklistImages: vi.fn().mockResolvedValue(undefined),
+  removeChecklistImage: vi.fn().mockResolvedValue(undefined),
   docClient: {},
 }));
 
@@ -48,6 +57,11 @@ import {
   queryChecklists,
   getChecklist,
   putChecklist,
+  conditionalPutChecklist,
+  conditionalStatusTransition,
+  conditionalDeleteChecklist,
+  markChecklistViewed,
+  updateChecklistMachine,
   deleteChecklist,
   getLine,
   getUser,
@@ -67,6 +81,11 @@ import {
 const mockedQueryChecklists = vi.mocked(queryChecklists);
 const mockedGetChecklist = vi.mocked(getChecklist);
 const mockedPutChecklist = vi.mocked(putChecklist);
+const mockedConditionalPutChecklist = vi.mocked(conditionalPutChecklist);
+const mockedConditionalStatusTransition = vi.mocked(conditionalStatusTransition);
+const mockedConditionalDeleteChecklist = vi.mocked(conditionalDeleteChecklist);
+const mockedMarkChecklistViewed = vi.mocked(markChecklistViewed);
+const mockedUpdateChecklistMachine = vi.mocked(updateChecklistMachine);
 const mockedDeleteChecklist = vi.mocked(deleteChecklist);
 const mockedGetLine = vi.mocked(getLine);
 const mockedGetUser = vi.mocked(getUser);
@@ -345,8 +364,10 @@ describe('Checklists Routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.viewedAt).toBeTruthy();
       expect(res.body.viewedBy).toBe('Yolanda Martinez');
-      expect(putChecklist).toHaveBeenCalledWith(
-        expect.objectContaining({ viewedAt: expect.any(String), viewedBy: 'Yolanda Martinez' }),
+      expect(markChecklistViewed).toHaveBeenCalledWith(
+        'cl-view-1',
+        expect.any(String),
+        'Yolanda Martinez',
       );
     });
 
@@ -360,7 +381,7 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.viewedAt).toBeUndefined();
-      expect(putChecklist).not.toHaveBeenCalled();
+      expect(markChecklistViewed).not.toHaveBeenCalled();
     });
 
     it('does NOT overwrite existing viewedAt (idempotent)', async () => {
@@ -378,7 +399,7 @@ describe('Checklists Routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.viewedAt).toBe('2026-04-01T12:00:00.000Z');
       expect(res.body.viewedBy).toBe('Previous Admin');
-      expect(putChecklist).not.toHaveBeenCalled();
+      expect(markChecklistViewed).not.toHaveBeenCalled();
     });
 
     it('does NOT mark approved/denied checklists as viewed', async () => {
@@ -391,7 +412,7 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.viewedAt).toBeUndefined();
-      expect(putChecklist).not.toHaveBeenCalled();
+      expect(markChecklistViewed).not.toHaveBeenCalled();
     });
 
     it('marks in_progress checklist as viewed when admin retrieves it', async () => {
@@ -406,7 +427,7 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.viewedAt).toBeTruthy();
-      expect(putChecklist).toHaveBeenCalled();
+      expect(markChecklistViewed).toHaveBeenCalled();
     });
   });
 
@@ -519,7 +540,7 @@ describe('Checklists Routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.machines).toEqual(newMachines);
       expect(res.body.updatedAt).toBeTruthy();
-      expect(putChecklist).toHaveBeenCalledOnce();
+      expect(conditionalPutChecklist).toHaveBeenCalledOnce();
     });
 
     it('allows admin to update a submitted checklist', async () => {
@@ -594,8 +615,9 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.version).toBe(4);
-      expect(putChecklist).toHaveBeenCalledWith(
-        expect.objectContaining({ version: 4 }),
+      expect(conditionalPutChecklist).toHaveBeenCalledWith(
+        expect.objectContaining({ machines: newMachines }),
+        3,
       );
     });
 
@@ -626,8 +648,8 @@ describe('Checklists Routes', () => {
         .send({ machines: [{ name: 'M', categories: [] }] });
 
       expect(res.status).toBe(200);
-      // Version should remain unchanged in unconditional write
-      expect(putChecklist).toHaveBeenCalledOnce();
+      // Still uses conditionalPutChecklist with the current version
+      expect(conditionalPutChecklist).toHaveBeenCalledOnce();
     });
   });
 
@@ -647,7 +669,7 @@ describe('Checklists Routes', () => {
       expect(res.body.status).toBe('submitted');
       expect(res.body.endTime).toBeTruthy();
       expect(res.body.submittedAt).toBeTruthy();
-      expect(putChecklist).toHaveBeenCalledOnce();
+      expect(conditionalStatusTransition).toHaveBeenCalledOnce();
     });
 
     it('returns 404 when checklist does not exist', async () => {
@@ -658,7 +680,7 @@ describe('Checklists Routes', () => {
         .set('Authorization', `Bearer ${operatorToken}`);
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Checklist not found');
+      expect(res.body.error).toContain('Checklist not found');
     });
   });
 
@@ -676,7 +698,7 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('approved');
-      expect(putChecklist).toHaveBeenCalledOnce();
+      expect(conditionalStatusTransition).toHaveBeenCalledOnce();
     });
 
     it('returns 403 when operator attempts to approve', async () => {
@@ -696,7 +718,7 @@ describe('Checklists Routes', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Checklist not found');
+      expect(res.body.error).toContain('Checklist not found');
     });
   });
 
@@ -714,7 +736,7 @@ describe('Checklists Routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.status).toBe('denied');
-      expect(putChecklist).toHaveBeenCalledOnce();
+      expect(conditionalStatusTransition).toHaveBeenCalledOnce();
     });
 
     it('returns 403 when operator attempts to deny', async () => {
@@ -734,7 +756,7 @@ describe('Checklists Routes', () => {
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(404);
-      expect(res.body.error).toBe('Checklist not found');
+      expect(res.body.error).toContain('Checklist not found');
     });
   });
 
@@ -744,14 +766,13 @@ describe('Checklists Routes', () => {
   describe('DELETE /api/checklists/:id', () => {
     it('deletes a checklist as admin and returns 204', async () => {
       const checklist = makeChecklist();
-      mockedGetChecklist.mockResolvedValueOnce(checklist);
 
       const res = await request(app)
         .delete(`/api/checklists/${checklist.id}`)
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(204);
-      expect(deleteChecklist).toHaveBeenCalledWith(checklist.id);
+      expect(conditionalDeleteChecklist).toHaveBeenCalledWith(checklist.id);
     });
 
     it('returns 403 when operator attempts to delete', async () => {
@@ -764,7 +785,9 @@ describe('Checklists Routes', () => {
     });
 
     it('returns 404 when checklist does not exist', async () => {
-      mockedGetChecklist.mockResolvedValueOnce(undefined);
+      const condError = new Error('Conditional check failed');
+      condError.name = 'ConditionalCheckFailedException';
+      mockedConditionalDeleteChecklist.mockRejectedValueOnce(condError);
 
       const res = await request(app)
         .delete('/api/checklists/nonexistent')

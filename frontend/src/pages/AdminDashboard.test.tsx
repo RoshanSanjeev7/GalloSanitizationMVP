@@ -217,10 +217,11 @@ describe('AdminDashboard', () => {
     const searchInput = screen.getByPlaceholderText('Search operator or line...');
     await user.type(searchInput, 'Gina');
 
-    // After debounce, API should be called with search param
+    // After debounce, API should be called with search param (second arg is AbortSignal)
     await waitFor(() => {
       expect(api.getChecklists).toHaveBeenCalledWith(
         expect.objectContaining({ search: 'Gina' }),
+        expect.anything(),
       );
     });
 
