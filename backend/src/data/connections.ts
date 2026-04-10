@@ -16,8 +16,13 @@ function ttlFromNow(minutes: number): number {
 }
 
 export async function putConnection(conn: ConnectionRecord): Promise<void> {
+  // Strip null values — DynamoDB GSIs can't index null key attributes
+  const item: Record<string, unknown> = { ...conn, ttl: ttlFromNow(30) };
+  for (const key of Object.keys(item)) {
+    if (item[key] === null) delete item[key];
+  }
   await docClient.send(
-    new PutCommand({ TableName: TABLE, Item: { ...conn, ttl: ttlFromNow(30) } }),
+    new PutCommand({ TableName: TABLE, Item: item }),
   );
 }
 
@@ -33,21 +38,38 @@ export async function updateConnectionSubscription(
   activeMachine: number | null,
 ): Promise<void> {
   const channel = checklistId ? `checklist:${checklistId}` : 'dashboard';
-  await docClient.send(
-    new UpdateCommand({
-      TableName: TABLE,
-      Key: { connectionId },
-      UpdateExpression: 'SET checklistId = :cid, activeMachine = :am, channel = :ch, lastActivity = :now, #ttl = :ttl',
-      ExpressionAttributeNames: { '#ttl': 'ttl' },
-      ExpressionAttributeValues: {
-        ':cid': checklistId,
-        ':am': activeMachine,
-        ':ch': channel,
-        ':now': new Date().toISOString(),
-        ':ttl': ttlFromNow(30),
-      },
-    }),
-  );
+  if (checklistId) {
+    await docClient.send(
+      new UpdateCommand({
+        TableName: TABLE,
+        Key: { connectionId },
+        UpdateExpression: 'SET checklistId = :cid, activeMachine = :am, channel = :ch, lastActivity = :now, #ttl = :ttl',
+        ExpressionAttributeNames: { '#ttl': 'ttl' },
+        ExpressionAttributeValues: {
+          ':cid': checklistId,
+          ':am': activeMachine,
+          ':ch': channel,
+          ':now': new Date().toISOString(),
+          ':ttl': ttlFromNow(30),
+        },
+      }),
+    );
+  } else {
+    // Remove checklistId and activeMachine — can't store null in GSI key attributes
+    await docClient.send(
+      new UpdateCommand({
+        TableName: TABLE,
+        Key: { connectionId },
+        UpdateExpression: 'REMOVE checklistId, activeMachine SET channel = :ch, lastActivity = :now, #ttl = :ttl',
+        ExpressionAttributeNames: { '#ttl': 'ttl' },
+        ExpressionAttributeValues: {
+          ':ch': channel,
+          ':now': new Date().toISOString(),
+          ':ttl': ttlFromNow(30),
+        },
+      }),
+    );
+  }
 }
 
 export async function updateConnectionMachine(
