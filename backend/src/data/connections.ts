@@ -1,5 +1,4 @@
 import {
-  DynamoDBDocumentClient,
   PutCommand,
   DeleteCommand,
   QueryCommand,
