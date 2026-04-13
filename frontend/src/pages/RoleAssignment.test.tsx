@@ -100,6 +100,9 @@ describe('RoleAssignment', () => {
     await user.type(screen.getByPlaceholderText('Enter full name'), 'New User');
     await user.type(screen.getByPlaceholderText('user@gallo.com'), 'new@gallo.com');
     await user.type(screen.getByPlaceholderText('Enter password'), 'testpass123');
+    // Select a factory (required for Add User button to be enabled)
+    const factoryCheckboxes = screen.getAllByRole('checkbox');
+    await user.click(factoryCheckboxes[0]);
     await user.click(screen.getByText('Add User'));
 
     await waitFor(() => {
