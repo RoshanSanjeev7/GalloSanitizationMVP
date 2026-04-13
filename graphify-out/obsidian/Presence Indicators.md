@@ -41,6 +41,10 @@ When an admin opens a submitted checklist for review, a sidebar section shows "C
 
 The Connections table has a TTL field set to 30 minutes from the last activity. If a user's browser crashes without a clean disconnect, the connection record will be auto-deleted by DynamoDB TTL. In the meantime (up to 30 minutes), that user may appear as a ghost presence. The 60-second heartbeat from the [[WebSocket System]] frontend client keeps the TTL refreshed for active users.
 
+## Worst-Case Staleness
+
+If a browser crashes without a clean WebSocket disconnect (no `close` event fires), the connection record remains in DynamoDB until the TTL expires -- up to 30 minutes from the last heartbeat. During this window, the crashed user appears as a ghost in presence lists. The 60-second heartbeat means the worst case is approximately 31 minutes of ghost presence (30 min TTL + up to 60 seconds since last heartbeat). A production improvement would be to add server-side ping/pong detection to identify dead connections faster. See [[Known Limitations]] for other MVP shortcuts.
+
 ## See also
 
 - [[WebSocket System]] -- the underlying transport for presence data

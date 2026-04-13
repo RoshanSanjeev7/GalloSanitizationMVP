@@ -27,6 +27,8 @@ Express handles all HTTP routing, organized into route files by resource: `auth.
 
 The data layer lives in `backend/src/data/dynamo.ts`, which wraps the AWS SDK v3 `DynamoDBDocumentClient`. This single file contains every database operation -- gets, puts, scans, queries, conditional writes, and transactional writes. It talks to [[DynamoDB Tables]] through table names loaded from `config.tables.*`, which default to the `Sanitization*` naming convention but are overridable via environment variables.
 
+SQS is used for asynchronous PDF generation: when a checklist is submitted, a message is sent to `pdf-generation-queue`, which triggers a Lambda function (`lambda-pdf.ts`) to generate and cache the PDF in S3. See [[PDF Export]] for the full synchronous and asynchronous generation flow.
+
 The [[WebSocket System]] is initialized at server startup. `createBroadcaster(config.wsMode)` dynamically imports either `LocalWsBroadcaster` (which creates a `ws` WebSocketServer attached to the HTTP server) or `ApiGatewayBroadcaster` (which posts messages to AWS API Gateway Management API). The broadcaster instance is stored on `app` via `app.set('broadcaster', broadcaster)` and retrieved in route handlers with `req.app.get('broadcaster')`.
 
 ## Frontend

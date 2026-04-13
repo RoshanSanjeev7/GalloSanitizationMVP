@@ -6,7 +6,7 @@ Bottling facility sanitation checklist management system. Operators fill out dee
 
 - **Frontend:** React 18 + Vite + TypeScript, Redux Toolkit, React Router v6, Recharts
 - **Backend:** Node.js + Express + TypeScript, PDFKit for PDF export
-- **Database:** DynamoDB (4 tables: Users, Lines, Templates, Checklists)
+- **Database:** DynamoDB (6 tables: Users, Lines, Templates, Checklists, Connections, AuditLog)
 - **Storage:** S3 for checklist images
 - **Local infra:** LocalStack (Docker) emulates AWS services
 - **Testing:** Playwright (E2E), Vitest (unit)
@@ -20,7 +20,7 @@ backend/src/
     routes/
       auth.ts             # Login, get current user
       users.ts            # User CRUD (admin-only for writes)
-      lines.ts            # Production lines (read-only)
+      lines.ts            # Production lines CRUD
       templates.ts        # Checklist templates (admin-only for writes)
       checklists.ts       # Checklists CRUD, submit, approve/deny, PDF export
     data/

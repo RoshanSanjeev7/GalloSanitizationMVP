@@ -69,6 +69,10 @@ But these are convenience guards -- the backend is the source of truth. See [[Ro
 
 The "count admins" check has a potential race condition: two admins could simultaneously try to delete each other. Both count 2 admins, both pass the check, both delete, leaving zero admins. In practice this is extremely unlikely (there are typically 1-2 admins), and the window is milliseconds. A production-grade fix would use a DynamoDB transaction to atomically check and delete. See [[Concurrency Scenarios]] for other race conditions.
 
+### Known Limitation
+
+Two admins could theoretically delete each other simultaneously. Both `getAllUsers` queries return 2 admins, both deletions proceed, leaving zero admins. A production fix would wrap the admin-count check and deletion in a single DynamoDB `TransactWriteCommand` with a `ConditionExpression` that verifies the admin count hasn't changed. See [[Known Limitations]] for a full list of MVP shortcuts.
+
 ## See also
 
 - [[Roles and Permissions]] -- what admin access means

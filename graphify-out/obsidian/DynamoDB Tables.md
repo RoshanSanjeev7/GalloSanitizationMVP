@@ -74,6 +74,10 @@ When an operator creates a checklist for a line, the backend queries `lineId-ind
 
 The `version` field is the backbone of [[Optimistic Concurrency]]. Every conditional write checks it, and every successful write increments it. The `machines` array is the actual checklist data -- each item has `completed`, `completedBy`, `completedAt`, `issue`, and `images` fields. The [[Per-Machine Auto-Save]] endpoint uses `UpdateCommand SET machines[N]` to write a single machine without touching the rest.
 
+The `activities` array is a timeline of events on the checklist. Each entry has `type` ('comment' | 'image' | 'submit' | 'created'), `by` (user name), `at` (ISO timestamp), and optional `detail` (comment text or image count). Activities are added by route handlers when comments are detected, images uploaded, or the checklist is submitted. The AdminDashboard notification dropdown shows the latest activity for each checklist.
+
+The `viewedAt` and `viewedBy` fields track when an admin last viewed the checklist. `POST /mark-all-viewed` atomically updates all unviewed submitted/in_progress checklists using `markChecklistViewed()` UpdateCommand (batched in groups of 25). These fields reset to null whenever an operator adds a comment or image, so the admin sees new activity.
+
 The `queryChecklists` function picks the most selective GSI based on which filters are provided: `operatorId-index` first, then `status-index`, then falls back to a full scan.
 
 ## SanitizationConnections
