@@ -178,7 +178,31 @@
   },
   "active": "af9b9cc2735b21e3",
   "lastOpenFiles": [
-    "factories.ts_1.md",
-    "_COMMUNITY_Admin Dashboard.md"
+    "Troubleshooting.md",
+    "Running Tests.md",
+    "Demo Credentials.md",
+    "Local Dev Setup.md",
+    "Release 2 Real-time.md",
+    "Release 1 Bulletproofing.md",
+    "WebSocket Adapter Pattern.md",
+    "Denied Is Final.md",
+    "JWT Design.md",
+    "Email Uniqueness.md",
+    "Admin Safety.md",
+    "Concurrency Scenarios.md",
+    "Roles and Permissions.md",
+    "Image Handling.md",
+    "Rate Limiting.md",
+    "Input Validation.md",
+    "Audit Log.md",
+    "Offline Queue.md",
+    "Toast Notifications.md",
+    "Presence Indicators.md",
+    "Auto-Save and Conflict Resolution.md",
+    "Per-Machine Auto-Save.md",
+    "Optimistic Concurrency.md",
+    "WebSocket System.md",
+    "Frontend Pages.md",
+    "API Endpoints.md"
   ]
 }

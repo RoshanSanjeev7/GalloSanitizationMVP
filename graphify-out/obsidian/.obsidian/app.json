@@ -1,1 +1,7 @@
-{}
+{
+  "showLineNumber": true,
+  "strictLineBreaks": false,
+  "readableLineLength": true,
+  "showFrontmatter": false,
+  "defaultViewMode": "preview"
+}
