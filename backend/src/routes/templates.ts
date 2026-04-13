@@ -14,8 +14,13 @@ const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   const templates = await getAllTemplates();
+  // Operators only see published templates
+  if (req.userRole !== 'admin') {
+    res.json(templates.filter(t => t.published !== false));
+    return;
+  }
   res.json(templates);
 });
 
@@ -37,7 +42,7 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
   }
 
   const now = new Date().toISOString();
-  const template = { id: uuid(), title, lineId, machines, createdAt: now, updatedAt: now };
+  const template = { id: uuid(), title, lineId, machines, published: false, createdAt: now, updatedAt: now };
   await putTemplate(template);
 
   res.status(201).json(template);
@@ -61,6 +66,22 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
   await putTemplate(template);
   res.json(template);
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_updated', targetType: 'template', targetId: template.id, detail: `Updated template "${template.title}"` }).catch(() => {});
+});
+
+// Publish or unpublish a template
+router.post('/:id/publish', adminOnly, async (req: AuthRequest, res) => {
+  const template = await getTemplate(req.params.id as string);
+  if (!template) {
+    res.status(404).json({ error: 'Template not found' });
+    return;
+  }
+
+  const { published } = req.body;
+  (template as any).published = published !== false;
+  (template as any).updatedAt = new Date().toISOString();
+  await putTemplate(template);
+  res.json(template);
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: published !== false ? 'template_published' : 'template_unpublished', targetType: 'template', targetId: template.id, detail: `${published !== false ? 'Published' : 'Unpublished'} template "${template.title}"` }).catch(() => {});
 });
 
 // Check for active checklists before deleting (returns warning, not error)

@@ -30,6 +30,7 @@ export interface Template {
   id: string;
   title: string;
   lineId: string;
+  published: boolean;
   machines: MachineTemplate[];
 }
 

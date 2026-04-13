@@ -48,6 +48,7 @@ export function makeTemplate(overrides: Partial<Template> = {}): Template {
     id,
     title: `Template ${id}`,
     lineId: 'line-1',
+    published: true,
     machines: [
       {
         name: 'Machine A',

@@ -659,6 +659,7 @@ export async function seedIfEmpty(): Promise<void> {
     id: uuid(),
     title: 'Weekly Deep Clean Checklist',
     lineId: line91.id,
+    published: true,
     machines,
   };
 
@@ -666,6 +667,7 @@ export async function seedIfEmpty(): Promise<void> {
     id: uuid(),
     title: 'Weekly Deep Clean Checklist',
     lineId: line92.id,
+    published: true,
     machines,
   };
 
@@ -673,6 +675,7 @@ export async function seedIfEmpty(): Promise<void> {
     id: uuid(),
     title: 'Weekly Deep Clean Checklist',
     lineId: line93.id,
+    published: true,
     machines: machines93,
   };
 

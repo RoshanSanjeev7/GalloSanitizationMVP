@@ -221,6 +221,7 @@ export interface Template {
   id: string;
   title: string;
   lineId: string;
+  published: boolean;
   machines: MachineTemplate[];
   createdAt?: string;
   updatedAt?: string;
@@ -249,6 +250,13 @@ async function updateTemplate(id: string, data: { title?: string; lineId?: strin
   return request<Template>(`/templates/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data),
+  });
+}
+
+async function publishTemplate(id: string, published: boolean): Promise<Template> {
+  return request<Template>(`/templates/${id}/publish`, {
+    method: 'POST',
+    body: JSON.stringify({ published }),
   });
 }
 
@@ -493,6 +501,7 @@ const api = {
   getTemplate,
   createTemplate,
   updateTemplate,
+  publishTemplate,
   deleteTemplate,
   getChecklists,
   getNotifications,
