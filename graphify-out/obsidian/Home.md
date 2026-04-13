@@ -30,6 +30,7 @@ A bottling facility sanitation checklist management system. Operators fill out d
 - [[Input Validation]] -- structure checks, MIME whitelists, size limits
 - [[Rate Limiting]] -- brute force and abuse protection
 - [[Image Handling]] -- S3 upload, presigned URLs, atomic DynamoDB updates
+- [[PDF Export]] -- synchronous PDFKit streaming and async SQS/Lambda generation
 - [[Roles and Permissions]] -- operator vs admin capabilities
 
 ## Decisions
@@ -43,6 +44,10 @@ A bottling facility sanitation checklist management system. Operators fill out d
 - [[Release 1 Bulletproofing]] -- everything shipped in the first hardening pass
 - [[Release 2 Real-time]] -- WebSocket, presence, offline queue, audit log
 - [[Environment Variables]] -- every config value
+
+## Production Readiness
+
+- [[Known Limitations]] -- all MVP shortcuts that need fixing before production
 
 ## Runbooks
 
