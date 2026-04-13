@@ -138,8 +138,11 @@ export default function ChecklistFill() {
             setSaveStatus('conflict');
           } else {
             setSaveStatus('error');
-            // Queue for offline sync if it's a network error (not 409 conflict)
-            enqueue(id, activeMachine, machines[activeMachine], version || 0);
+            // Only queue for offline sync on actual network failures (no status code)
+            const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
+            if (!status && !navigator.onLine) {
+              enqueue(id, activeMachine, machines[activeMachine], version || 0);
+            }
           }
         } finally {
           savingRef.current = false;
@@ -477,28 +480,102 @@ export default function ChecklistFill() {
         const allItems = machines.flatMap(m => m.categories.flatMap(c => c.items));
         const completed = allItems.filter(i => i.completed !== null).length;
         const total = allItems.length;
+        const isComplete = completed === total;
+
+        // Build list of incomplete items grouped by machine > category
+        const incompleteItems: { machine: string; machineIdx: number; category: string; catIdx: number; description: string; itemIdx: number }[] = [];
+        machines.forEach((m, mi) => {
+          m.categories.forEach((c, ci) => {
+            c.items.forEach((item, ii) => {
+              if (item.completed === null) {
+                incompleteItems.push({ machine: m.name, machineIdx: mi, category: c.name, catIdx: ci, description: item.description, itemIdx: ii });
+              }
+            });
+          });
+        });
+
+        const jumpTo = (machineIdx: number, catIdx: number) => {
+          setActiveMachine(machineIdx);
+          setCollapsed((prev) => ({ ...prev, [getCollapseKey(machineIdx, catIdx)]: false }));
+          setShowSubmitConfirm(false);
+          setTimeout(() => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }, 50);
+        };
+
         return (
           <Modal onClose={() => setShowSubmitConfirm(false)}>
-            <h2>Submit Checklist</h2>
-            <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
-              {completed} out of {total} items completed.
-            </p>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
-              Are you sure you want to submit this checklist for review?
-            </p>
-            {submitError && (
-              <div style={{ padding: '8px 12px', marginBottom: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
-                {submitError}
-              </div>
+            {isComplete ? (
+              <>
+                <h2>Submit Checklist</h2>
+                <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 20 }}>
+                  All {total} items completed.
+                </p>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
+                  Are you sure you want to submit this checklist for review?
+                </p>
+                {submitError && (
+                  <div style={{ padding: '8px 12px', marginBottom: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+                    {submitError}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => setShowSubmitConfirm(false)}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary btn-sm" onClick={confirmSubmit} disabled={submitting}>
+                    {submitting ? 'Submitting...' : 'Submit'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h2>Cannot Submit</h2>
+                <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 4 }}>
+                  {completed} out of {total} items completed.
+                </p>
+                <p style={{ fontSize: 13, color: 'var(--red, #dc2626)', marginBottom: 16 }}>
+                  All items must be checked or marked before submitting.
+                </p>
+                <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
+                  {(() => {
+                    // Group by machine
+                    const grouped: Record<string, typeof incompleteItems> = {};
+                    for (const item of incompleteItems) {
+                      const key = item.machine;
+                      if (!grouped[key]) grouped[key] = [];
+                      grouped[key].push(item);
+                    }
+                    return Object.entries(grouped).map(([machineName, items]) => (
+                      <div key={machineName} style={{ marginBottom: 12 }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary)', marginBottom: 6 }}>
+                          {machineName} ({items.length} remaining)
+                        </div>
+                        {items.map((item, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', borderBottom: '1px solid var(--border-light, #f0f0f0)' }}>
+                            <span style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)' }}>
+                              {item.category} &rsaquo; {item.description.length > 60 ? item.description.slice(0, 60) + '...' : item.description}
+                            </span>
+                            <button
+                              className="btn btn-outline btn-sm"
+                              style={{ flexShrink: 0, fontSize: 11, padding: '2px 8px' }}
+                              onClick={() => jumpTo(item.machineIdx, item.catIdx)}
+                            >
+                              Go to
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ));
+                  })()}
+                </div>
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button className="btn btn-outline btn-sm" onClick={() => setShowSubmitConfirm(false)}>
+                    Close
+                  </button>
+                </div>
+              </>
             )}
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn btn-outline btn-sm" onClick={() => setShowSubmitConfirm(false)}>
-                Cancel
-              </button>
-              <button className="btn btn-primary btn-sm" onClick={confirmSubmit} disabled={submitting}>
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
-            </div>
           </Modal>
         );
       })()}
