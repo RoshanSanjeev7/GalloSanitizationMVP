@@ -8,6 +8,7 @@ import {
 import { docClient } from './dynamo.js';
 import { config } from '../config/env.js';
 import type { ConnectionRecord } from '../ws/messages.js';
+import { CONNECTION_TTL_MINUTES } from '../config/constants.js';
 
 const TABLE = config.tables.connections;
 
@@ -17,7 +18,7 @@ function ttlFromNow(minutes: number): number {
 
 export async function putConnection(conn: ConnectionRecord): Promise<void> {
   // Strip null values — DynamoDB GSIs can't index null key attributes
-  const item: Record<string, unknown> = { ...conn, ttl: ttlFromNow(30) };
+  const item: Record<string, unknown> = { ...conn, ttl: ttlFromNow(CONNECTION_TTL_MINUTES) };
   for (const key of Object.keys(item)) {
     if (item[key] === null) delete item[key];
   }
@@ -50,7 +51,7 @@ export async function updateConnectionSubscription(
           ':am': activeMachine,
           ':ch': channel,
           ':now': new Date().toISOString(),
-          ':ttl': ttlFromNow(30),
+          ':ttl': ttlFromNow(CONNECTION_TTL_MINUTES),
         },
       }),
     );
@@ -65,7 +66,7 @@ export async function updateConnectionSubscription(
         ExpressionAttributeValues: {
           ':ch': channel,
           ':now': new Date().toISOString(),
-          ':ttl': ttlFromNow(30),
+          ':ttl': ttlFromNow(CONNECTION_TTL_MINUTES),
         },
       }),
     );
@@ -85,7 +86,7 @@ export async function updateConnectionMachine(
       ExpressionAttributeValues: {
         ':am': activeMachine,
         ':now': new Date().toISOString(),
-        ':ttl': ttlFromNow(30),
+        ':ttl': ttlFromNow(CONNECTION_TTL_MINUTES),
       },
     }),
   );
@@ -100,7 +101,7 @@ export async function touchConnection(connectionId: string): Promise<void> {
       ExpressionAttributeNames: { '#ttl': 'ttl' },
       ExpressionAttributeValues: {
         ':now': new Date().toISOString(),
-        ':ttl': ttlFromNow(30),
+        ':ttl': ttlFromNow(CONNECTION_TTL_MINUTES),
       },
     }),
   );

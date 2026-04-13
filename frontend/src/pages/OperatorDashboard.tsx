@@ -8,11 +8,11 @@ import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
+import { formatDate, formatTime } from '../utils/format';
+import { PAGE_LIMIT } from '../config/constants';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'in_progress' | 'submitted' | 'completed';
-
-const PAGE_LIMIT = 20;
 
 function statusParamsForTab(tab: Tab): Record<string, string> {
   if (tab === 'in_progress') return { status: 'in_progress' };
@@ -129,24 +129,6 @@ export default function OperatorDashboard() {
       const msg = err instanceof Error ? err.message : 'Failed to create checklist';
       setCreateError(msg);
     }
-  };
-
-  const formatDate = (iso: string) => {
-    const dt = new Date(iso);
-    return dt.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (iso: string) => {
-    const dt = new Date(iso);
-    return dt.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
   };
 
   const now = new Date();

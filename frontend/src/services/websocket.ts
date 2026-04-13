@@ -1,4 +1,6 @@
-type MessageHandler = (data: any) => void;
+import type { ServerMessage } from '../types/websocket';
+
+type MessageHandler = (data: ServerMessage) => void;
 
 const WS_URL = import.meta.env.VITE_WS_URL || `ws://${window.location.hostname}:4000/ws`;
 const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutes

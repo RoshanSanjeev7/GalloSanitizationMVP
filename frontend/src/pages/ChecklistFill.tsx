@@ -8,6 +8,8 @@ import { useChecklistSync } from '../hooks/useChecklistSync';
 import PresenceAvatars from '../components/PresenceAvatars';
 import { wsClient } from '../services/websocket';
 import { useOfflineQueue } from '../hooks/useOfflineQueue';
+import MachineSelector from '../components/MachineSelector';
+import { AUTOSAVE_DEBOUNCE_MS } from '../config/constants';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistFill.module.css';
 import Spinner from '../components/Spinner';
@@ -50,10 +52,14 @@ export default function ChecklistFill() {
 
   const loadChecklist = async () => {
     if (!id) return;
-    const data = await api.getChecklist(id);
-    setChecklist(data);
-    setMachines(data.machines);
-    setVersion(data.version);
+    try {
+      const data = await api.getChecklist(id);
+      setChecklist(data);
+      setMachines(data.machines);
+      setVersion(data.version);
+    } catch {
+      navigate('/');
+    }
   };
 
   const setItemStatus = (catIdx: number, itemIdx: number, completed: boolean) => {
@@ -90,7 +96,7 @@ export default function ChecklistFill() {
     setCommentInputs((prev) => ({ ...prev, [key]: text }));
   };
 
-  const buildMachines = (): ChecklistMachine[] => {
+  const buildMachinesPayload = (): ChecklistMachine[] => {
     return machines.map((machine, mi) => ({
       ...machine,
       categories: machine.categories.map((cat, catIdx) => ({
@@ -142,7 +148,7 @@ export default function ChecklistFill() {
       setSaveStatus('saving');
       const p = (async () => {
         try {
-          const result = await api.updateChecklistItems(id, buildMachines(), version);
+          const result = await api.updateChecklistItems(id, buildMachinesPayload(), version);
           setVersion(result.version);
           setSaveStatus('saved');
         } catch (err: unknown) {
@@ -162,7 +168,7 @@ export default function ChecklistFill() {
         }
       })();
       savePromiseRef.current = p;
-    }, 500);
+    }, AUTOSAVE_DEBOUNCE_MS);
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
@@ -181,7 +187,7 @@ export default function ChecklistFill() {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       if (savePromiseRef.current) await savePromiseRef.current;
       // Final save + submit
-      await api.updateChecklistItems(id, buildMachines(), version);
+      await api.updateChecklistItems(id, buildMachinesPayload(), version);
       await api.submitChecklist(id);
       navigate('/');
     } catch (err: unknown) {
@@ -213,7 +219,7 @@ export default function ChecklistFill() {
           <button className="back-link" style={{ marginBottom: 0 }} onClick={async () => {
             if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
             try {
-              if (id) await api.updateChecklistItems(id, buildMachines(), version);
+              if (id) await api.updateChecklistItems(id, buildMachinesPayload(), version);
             } catch {
               // Best effort save on back navigation
             }
@@ -264,40 +270,8 @@ export default function ChecklistFill() {
           {new Date(checklist.startTime).toLocaleString()}
         </p>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          {machines.map((m, idx) => {
-            const total = m.categories.reduce((sum, c) => sum + c.items.length, 0);
-            const done = m.categories.reduce((sum, c) => sum + c.items.filter(i => i.completed !== null).length, 0);
-            const isActive = idx === activeMachine;
-            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-            return (
-              <button
-                key={idx}
-                onClick={() => setActiveMachine(idx)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  border: isActive ? '2px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
-                  background: isActive ? 'var(--primary, #5B2333)' : '#fff',
-                  color: isActive ? '#fff' : 'var(--text, #333)',
-                  fontSize: 13,
-                  fontWeight: isActive ? 600 : 400,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 4,
-                  minWidth: 90,
-                  transition: 'all 0.15s',
-                }}
-              >
-                <span>{m.name}</span>
-                <span style={{ fontSize: 11, opacity: 0.8 }}>
-                  {done}/{total} {pct === 100 ? '✓' : `${pct}%`}
-                </span>
-              </button>
-            );
-          })}
+        <div style={{ marginBottom: 16 }}>
+          <MachineSelector machines={machines} activeMachine={activeMachine} onSelect={setActiveMachine} />
         </div>
 
         {currentMachine.categories.map((cat, catIdx) => {
@@ -479,40 +453,8 @@ export default function ChecklistFill() {
         })}
 
         {machines.length > 1 && (
-          <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
-            {machines.map((m, idx) => {
-              const total = m.categories.reduce((sum, c) => sum + c.items.length, 0);
-              const done = m.categories.reduce((sum, c) => sum + c.items.filter(i => i.completed !== null).length, 0);
-              const isActive = idx === activeMachine;
-              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-              return (
-                <button
-                  key={idx}
-                  onClick={() => { setActiveMachine(idx); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    border: isActive ? '2px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
-                    background: isActive ? 'var(--primary, #5B2333)' : '#fff',
-                    color: isActive ? '#fff' : 'var(--text, #333)',
-                    fontSize: 13,
-                    fontWeight: isActive ? 600 : 400,
-                    cursor: 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 4,
-                    minWidth: 90,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <span>{m.name}</span>
-                  <span style={{ fontSize: 11, opacity: 0.8 }}>
-                    {done}/{total} {pct === 100 ? '✓' : `${pct}%`}
-                  </span>
-                </button>
-              );
-            })}
+          <div style={{ marginTop: 20 }}>
+            <MachineSelector machines={machines} activeMachine={activeMachine} onSelect={setActiveMachine} scrollToTop />
           </div>
         )}
 

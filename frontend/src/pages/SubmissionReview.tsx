@@ -5,6 +5,8 @@ import { formatTime, formatFullDate, formatStamp, statusColor, statusIcon, STATU
 import { useImageUrlsForMachines } from '../hooks/useImageUrls';
 import { useChecklistSync } from '../hooks/useChecklistSync';
 import PresenceAvatars from '../components/PresenceAvatars';
+import MachineSelector from '../components/MachineSelector';
+import { HIGHLIGHT_DURATION_MS } from '../config/constants';
 import cl from '../styles/checklist.module.css';
 import s from '../styles/sidebar.module.css';
 import fillStyles from './ChecklistFill.module.css';
@@ -108,7 +110,7 @@ export default function SubmissionReview() {
     setActionInProgress('saving');
     try {
       setSaveError(null);
-      const result = await api.updateChecklistItems(id, buildMachines(), version);
+      const result = await api.updateChecklistItems(id, buildMachinesPayload(), version);
       setVersion(result.version);
       setEditMode(false);
       const data = await api.getChecklist(id);
@@ -160,7 +162,7 @@ export default function SubmissionReview() {
     setMachines((prev) => updateMachineItem(prev, activeMachine, catIdx, itemIdx, (item) => ({ ...item, issue: null })));
   };
 
-  const buildMachines = (): ChecklistMachine[] => {
+  const buildMachinesPayload = (): ChecklistMachine[] => {
     return machines.map((machine, mi) => ({
       ...machine,
       categories: machine.categories.map((cat, catIdx) => ({
@@ -250,7 +252,7 @@ export default function SubmissionReview() {
         element.style.backgroundColor = '#fef9c3';
         setTimeout(() => {
           element.style.backgroundColor = '';
-        }, 2000);
+        }, HIGHLIGHT_DURATION_MS);
       }
     }, 100);
   };
@@ -328,40 +330,8 @@ export default function SubmissionReview() {
           </div>
         )}
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-          {machines.map((m, idx) => {
-            const total = m.categories.reduce((sum: number, c: any) => sum + c.items.length, 0);
-            const done = m.categories.reduce((sum: number, c: any) => sum + c.items.filter((i: any) => i.completed !== null).length, 0);
-            const isActive = idx === activeMachine;
-            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-            return (
-              <button
-                key={idx}
-                onClick={() => setActiveMachine(idx)}
-                style={{
-                  padding: '8px 14px',
-                  borderRadius: 8,
-                  border: isActive ? '2px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
-                  background: isActive ? 'var(--primary, #5B2333)' : '#fff',
-                  color: isActive ? '#fff' : 'var(--text, #333)',
-                  fontSize: 13,
-                  fontWeight: isActive ? 600 : 400,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 4,
-                  minWidth: 90,
-                  transition: 'all 0.15s',
-                }}
-              >
-                <span>{m.name}</span>
-                <span style={{ fontSize: 11, opacity: 0.8 }}>
-                  {done}/{total} {pct === 100 ? '✓' : `${pct}%`}
-                </span>
-              </button>
-            );
-          })}
+        <div style={{ marginBottom: 16 }}>
+          <MachineSelector machines={machines} activeMachine={activeMachine} onSelect={setActiveMachine} />
         </div>
 
         <div className={s.reviewLayout}>

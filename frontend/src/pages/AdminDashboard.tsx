@@ -13,12 +13,12 @@ import { usePresenceSummary } from '../hooks/usePresenceSummary';
 import { useToasts } from '../hooks/useToasts';
 import PresenceAvatars from '../components/PresenceAvatars';
 import { wsClient } from '../services/websocket';
+import type { StatusChangeMessage } from '../types/websocket';
+import { formatDate, formatTime } from '../utils/format';
+import { PAGE_LIMIT, NOTIF_PAGE_SIZE, POLL_INTERVAL_MS, SEARCH_DEBOUNCE_MS } from '../config/constants';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'submitted' | 'approved' | 'in_progress';
-
-const PAGE_LIMIT = 20;
-const NOTIF_PAGE_SIZE = 20;
 
 function statusParamsForTab(tab: Tab): Record<string, string> {
   if (tab === 'submitted') return { status: 'submitted' };
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
       fetchChecklists(tab, 0, value, lineFilter, false, dateFilter, controller.signal)
         .catch((err) => { if (err?.name !== 'AbortError') console.error(err); })
         .finally(() => setLoading(false));
-    }, 300);
+    }, SEARCH_DEBOUNCE_MS);
   };
 
   const handleLineFilterChange = (value: string) => {
@@ -222,24 +222,6 @@ export default function AdminDashboard() {
   // Sort visible items client-side (server returns newest first)
   const sorted = sortOrder === 'oldest' ? [...checklists].reverse() : checklists;
 
-  const formatDate = (iso: string) => {
-    const dt = new Date(iso);
-    return dt.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatTime = (iso: string) => {
-    const dt = new Date(iso);
-    return dt.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-
   // Close notification dropdown on click outside
   useEffect(() => {
     if (!showNotifications) return;
@@ -258,13 +240,14 @@ export default function AdminDashboard() {
     const interval = setInterval(() => {
       fetchCounts();
       fetchNotifications();
-    }, 30000);
+    }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [user, fetchCounts, fetchNotifications]);
 
   // Listen for WebSocket status_change events to show toast notifications
   useEffect(() => {
-    const off = wsClient.on('status_change', (msg: any) => {
+    const off = wsClient.on('status_change', (data) => {
+      const msg = data as StatusChangeMessage;
       if (msg.status === 'submitted') {
         addToast(
           `New submission from ${msg.by} for checklist`,

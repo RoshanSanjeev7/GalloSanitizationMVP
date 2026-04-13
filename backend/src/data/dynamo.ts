@@ -44,7 +44,6 @@ export const docClient = DynamoDBDocumentClient.from(client, {
 // Primary key: id
 // Global Secondary Index (GSI): email-index (for login lookup)
 
-// Get a single user by their ID (primary key lookup - very fast)
 export async function getUser(id: string): Promise<User | undefined> {
   const result = await docClient.send(
     new GetCommand({ TableName: config.tables.users, Key: { id } })
@@ -69,7 +68,6 @@ export async function getUserByEmail(email: string): Promise<User | undefined> {
   return users.find(u => !u.id.startsWith('EMAIL#'));
 }
 
-// Get ALL users - used for admin user management
 // WARNING: Scan reads the entire table, expensive for large datasets
 export async function getAllUsers(): Promise<User[]> {
   const result = await docClient.send(
@@ -78,15 +76,12 @@ export async function getAllUsers(): Promise<User[]> {
   return ((result.Items || []) as User[]).filter(u => !u.id.startsWith('EMAIL#'));
 }
 
-// Create or update a user
-// PutCommand will overwrite if a user with same ID exists
 export async function putUser(user: User): Promise<void> {
   await docClient.send(
     new PutCommand({ TableName: config.tables.users, Item: user })
   );
 }
 
-// Delete a user by ID
 export async function deleteUser(id: string): Promise<void> {
   await docClient.send(
     new DeleteCommand({ TableName: config.tables.users, Key: { id } })
@@ -245,8 +240,8 @@ export async function deleteChecklist(id: string): Promise<void> {
 
 /**
  * Update a checklist with optimistic concurrency control.
- * Only succeeds if the stored version matches expectedVersion.
- * Automatically increments version on success.
+ * Fails with ConditionalCheckFailedException if the stored version
+ * doesn't match expectedVersion, preventing lost updates from concurrent edits.
  */
 export async function conditionalPutChecklist(
   checklist: Checklist,
@@ -264,9 +259,9 @@ export async function conditionalPutChecklist(
 }
 
 /**
- * Transition a checklist's status atomically.
- * Only succeeds if BOTH the version AND current status match expectations.
- * Used for approve, deny, and submit operations.
+ * Atomically transition a checklist's status.
+ * Requires BOTH the version AND current status to match, preventing
+ * race conditions like two admins approving/denying simultaneously.
  */
 export async function conditionalStatusTransition(
   checklist: Checklist,
@@ -304,9 +299,9 @@ export async function markChecklistViewed(
 }
 
 /**
- * Atomically update a single machine in a checklist.
- * Used for per-machine auto-save so operators on different machines never conflict.
- * Only succeeds if the version matches.
+ * Atomically update a single machine within a checklist.
+ * Uses DynamoDB UpdateCommand to SET machines[N] so operators on
+ * different machines never conflict with each other.
  */
 export async function updateChecklistMachine(
   checklistId: string,
