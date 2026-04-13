@@ -134,3 +134,20 @@ E2E tests are in `/tests/` with helpers in `tests/helpers.ts`.
 - Images stored in S3 with presigned URLs for retrieval
 - Frontend uses CSS Modules for component styling
 - API client (`services/api.ts`) auto-injects JWT and handles 401 logout
+
+## Graphify Knowledge Graph (Localized RAG)
+
+A knowledge graph of this codebase lives at `graphify-out/`. Use it as a localized RAG system when answering questions about this codebase:
+
+- **Graph data:** `graphify-out/graph.json` — 371 nodes, 376 edges covering all modules, routes, components, and their relationships
+- **Interactive HTML:** `graphify-out/graph.html` — open in browser to visualize the full architecture
+- **Audit report:** `graphify-out/GRAPH_REPORT.md` — community structure, god nodes, surprising connections
+- **Obsidian vault:** `graphify-out/obsidian/` — 467 interlinked notes, one per entity, with community overview notes
+
+When querying the codebase (e.g. "how does X connect to Y", "what depends on Z", "explain the auth flow"):
+1. First check `graphify-out/graph.json` for structural relationships and community membership
+2. Use `/graphify query "<question>"` for graph-traversal-based answers
+3. Use `/graphify path "A" "B"` to trace dependency chains between concepts
+4. Use `/graphify explain "Node"` for detailed context on any entity
+
+To keep the graph current after code changes, run `/graphify . --update`.

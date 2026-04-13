@@ -194,8 +194,8 @@
       "type": "feature",
       "description": "Task 10: Frontend env config (VITE_WS_URL) and end-to-end verification",
       "priority": "high",
-      "status": "pending",
-      "progress": 0,
+      "status": "completed",
+      "progress": 100,
       "assignedTo": [],
       "tags": [
         "websocket",
@@ -204,15 +204,19 @@
       ],
       "createdAt": "2026-04-10T08:43:53.428Z",
       "startedAt": null,
-      "completedAt": null
+      "completedAt": "2026-04-10T09:38:33.421Z",
+      "result": {
+        "status": "done",
+        "note": "Task 10 - env config verified"
+      }
     },
     "task-1775810634244-ekozbz": {
       "taskId": "task-1775810634244-ekozbz",
       "type": "feature",
       "description": "Task 11: Playwright E2E tests for real-time WebSocket features (presence, sync, reconnect)",
       "priority": "high",
-      "status": "pending",
-      "progress": 0,
+      "status": "completed",
+      "progress": 100,
       "assignedTo": [],
       "tags": [
         "websocket",
@@ -220,6 +224,86 @@
         "task-11"
       ],
       "createdAt": "2026-04-10T08:43:54.244Z",
+      "startedAt": null,
+      "completedAt": "2026-04-10T09:38:34.021Z",
+      "result": {
+        "status": "done",
+        "note": "Task 11 - all 92 E2E tests passing"
+      }
+    },
+    "task-1776040040186-c67gcw": {
+      "taskId": "task-1776040040186-c67gcw",
+      "type": "feature",
+      "description": "SP2-1: Admin toast notification component + WebSocket integration for new submissions",
+      "priority": "critical",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [],
+      "tags": [
+        "sp2",
+        "frontend",
+        "toast"
+      ],
+      "createdAt": "2026-04-13T00:27:20.187Z",
+      "startedAt": null,
+      "completedAt": "2026-04-13T00:30:58.233Z",
+      "result": {
+        "status": "done"
+      }
+    },
+    "task-1776040042072-mlnn24": {
+      "taskId": "task-1776040042072-mlnn24",
+      "type": "feature",
+      "description": "SP2-2: Backend broadcast new_submission event on checklist submit + status changes to dashboard subscribers",
+      "priority": "critical",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [],
+      "tags": [
+        "sp2",
+        "backend",
+        "broadcast"
+      ],
+      "createdAt": "2026-04-13T00:27:22.072Z",
+      "startedAt": null,
+      "completedAt": "2026-04-13T00:30:59.125Z",
+      "result": {
+        "status": "done"
+      }
+    },
+    "task-1776040042986-cue9ms": {
+      "taskId": "task-1776040042986-cue9ms",
+      "type": "feature",
+      "description": "SP2-3: IndexedDB offline save queue with 24h TTL and auto-sync on reconnect",
+      "priority": "high",
+      "status": "completed",
+      "progress": 100,
+      "assignedTo": [],
+      "tags": [
+        "sp2",
+        "frontend",
+        "offline"
+      ],
+      "createdAt": "2026-04-13T00:27:22.986Z",
+      "startedAt": null,
+      "completedAt": "2026-04-13T00:30:59.575Z",
+      "result": {
+        "status": "done"
+      }
+    },
+    "task-1776040043998-0cf8jy": {
+      "taskId": "task-1776040043998-0cf8jy",
+      "type": "feature",
+      "description": "SP2-4: Tests + Playwright E2E for toasts and offline queue",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "sp2",
+        "testing"
+      ],
+      "createdAt": "2026-04-13T00:27:23.998Z",
       "startedAt": null,
       "completedAt": null
     }
