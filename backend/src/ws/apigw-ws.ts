@@ -106,6 +106,12 @@ export class ApiGatewayBroadcaster implements WebSocketBroadcaster {
     await Promise.all(dashboardConns.map((c) => this.sendToConnection(c.connectionId, data)));
   }
 
+  async broadcastToDashboard(message: object): Promise<void> {
+    const dashboardConns = await getConnectionsByChannel('dashboard');
+    const data = JSON.stringify(message);
+    await Promise.all(dashboardConns.map((c) => this.sendToConnection(c.connectionId, data)));
+  }
+
   async getChecklistPresence(checklistId: string): Promise<PresenceUser[]> {
     const connections = await getConnectionsByChecklist(checklistId);
     const seen = new Set<string>();

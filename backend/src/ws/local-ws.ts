@@ -241,6 +241,16 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
     }
   }
 
+  async broadcastToDashboard(message: object): Promise<void> {
+    const msg = JSON.stringify(message);
+    for (const conn of this.connections.values()) {
+      // Send to all connections (dashboard viewers will filter client-side)
+      if (conn.ws.readyState === WsWebSocket.OPEN) {
+        conn.ws.send(msg);
+      }
+    }
+  }
+
   async getChecklistPresence(checklistId: string): Promise<PresenceUser[]> {
     const users: PresenceUser[] = [];
     const seen = new Set<string>();
