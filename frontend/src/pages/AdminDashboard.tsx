@@ -8,8 +8,11 @@ import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
+import ToastContainer from '../components/Toast';
 import { usePresenceSummary } from '../hooks/usePresenceSummary';
+import { useToasts } from '../hooks/useToasts';
 import PresenceAvatars from '../components/PresenceAvatars';
+import { wsClient } from '../services/websocket';
 import d from '../styles/dashboard.module.css';
 
 type Tab = 'all' | 'submitted' | 'approved' | 'in_progress';
@@ -51,6 +54,7 @@ export default function AdminDashboard() {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController | null>(null);
   const { presenceMap } = usePresenceSummary();
+  const { toasts, addToast, dismissToast } = useToasts();
 
   const fetchNotifications = useCallback(async (offset = 0, append = false) => {
     const [submitted, inProgress] = await Promise.all([
@@ -258,6 +262,23 @@ export default function AdminDashboard() {
     return () => clearInterval(interval);
   }, [user, fetchCounts, fetchNotifications]);
 
+  // Listen for WebSocket status_change events to show toast notifications
+  useEffect(() => {
+    const off = wsClient.on('status_change', (msg: any) => {
+      if (msg.status === 'submitted') {
+        addToast(
+          `New submission from ${msg.by} for checklist`,
+          'info',
+          { label: 'Review', onClick: () => navigate(`/checklist/${msg.checklistId}/review`) }
+        );
+        // Refresh counts and notifications
+        fetchCounts();
+        fetchNotifications();
+      }
+    });
+    return off;
+  }, [addToast, navigate, fetchCounts, fetchNotifications]);
+
   // Cleanup AbortController on unmount
   useEffect(() => {
     return () => {
@@ -271,6 +292,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="page-container">
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
       <div className="main-content">
         <div className={d.dashHeader}>
           <div>
