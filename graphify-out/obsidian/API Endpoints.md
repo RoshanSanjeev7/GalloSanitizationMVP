@@ -40,6 +40,7 @@ All endpoints are prefixed with `/api`. Every endpoint except `POST /api/auth/lo
 | POST | `/templates` | Admin | Create template |
 | PUT | `/templates/:id` | Admin | Update template |
 | DELETE | `/templates/:id` | Admin | Delete template |
+| POST | `/templates/:id/publish` | Admin | Publish or unpublish template (body: `{ published: boolean }`) |
 
 ## Checklists
 

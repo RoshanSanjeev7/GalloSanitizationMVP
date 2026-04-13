@@ -42,6 +42,18 @@ Two implementations exist:
 
 5. **Reconnect:** When the connection closes unexpectedly (not idle), the frontend schedules a reconnect with exponential backoff: `min(1000 * 2^attempt, 30s)` plus 20% jitter. On reconnect, it re-subscribes to all active checklist and dashboard subscriptions.
 
+## Client → Server Messages
+
+| Type | Payload | Purpose |
+|------|---------|---------|
+| `subscribe` | `{ checklistId }` | Join a checklist room to receive item deltas and presence |
+| `unsubscribe` | `{ checklistId }` | Leave a checklist room |
+| `machine_change` | `{ checklistId, machineIdx }` | Update which machine the user is on (for presence display) |
+| `subscribe_dashboard` | `{}` | Subscribe to presence summary updates (admin dashboard) |
+| `unsubscribe_dashboard` | `{}` | Unsubscribe from presence summary |
+| `heartbeat` | `{}` | Keep connection alive, resets TTL (sent every 60 seconds) |
+| `idle` | `{}` | Signals 5 minutes of inactivity, client disconnects after sending |
+
 ## Message Types (Server to Client)
 
 | Type | When | Data |

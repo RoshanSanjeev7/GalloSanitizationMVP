@@ -35,9 +35,19 @@ In addition to the toast, the `new_submission` event triggers a data refresh on 
 
 Similarly, `dashboard_refresh` events (sent when a checklist is approved or denied) trigger a re-fetch so the checklist moves to the correct tab without manual reload.
 
-## Relationship to the Notification Bell
+## Notification Bell
 
-The notification bell (top-right of AdminDashboard) is a separate mechanism from toasts. It queries `GET /checklists/notifications` which returns submitted and in-progress checklists with an `unviewedCount`. The bell shows the unviewed count badge and clicking it opens a dropdown with recent submissions.
+The admin dashboard has a notification bell icon that shows unviewed submitted and in-progress checklists.
+
+**Backend:** `GET /checklists/notifications` returns paginated checklists with `{ items, total, unviewedCount, hasMore }`. The `viewedAt` and `viewedBy` fields on each checklist track whether an admin has seen it.
+
+**Mark as viewed:** Checklists are auto-marked as viewed when an admin opens them (`GET /checklists/:id` sets `viewedAt` via atomic `markChecklistViewed()` UpdateCommand). Bulk marking uses `POST /mark-all-viewed` which processes up to 500 checklists in batches of 25.
+
+**New activity resets viewed status:** When an operator adds a comment or image, `viewedAt` is reset to `null` so the admin sees it as new activity again.
+
+**Frontend:** The dropdown shows 20 notifications per page with a "Load more" button. Each row shows line name, operator, status badge, latest activity, and "New"/"Viewed" indicator. Clicking navigates to the review page.
+
+## Relationship to Toasts
 
 Toasts are ephemeral (5 seconds). The notification bell is persistent (until the admin views the checklists). They complement each other: toasts catch your attention in the moment, the bell catches up if you missed the toast.
 

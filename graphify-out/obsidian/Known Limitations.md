@@ -40,6 +40,14 @@ If a browser crashes without a clean WebSocket disconnect (no `close` event fire
 
 The `seedIfEmpty` function checks if ANY users exist in the table, not whether the specific seed users exist. If stale test data remains in the table (e.g., from a previous test run), the seed script skips seeding entirely, leaving the database in an inconsistent state. See [[Troubleshooting]] for workarounds when this occurs.
 
+## No Frontend Route Protection by Role
+
+An operator who navigates directly to `/admin` will see the AdminDashboard with data filtered by their `operatorId` (they see their own checklists, not all). Admin-only actions (approve, deny, delete) fail with 403 on the backend. However, the operator can see other operators' names on shared checklists. A `ProtectedAdminRoute` wrapper could prevent this.
+
+## Operator Data Isolation Gap
+
+The `GET /checklists` endpoint does NOT automatically filter by the requesting user's ID. The frontend sends `operatorId` as a query parameter, but an operator could craft an API request without it and see all checklists. This is an access control gap -- the backend should enforce `operatorId = req.userId` when the requester is an operator. See [[Roles and Permissions]] for how operator filtering currently works.
+
 ## See also
 
 - [[Troubleshooting]] -- workarounds for issues caused by these limitations

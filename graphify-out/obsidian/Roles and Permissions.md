@@ -15,7 +15,9 @@ The system has exactly two roles: **operator** and **admin**. There are no fine-
 - View their own checklists (in progress, submitted, completed)
 - View their own profile in Settings
 
-Operators can only see their own checklists on the OperatorDashboard. The backend enforces this by filtering with `operatorId` when the request comes from an operator (the frontend sends `operatorId` as a query parameter matching the logged-in user).
+Operators can only see their own checklists on the OperatorDashboard. The frontend sends `operatorId` as a query parameter matching the logged-in user.
+
+**Backend enforcement of data isolation:** The `GET /checklists` endpoint does NOT automatically filter by the requesting user's ID. The frontend sends `operatorId` as a query parameter, but an operator could craft an API request without it and see all checklists. This is an access control gap — the backend should enforce `operatorId = req.userId` when the requester is an operator. See [[Known Limitations]].
 
 ## Admin Capabilities
 

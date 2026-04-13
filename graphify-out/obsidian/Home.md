@@ -35,6 +35,7 @@ A bottling facility sanitation checklist management system. Operators fill out d
 
 ## Decisions
 
+- [[Template Publishing]] -- draft/published workflow for templates
 - [[Concurrency Scenarios]] -- every race condition and how it's handled
 - [[Admin Safety]] -- preventing admin lockout
 - [[Email Uniqueness]] -- transactional enforcement in DynamoDB
