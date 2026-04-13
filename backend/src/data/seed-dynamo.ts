@@ -941,7 +941,9 @@ export async function seedIfEmpty(): Promise<void> {
     });
   }
 
+  // Stamp all seed checklists with Modesto factoryId (all are for Lines 91/92/93)
   for (const cl of seedChecklists) {
+    (cl as any).factoryId = factoryModesto.id;
     await putSafe(() => putChecklist(cl));
   }
 

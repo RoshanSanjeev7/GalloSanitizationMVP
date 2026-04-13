@@ -156,24 +156,6 @@ export default function OperatorDashboard() {
           <Avatar name={user.name} />
         </div>
 
-        {factories.length > 1 && (
-          <div style={{ marginBottom: 12 }}>
-            <select
-              className="form-select"
-              value={factoryFilter}
-              onChange={(e) => setFactoryFilter(e.target.value)}
-              style={{ width: '100%' }}
-            >
-              <option value="">All Factories</option>
-              {factories.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name} — {f.location}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
         <div className={d.dashTabs}>
           {([
             { key: 'in_progress' as Tab, label: 'In Progress' },
@@ -236,24 +218,6 @@ export default function OperatorDashboard() {
       {showModal && (
         <Modal onClose={() => setShowModal(false)}>
           <h2>New Checklist</h2>
-          {factories.length > 1 && (
-            <>
-              <p className="form-label">Factory</p>
-              <select
-                className="form-select"
-                value={factoryFilter}
-                onChange={(e) => { setFactoryFilter(e.target.value); setSelectedLine(''); }}
-                style={{ marginBottom: 12 }}
-              >
-                <option value="">All Factories</option>
-                {factories.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} — {f.location}
-                  </option>
-                ))}
-              </select>
-            </>
-          )}
           <p className="form-label">Select Production Line</p>
           <select
             className="form-select"
@@ -261,7 +225,7 @@ export default function OperatorDashboard() {
             onChange={(e) => setSelectedLine(e.target.value)}
           >
             <option value="">&mdash; Choose a line &mdash;</option>
-            {(factoryFilter ? lines.filter(l => l.factoryId === factoryFilter) : lines).map((l) => (
+            {lines.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
               </option>
