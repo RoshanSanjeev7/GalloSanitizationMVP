@@ -48,6 +48,8 @@ The `queueCount` state from `useOfflineQueue` drives the banner visibility. Duri
 
 The version field in queued saves may be stale by the time they replay. If another operator saved in the meantime, the replayed save will get a 409 and be discarded. This means some offline work can be lost if there was concurrent editing. This is an acceptable trade-off -- the alternative (merging diverged states) would be significantly more complex and error-prone for a checklist use case.
 
+**Multi-operator scenario:** In a factory floor environment where multiple operators edit the same checklist, offline queuing has limited value. If Operator A goes offline while Operator B continues editing, ALL of A's queued saves will fail with version conflicts (409) on reconnect and be silently discarded. The offline queue is designed for **brief connectivity blips** (seconds to minutes), not extended offline work. For extended offline scenarios, operators should work on separate machines within the same checklist — per-machine saves reduce conflict surface area.
+
 ## See also
 
 - [[Auto-Save and Conflict Resolution]] -- when the offline queue engages in the save lifecycle

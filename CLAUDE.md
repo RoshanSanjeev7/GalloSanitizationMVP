@@ -23,6 +23,8 @@ backend/src/
       lines.ts            # Production lines CRUD
       templates.ts        # Checklist templates (admin-only for writes)
       checklists.ts       # Checklists CRUD, submit, approve/deny, PDF export
+      images.ts           # Image upload, presigned URLs, deletion
+      audit.ts            # Audit log queries
     data/
       dynamo.ts           # All DynamoDB operations
       s3.ts               # S3 image upload/retrieval

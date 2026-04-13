@@ -13,7 +13,7 @@ The project has two test suites: Vitest for unit/integration tests and Playwrigh
 npm test
 ```
 
-Runs approximately 300 tests: 168 backend and 132 frontend. These test individual functions and components in isolation. Backend tests cover the data layer (dynamo operations, conditional writes), route handlers (with mocked DynamoDB), and utility functions. Frontend tests cover components, hooks, and the api service.
+Runs approximately 300 tests: ~170 backend and ~130 frontend. These test individual functions and components in isolation. Backend tests cover the data layer (dynamo operations, conditional writes), route handlers (with mocked DynamoDB), and utility functions. Frontend tests cover components, hooks, and the api service.
 
 Tests run fast (typically under 10 seconds) and don't require LocalStack or any running services.
 
@@ -26,7 +26,7 @@ npm run test:e2e       # Headless mode
 npm run test:e2e:ui    # Playwright UI mode (interactive)
 ```
 
-Runs 92 tests in Playwright. These test the full application through the browser: logging in, creating checklists, filling items, submitting, approving, managing users, etc. The tests exercise [[Concurrency Scenarios]] like dual-submit, dual-approve, and concurrent editing.
+Runs ~92 tests in Playwright. These test the full application through the browser: logging in, creating checklists, filling items, submitting, approving, managing users, etc. The tests exercise [[Concurrency Scenarios]] like dual-submit, dual-approve, and concurrent editing.
 
 **Prerequisites:** The app must be running (`npm run dev`) and LocalStack must be seeded. E2E tests talk to the real running application.
 
