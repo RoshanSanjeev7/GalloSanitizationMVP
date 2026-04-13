@@ -15,9 +15,8 @@ test.describe('Checklist Fill', () => {
   });
 
   test('shows machine selector buttons', async ({ page }) => {
-    // Machine buttons should be visible (replaced dropdown with button bar)
-    const machineButtons = page.locator('button:has-text("/")');
-    expect(await machineButtons.count()).toBeGreaterThan(0);
+    // Machine buttons render with name + progress, look for the percentage pattern
+    await expect(page.locator('text=/%/')).toBeVisible({ timeout: 5000 });
   });
 
   test('shows collapsible categories with counts', async ({ page }) => {
