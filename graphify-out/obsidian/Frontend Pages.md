@@ -13,7 +13,7 @@ Simple email + password form. Calls `api.login()`, stores the JWT and user in lo
 
 ## OperatorDashboard (`/`)
 
-Three tabs: **In Progress**, **Pending Review** (submitted), and **Completed** (approved + denied). Lists the operator's own checklists, fetched with `operatorId` filter. Each row shows line name, status badge, and timestamps. A "New Checklist" button creates a checklist for a selected line and navigates to the fill page.
+Three tabs: **In Progress**, **Pending Review** (submitted), and **Completed** (approved + denied). Lists the operator's own checklists, fetched with `operatorId` filter. Each row shows line name, status badge, and timestamps. A "New Checklist" button creates a checklist for a selected line — but only one in-progress checklist is allowed per line. The backend rejects duplicates with a 409 and the modal shows the error.
 
 Polls for updated data with a 30-second interval. Uses `AbortController` to cancel stale fetches when filters change quickly.
 
@@ -30,7 +30,7 @@ Search and date filters are applied with `AbortController` to cancel in-flight r
 The most complex page. This is where operators actually fill out the checklist, task by task.
 
 **Key state:**
-- `machines` / `activeMachine` -- the checklist data and which machine tab is selected
+- `machines` / `activeMachine` -- the checklist data and which machine button is selected (button bar at top and bottom, replaced dropdown)
 - `version` -- tracks the current version for [[Optimistic Concurrency]]
 - `saveStatus` -- `idle | saving | saved | error | conflict`
 - `savingRef` / `savePromiseRef` -- prevent concurrent saves and enable submit to await in-flight saves
