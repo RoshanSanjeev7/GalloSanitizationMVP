@@ -127,6 +127,7 @@ export interface UserPublic {
   name: string;
   email: string;
   role: 'operator' | 'admin';
+  factoryIds?: string[];
 }
 
 interface LoginResponse {
@@ -184,10 +185,40 @@ async function deleteUser(id: string): Promise<void> {
   await request(`/users/${id}`, { method: 'DELETE' });
 }
 
+// ─── Factories ─────────────────────────────────────────────────────
+export interface Factory {
+  id: string;
+  name: string;
+  location: string;
+}
+
+async function getFactories(): Promise<Factory[]> {
+  return requestWithRetry<Factory[]>('/factories');
+}
+
+async function createFactory(data: { name: string; location: string }): Promise<Factory> {
+  return request<Factory>('/factories', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+async function deleteFactory(id: string): Promise<void> {
+  await request(`/factories/${id}`, { method: 'DELETE' });
+}
+
+async function updateUserFactories(userId: string, factoryIds: string[]): Promise<UserPublic> {
+  return request<UserPublic>(`/users/${userId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ factoryIds }),
+  });
+}
+
 // ─── Lines ──────────────────────────────────────────────────────────
 export interface Line {
   id: string;
   name: string;
+  factoryId?: string;
 }
 
 async function getLines(): Promise<Line[]> {
@@ -503,6 +534,10 @@ const api = {
   createUser,
   updateUserRole,
   deleteUser,
+  getFactories,
+  createFactory,
+  deleteFactory,
+  updateUserFactories,
   getLines,
   createLine,
   getTemplates,

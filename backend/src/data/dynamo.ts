@@ -21,7 +21,7 @@ import {
   TransactWriteCommand,  // Multi-item atomic transaction (for email uniqueness)
 } from '@aws-sdk/lib-dynamodb';
 import { config } from '../config/env.js';
-import type { User, Line, Template, Checklist, ChecklistMachine, Activity } from '../types/index.js';
+import type { User, Line, Template, Checklist, ChecklistMachine, Activity, Factory } from '../types/index.js';
 
 // ─── CLIENT SETUP ───────────────────────────────────────────────────
 // Create the low-level DynamoDB client with connection settings
@@ -85,6 +85,36 @@ export async function putUser(user: User): Promise<void> {
 export async function deleteUser(id: string): Promise<void> {
   await docClient.send(
     new DeleteCommand({ TableName: config.tables.users, Key: { id } })
+  );
+}
+
+// ─── FACTORIES ─────────────────────────────────────────────────────
+// Factories = physical plant locations that contain production lines
+// Primary key: id
+
+export async function getAllFactories(): Promise<Factory[]> {
+  const result = await docClient.send(
+    new ScanCommand({ TableName: config.tables.factories })
+  );
+  return (result.Items || []) as Factory[];
+}
+
+export async function getFactory(id: string): Promise<Factory | undefined> {
+  const result = await docClient.send(
+    new GetCommand({ TableName: config.tables.factories, Key: { id } })
+  );
+  return result.Item as Factory | undefined;
+}
+
+export async function putFactory(factory: Factory): Promise<void> {
+  await docClient.send(
+    new PutCommand({ TableName: config.tables.factories, Item: factory })
+  );
+}
+
+export async function deleteFactory(id: string): Promise<void> {
+  await docClient.send(
+    new DeleteCommand({ TableName: config.tables.factories, Key: { id } })
   );
 }
 

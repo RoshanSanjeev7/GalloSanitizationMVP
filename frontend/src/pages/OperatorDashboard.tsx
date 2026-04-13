@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import api, { type Checklist, type Line } from '../services/api';
+import api, { type Checklist, type Line, type Factory } from '../services/api';
 import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
@@ -26,6 +26,8 @@ export default function OperatorDashboard() {
   const navigate = useNavigate();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
+  const [factories, setFactories] = useState<Factory[]>([]);
+  const [factoryFilter, setFactoryFilter] = useState('');
   const [tab, setTab] = useState<Tab>('in_progress');
   const [showModal, setShowModal] = useState(false);
   const [selectedLine, setSelectedLine] = useState('');
@@ -71,12 +73,14 @@ export default function OperatorDashboard() {
     setLoading(true);
     setOffset(0);
     try {
-      const [, lns] = await Promise.all([
+      const [, lns, , fcts] = await Promise.all([
         fetchChecklists(currentTab, 0, false),
         api.getLines(),
         fetchCounts(),
+        api.getFactories(),
       ]);
       setLines(lns);
+      setFactories(fcts);
     } catch {
       // 401 handled by api interceptor
     } finally {
@@ -152,6 +156,24 @@ export default function OperatorDashboard() {
           <Avatar name={user.name} />
         </div>
 
+        {factories.length > 1 && (
+          <div style={{ marginBottom: 12 }}>
+            <select
+              className="form-select"
+              value={factoryFilter}
+              onChange={(e) => setFactoryFilter(e.target.value)}
+              style={{ width: '100%' }}
+            >
+              <option value="">All Factories</option>
+              {factories.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name} — {f.location}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className={d.dashTabs}>
           {([
             { key: 'in_progress' as Tab, label: 'In Progress' },
@@ -214,6 +236,24 @@ export default function OperatorDashboard() {
       {showModal && (
         <Modal onClose={() => setShowModal(false)}>
           <h2>New Checklist</h2>
+          {factories.length > 1 && (
+            <>
+              <p className="form-label">Factory</p>
+              <select
+                className="form-select"
+                value={factoryFilter}
+                onChange={(e) => { setFactoryFilter(e.target.value); setSelectedLine(''); }}
+                style={{ marginBottom: 12 }}
+              >
+                <option value="">All Factories</option>
+                {factories.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} — {f.location}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <p className="form-label">Select Production Line</p>
           <select
             className="form-select"
@@ -221,7 +261,7 @@ export default function OperatorDashboard() {
             onChange={(e) => setSelectedLine(e.target.value)}
           >
             <option value="">&mdash; Choose a line &mdash;</option>
-            {lines.map((l) => (
+            {(factoryFilter ? lines.filter(l => l.factoryId === factoryFilter) : lines).map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
               </option>

@@ -57,7 +57,7 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
 });
 
 router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
-  const { role } = req.body;
+  const { role, factoryIds } = req.body;
   const user = await getUser(req.params.id as string);
 
   if (!user) {
@@ -76,6 +76,7 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
   }
 
   if (role) user.role = role;
+  if (Array.isArray(factoryIds)) user.factoryIds = factoryIds;
   await putUser(user);
 
   const { password: _, ...userPublic } = user;

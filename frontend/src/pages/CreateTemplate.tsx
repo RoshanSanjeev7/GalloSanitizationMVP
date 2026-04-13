@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api, { type Line, type Template, type MachineTemplate } from '../services/api';
+import api, { type Line, type Template, type MachineTemplate, type Factory } from '../services/api';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
 import { TEMPLATE_RETENTION_DAYS } from '../config/constants';
@@ -27,6 +27,8 @@ const emptyMachine = (): MachineState => ({
 
 export default function CreateTemplate() {
   const navigate = useNavigate();
+  const [factories, setFactories] = useState<Factory[]>([]);
+  const [factoryFilter, setFactoryFilter] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [lineId, setLineId] = useState('');
@@ -43,9 +45,10 @@ export default function CreateTemplate() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.getLines(), api.getTemplates({ includeDeleted: 'true' })]).then(([lns, tpls]) => {
+    Promise.all([api.getLines(), api.getTemplates({ includeDeleted: 'true' }), api.getFactories()]).then(([lns, tpls, fcts]) => {
       setLines(lns);
       setTemplates(tpls);
+      setFactories(fcts);
       setInitialLoading(false);
     });
   }, []);
@@ -95,6 +98,10 @@ export default function CreateTemplate() {
       setCreatingLine(false);
     }
   };
+
+  const filteredLines = factoryFilter
+    ? lines.filter(l => l.factoryId === factoryFilter)
+    : lines;
 
   const selectedLine = lines.find(l => l.id === lineId);
   const isEditing = editingId !== null;
@@ -303,6 +310,30 @@ export default function CreateTemplate() {
 
         <div className="card" style={{ marginBottom: 24 }}>
           <h3 style={{ fontSize: 15, marginBottom: 16 }}>Select a Line</h3>
+          {factories.length > 1 && (
+            <div className="form-group">
+              <label className="form-label">Factory</label>
+              <select
+                className="form-select"
+                value={factoryFilter}
+                onChange={(e) => {
+                  setFactoryFilter(e.target.value);
+                  setLineId('');
+                  setEditingId(null);
+                  setTitle('');
+                  setMachines([emptyMachine()]);
+                  setActiveMachine(0);
+                }}
+              >
+                <option value="">All Factories</option>
+                {factories.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.name} — {f.location}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">Production Line</label>
             <select
@@ -311,7 +342,7 @@ export default function CreateTemplate() {
               onChange={(e) => handleLineSelect(e.target.value)}
             >
               <option value="">Choose a line...</option>
-              {lines.map((l) => {
+              {filteredLines.map((l) => {
                 const hasTemplate = templates.some(t => t.lineId === l.id && !t.deleted);
                 return (
                   <option key={l.id} value={l.id}>

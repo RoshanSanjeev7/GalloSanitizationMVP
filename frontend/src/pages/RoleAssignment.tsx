@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api, { type UserPublic } from '../services/api';
+import api, { type UserPublic, type Factory } from '../services/api';
 import Avatar from '../components/Avatar';
 import Modal from '../components/Modal';
 import s from './RoleAssignment.module.css';
@@ -14,11 +14,13 @@ export default function RoleAssignment() {
   const [role, setRole] = useState<'operator' | 'admin'>('operator');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [factories, setFactories] = useState<Factory[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: UserPublic; newRole: string } | null>(null);
 
   useEffect(() => {
     loadUsers();
+    api.getFactories().then(setFactories).catch(() => {});
   }, []);
 
   const loadUsers = async () => {
@@ -79,6 +81,19 @@ export default function RoleAssignment() {
   const handleRoleChange = (user: UserPublic, newRole: string) => {
     if (user.role === newRole) return;
     setRoleChangeTarget({ user, newRole });
+  };
+
+  const handleToggleFactory = async (user: UserPublic, factoryId: string) => {
+    const current = user.factoryIds || [];
+    const updated = current.includes(factoryId)
+      ? current.filter((id) => id !== factoryId)
+      : [...current, factoryId];
+    try {
+      await api.updateUserFactories(user.id, updated);
+      await loadUsers();
+    } catch (err) {
+      setError((err as Error).message);
+    }
   };
 
   return (
@@ -154,39 +169,68 @@ export default function RoleAssignment() {
         <div className="card" style={{ maxWidth: 500, margin: '0 auto' }}>
           <h3 style={{ fontSize: 15, marginBottom: 12 }}>Current Users</h3>
           {users.map((u) => (
-            <div key={u.id} className={s.userRow}>
-              <div className={s.userInfo}>
-                <Avatar name={u.name} />
-                <div>
-                  <h4>{u.name}</h4>
-                  <p>{u.email}</p>
+            <div key={u.id} className={s.userRow} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div className={s.userInfo}>
+                  <Avatar name={u.name} />
+                  <div>
+                    <h4>{u.name}</h4>
+                    <p>{u.email}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div className={s.roleToggle} style={{ width: 180 }}>
+                    <button
+                      className={u.role === 'operator' ? s.roleToggleActive : ''}
+                      onClick={() => handleRoleChange(u, 'operator')}
+                      style={{ padding: '6px 12px', fontSize: 12 }}
+                    >
+                      Operator
+                    </button>
+                    <button
+                      className={u.role === 'admin' ? s.roleToggleActive : ''}
+                      onClick={() => handleRoleChange(u, 'admin')}
+                      style={{ padding: '6px 12px', fontSize: 12 }}
+                    >
+                      Admin
+                    </button>
+                  </div>
+                  <button
+                    className="btn btn-red-outline btn-sm"
+                    style={{ padding: '6px 10px', fontSize: 11 }}
+                    onClick={() => setDeleteTarget(u)}
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div className={s.roleToggle} style={{ width: 180 }}>
-                  <button
-                    className={u.role === 'operator' ? s.roleToggleActive : ''}
-                    onClick={() => handleRoleChange(u, 'operator')}
-                    style={{ padding: '6px 12px', fontSize: 12 }}
-                  >
-                    Operator
-                  </button>
-                  <button
-                    className={u.role === 'admin' ? s.roleToggleActive : ''}
-                    onClick={() => handleRoleChange(u, 'admin')}
-                    style={{ padding: '6px 12px', fontSize: 12 }}
-                  >
-                    Admin
-                  </button>
+              {factories.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 48 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center', marginRight: 4 }}>Factories:</span>
+                  {factories.map((f) => {
+                    const assigned = (u.factoryIds || []).includes(f.id);
+                    return (
+                      <button
+                        key={f.id}
+                        onClick={() => handleToggleFactory(u, f.id)}
+                        style={{
+                          padding: '3px 10px',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          borderRadius: 12,
+                          border: assigned ? '1px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
+                          background: assigned ? 'var(--primary, #5B2333)' : '#fff',
+                          color: assigned ? '#fff' : 'var(--text-secondary, #666)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {f.name}
+                      </button>
+                    );
+                  })}
                 </div>
-                <button
-                  className="btn btn-red-outline btn-sm"
-                  style={{ padding: '6px 10px', fontSize: 11 }}
-                  onClick={() => setDeleteTarget(u)}
-                >
-                  Delete
-                </button>
-              </div>
+              )}
             </div>
           ))}
         </div>
