@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import api, { type Checklist, type Line, type Factory } from '../services/api';
+import api, { type Checklist, type Line } from '../services/api';
 import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
@@ -26,8 +26,6 @@ export default function OperatorDashboard() {
   const navigate = useNavigate();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
-  const [factories, setFactories] = useState<Factory[]>([]);
-  const [factoryFilter, setFactoryFilter] = useState('');
   const [tab, setTab] = useState<Tab>('in_progress');
   const [showModal, setShowModal] = useState(false);
   const [selectedLine, setSelectedLine] = useState('');
@@ -73,14 +71,12 @@ export default function OperatorDashboard() {
     setLoading(true);
     setOffset(0);
     try {
-      const [, lns, , fcts] = await Promise.all([
+      const [, lns] = await Promise.all([
         fetchChecklists(currentTab, 0, false),
         api.getLines(),
         fetchCounts(),
-        api.getFactories(),
       ]);
       setLines(lns);
-      setFactories(fcts);
     } catch {
       // 401 handled by api interceptor
     } finally {

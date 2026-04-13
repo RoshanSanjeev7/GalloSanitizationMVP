@@ -22,7 +22,7 @@ The seed data includes four Gallo facilities:
 
 **Operators** are assigned to factories via a `factoryIds` array on their user record (see [[DynamoDB Tables]]). When an operator queries checklists, the backend filters results to only include checklists from lines belonging to their assigned factories. Operators do NOT choose their factory — admins assign them via the [[Roles and Permissions]] page.
 
-**Admins** see all factories. The [[Frontend Pages]] AdminDashboard and CreateTemplate pages have a factory dropdown filter that lets admins narrow their view, but this is a convenience filter, not an access restriction.
+**Admins** see all factories but must select a factory first ("Select a Factory" dropdown) on the [[Frontend Pages]] AdminDashboard and CreateTemplate pages. This is a convenience filter, not an access restriction. Admins can switch between factories freely. When creating a new user, at least one factory must be assigned (the "Add User" button is disabled until a factory checkbox is selected).
 
 ## Data Flow
 
