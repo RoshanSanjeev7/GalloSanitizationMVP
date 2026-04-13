@@ -10,6 +10,10 @@ vi.mock('../services/api', () => ({
     getUsers: vi.fn(),
     createUser: vi.fn().mockResolvedValue({}),
     updateUserRole: vi.fn().mockResolvedValue({}),
+    getFactories: vi.fn().mockResolvedValue([
+      { id: 'f-1', name: 'Modesto Plant', location: 'Modesto, CA' },
+    ]),
+    updateUserFactories: vi.fn().mockResolvedValue({}),
     getStoredUser: vi.fn().mockReturnValue(null),
   },
 }));

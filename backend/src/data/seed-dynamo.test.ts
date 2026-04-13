@@ -7,10 +7,11 @@ vi.mock('./dynamo.js', () => ({
   putLine: vi.fn(),
   putTemplate: vi.fn(),
   putChecklist: vi.fn(),
+  putFactory: vi.fn(),
 }));
 
 import { seedIfEmpty } from './seed-dynamo.js';
-import { getAllUsers, putUser, putLine, putTemplate, putChecklist } from './dynamo.js';
+import { getAllUsers, putUser, putLine, putTemplate, putChecklist, putFactory } from './dynamo.js';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -22,6 +23,7 @@ describe('seedIfEmpty', () => {
 
     await seedIfEmpty();
 
+    expect(putFactory).toHaveBeenCalledTimes(4); // Modesto, Livingston, Fresno, Dry Creek
     expect(putUser).toHaveBeenCalledTimes(3); // admin + 2 operators
     expect(putLine).toHaveBeenCalledTimes(3); // Line 91, 92, 93
     expect(putTemplate).toHaveBeenCalledTimes(3); // one template per line

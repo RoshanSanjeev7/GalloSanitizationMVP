@@ -9,6 +9,9 @@ vi.mock('../services/api', () => ({
   default: {
     getLines: vi.fn(),
     getTemplates: vi.fn(),
+    getFactories: vi.fn().mockResolvedValue([
+      { id: 'f-1', name: 'Modesto Plant', location: 'Modesto, CA' },
+    ]),
     createTemplate: vi.fn().mockResolvedValue({ id: 'tpl-1', title: 'Test', lineId: 'line-1', machines: [] }),
     updateTemplate: vi.fn().mockResolvedValue({ id: 'tpl-1', title: 'Test', lineId: 'line-1', machines: [] }),
     getStoredUser: vi.fn().mockReturnValue(null),
