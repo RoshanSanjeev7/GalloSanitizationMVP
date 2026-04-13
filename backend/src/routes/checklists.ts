@@ -18,6 +18,7 @@ import {
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 import type { Checklist, ChecklistMachine, Activity } from '../types/index.js';
 import type { WebSocketBroadcaster } from '../ws/broadcaster.js';
+import { logAudit } from '../data/audit.js';
 
 function getBroadcaster(req: AuthRequest): WebSocketBroadcaster | null {
   return req.app.get('broadcaster') || null;
@@ -225,6 +226,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
   await putChecklist(checklist);
   res.status(201).json(checklist);
+  logAudit({ userId: req.userId!, userName: user.name, userRole: req.userRole!, action: 'checklist_created', targetType: 'checklist', targetId: checklist.id, detail: `Created checklist for ${line.name}` }).catch(() => {});
 });
 
 router.put('/:id/machines/:machineIdx', async (req: AuthRequest, res) => {
@@ -401,6 +403,7 @@ router.post('/:id/submit', async (req: AuthRequest, res) => {
     await conditionalStatusTransition(checklist, 'in_progress', checklist.version);
     checklist.version = checklist.version + 1;
     res.json(checklist);
+    logAudit({ userId: req.userId!, userName: checklist.operatorName, userRole: req.userRole!, action: 'checklist_submitted', targetType: 'checklist', targetId: checklist.id, detail: `Submitted ${checklist.lineName} checklist` }).catch(() => {});
     const bc = getBroadcaster(req);
     if (bc) {
       bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'submitted', by: checklist.operatorName, at: checklist.submittedAt }, req.userId).catch(() => {});
@@ -442,9 +445,10 @@ router.post('/:id/approve', adminOnly, async (req: AuthRequest, res) => {
     checklist.version = checklist.version + 1;
     res.json(checklist);
     const bc = getBroadcaster(req);
+    const approver = await getUser(req.userId!);
+    logAudit({ userId: req.userId!, userName: approver?.name || 'Admin', userRole: 'admin', action: 'checklist_approved', targetType: 'checklist', targetId: checklist.id, detail: `Approved ${checklist.lineName} checklist` }).catch(() => {});
     if (bc) {
-      const u = await getUser(req.userId!);
-      bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'approved', by: u?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {});
+      bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'approved', by: approver?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {});
       bc.broadcastToDashboard({
         type: 'dashboard_refresh',
         reason: 'status_changed',
@@ -481,9 +485,10 @@ router.post('/:id/deny', adminOnly, async (req: AuthRequest, res) => {
     checklist.version = checklist.version + 1;
     res.json(checklist);
     const bc = getBroadcaster(req);
+    const denier = await getUser(req.userId!);
+    logAudit({ userId: req.userId!, userName: denier?.name || 'Admin', userRole: 'admin', action: 'checklist_denied', targetType: 'checklist', targetId: checklist.id, detail: `Denied ${checklist.lineName} checklist` }).catch(() => {});
     if (bc) {
-      const u = await getUser(req.userId!);
-      bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'denied', by: u?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {});
+      bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'denied', by: denier?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {});
       bc.broadcastToDashboard({
         type: 'dashboard_refresh',
         reason: 'status_changed',
@@ -504,6 +509,7 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
   try {
     await conditionalDeleteChecklist(req.params.id as string);
     res.status(204).send();
+    logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'checklist_deleted', targetType: 'checklist', targetId: req.params.id as string, detail: 'Deleted checklist' }).catch(() => {});
     const bc = getBroadcaster(req);
     if (bc) bc.broadcastToChecklist(req.params.id as string, { type: 'checklist_deleted', checklistId: req.params.id }, req.userId).catch(() => {});
   } catch (err: unknown) {

@@ -10,6 +10,7 @@ import {
   deleteUserWithEmailLock,
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
+import { logAudit } from '../data/audit.js';
 
 const router = Router();
 
@@ -50,6 +51,7 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
 
   const { password: _, ...userPublic } = user;
   res.status(201).json(userPublic);
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'user_created', targetType: 'user', targetId: user.id, detail: `Created user ${user.name} (${user.email}) as ${user.role}` }).catch(() => {});
 });
 
 router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
@@ -76,6 +78,7 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
 
   const { password: _, ...userPublic } = user;
   res.json(userPublic);
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'user_role_changed', targetType: 'user', targetId: user.id, detail: `Changed ${user.name} role to ${role}` }).catch(() => {});
 });
 
 router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
@@ -108,6 +111,7 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
     await deleteUserDynamo(user.id);
   }
   res.status(204).send();
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'user_deleted', targetType: 'user', targetId: user.id, detail: `Deleted user ${user.name} (${user.email})` }).catch(() => {});
 });
 
 export default router;

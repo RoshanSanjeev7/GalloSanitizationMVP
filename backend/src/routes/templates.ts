@@ -8,6 +8,7 @@ import {
   queryChecklists,
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
+import { logAudit } from '../data/audit.js';
 
 const router = Router();
 
@@ -40,6 +41,7 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
   await putTemplate(template);
 
   res.status(201).json(template);
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_created', targetType: 'template', targetId: template.id, detail: `Created template "${template.title}"` }).catch(() => {});
 });
 
 router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
@@ -58,6 +60,7 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
 
   await putTemplate(template);
   res.json(template);
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_updated', targetType: 'template', targetId: template.id, detail: `Updated template "${template.title}"` }).catch(() => {});
 });
 
 // Check for active checklists before deleting (returns warning, not error)
@@ -88,6 +91,7 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
 
   await deleteTemplateDynamo(req.params.id as string);
   res.status(204).send();
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_deleted', targetType: 'template', targetId: req.params.id as string, detail: `Deleted template "${template.title}"` }).catch(() => {});
 });
 
 export default router;

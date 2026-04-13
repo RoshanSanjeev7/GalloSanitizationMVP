@@ -108,6 +108,35 @@ awslocal dynamodb update-time-to-live \
   --table-name SanitizationConnections \
   --time-to-live-specification Enabled=true,AttributeName=ttl
 
+# Audit log table
+awslocal dynamodb create-table \
+  --table-name SanitizationAuditLog \
+  --attribute-definitions \
+    AttributeName=id,AttributeType=S \
+    AttributeName=timestamp,AttributeType=S \
+    AttributeName=userId,AttributeType=S \
+    AttributeName=action,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "timestamp-index",
+      "KeySchema": [
+        {"AttributeName": "action", "KeyType": "HASH"},
+        {"AttributeName": "timestamp", "KeyType": "RANGE"}
+      ],
+      "Projection": {"ProjectionType": "ALL"}
+    },
+    {
+      "IndexName": "userId-index",
+      "KeySchema": [
+        {"AttributeName": "userId", "KeyType": "HASH"},
+        {"AttributeName": "timestamp", "KeyType": "RANGE"}
+      ],
+      "Projection": {"ProjectionType": "ALL"}
+    }
+  ]'
+
 echo "Creating S3 bucket..."
 awslocal s3 mb s3://checklist-images
 

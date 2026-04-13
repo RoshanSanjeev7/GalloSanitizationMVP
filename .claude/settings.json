@@ -10,60 +10,11 @@
       "Bash(mdfind \"kMDItemCFBundleIdentifier == 'md.obsidian'\")",
       "Bash(ls /Users/roshansanjeev/Desktop/Gallo/GalloSanitizationMVP/graphify-out/obsidian/_COMMUNITY_*)",
       "Skill(update-config)",
-      "Skill(update-config:*)"
-    ]
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /Users/roshansanjeev/Desktop/Gallo/GalloSanitizationMVP/.claude/ruflo-session-start.sh",
-            "timeout": 5,
-            "statusMessage": "Restoring Ruflo context..."
-          }
-        ]
-      }
+      "Skill(update-config:*)",
+      "Read(//Users/roshansanjeev/.claude/**)"
     ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /Users/roshansanjeev/Desktop/Gallo/GalloSanitizationMVP/.claude/graphify-hook.sh",
-            "timeout": 15,
-            "async": true,
-            "statusMessage": "Updating knowledge graph..."
-          },
-          {
-            "type": "command",
-            "command": "bash /Users/roshansanjeev/Desktop/Gallo/GalloSanitizationMVP/.claude/ruflo-post-edit.sh",
-            "timeout": 5,
-            "async": true,
-            "statusMessage": "Logging edit to Ruflo..."
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd /Users/roshansanjeev/Desktop/Gallo/GalloSanitizationMVP && npx vitest run --reporter=verbose 2>&1 | tail -30; echo '---'; npx playwright test --reporter=line 2>&1 | tail -30",
-            "timeout": 120,
-            "statusMessage": "Running tests (Vitest + Playwright)..."
-          },
-          {
-            "type": "command",
-            "command": "bash /Users/roshansanjeev/Desktop/Gallo/GalloSanitizationMVP/.claude/ruflo-stop.sh",
-            "timeout": 5,
-            "statusMessage": "Persisting Ruflo session..."
-          }
-        ]
-      }
+    "additionalDirectories": [
+      "/Users/roshansanjeev/.claude/hooks"
     ]
   }
 }
