@@ -248,10 +248,11 @@ router.post('/', async (req: AuthRequest, res) => {
   // Stamp the factory from the line onto the checklist
   if (line.factoryId) checklist.factoryId = line.factoryId;
 
-  await putChecklist(checklist as Checklist);
-  res.status(201).json(checklist);
+  const typedChecklist = checklist as unknown as Checklist;
+  await putChecklist(typedChecklist);
+  res.status(201).json(typedChecklist);
   // Fire-and-forget: audit/broadcast failures must not block the HTTP response
-  logAudit({ userId: req.userId!, userName: user.name, userRole: req.userRole!, action: 'checklist_created', targetType: 'checklist', targetId: checklist.id as string, detail: `Created checklist for ${line.name}` }).catch(() => {});
+  logAudit({ userId: req.userId!, userName: user.name, userRole: req.userRole!, action: 'checklist_created', targetType: 'checklist', targetId: typedChecklist.id, detail: `Created checklist for ${line.name}` }).catch(() => {});
 });
 
 router.put('/:id/machines/:machineIdx', async (req: AuthRequest, res) => {
