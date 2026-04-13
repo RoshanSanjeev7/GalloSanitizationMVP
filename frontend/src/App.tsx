@@ -17,6 +17,7 @@ const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
 const SubmissionReview = React.lazy(() => import('./pages/SubmissionReview'));
 const CreateTemplate = React.lazy(() => import('./pages/CreateTemplate'));
 const RoleAssignment = React.lazy(() => import('./pages/RoleAssignment'));
+const AuditLog = React.lazy(() => import('./pages/AuditLog'));
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const user = useSelector((s: RootState) => s.auth.user);
@@ -103,6 +104,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <RoleAssignment />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings/audit"
+              element={
+                <ProtectedRoute>
+                  <AuditLog />
                 </ProtectedRoute>
               }
             />
