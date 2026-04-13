@@ -25,6 +25,13 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
+  const user = useSelector((s: RootState) => s.auth.user);
+  if (!user) return <Navigate to="/login" replace />;
+  if (user.role !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function HomeRedirect() {
   const user = useSelector((s: RootState) => s.auth.user);
   if (!user) return <Navigate to="/login" replace />;
@@ -54,9 +61,9 @@ export default function App() {
             <Route
               path="/admin"
               element={
-                <ProtectedRoute>
+                <ProtectedAdminRoute>
                   <AdminDashboard />
-                </ProtectedRoute>
+                </ProtectedAdminRoute>
               }
             />
             <Route
@@ -70,9 +77,9 @@ export default function App() {
             <Route
               path="/checklist/:id/review"
               element={
-                <ProtectedRoute>
+                <ProtectedAdminRoute>
                   <SubmissionReview />
-                </ProtectedRoute>
+                </ProtectedAdminRoute>
               }
             />
             <Route
@@ -86,9 +93,9 @@ export default function App() {
             <Route
               path="/templates/create"
               element={
-                <ProtectedRoute>
+                <ProtectedAdminRoute>
                   <CreateTemplate />
-                </ProtectedRoute>
+                </ProtectedAdminRoute>
               }
             />
             <Route
@@ -102,17 +109,17 @@ export default function App() {
             <Route
               path="/settings/roles"
               element={
-                <ProtectedRoute>
+                <ProtectedAdminRoute>
                   <RoleAssignment />
-                </ProtectedRoute>
+                </ProtectedAdminRoute>
               }
             />
             <Route
               path="/settings/audit"
               element={
-                <ProtectedRoute>
+                <ProtectedAdminRoute>
                   <AuditLog />
-                </ProtectedRoute>
+                </ProtectedAdminRoute>
               }
             />
           </Routes>
