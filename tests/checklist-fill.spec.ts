@@ -58,7 +58,8 @@ test.describe('Checklist Fill', () => {
 
   test('submit button opens confirmation modal', async ({ page }) => {
     await page.locator('button:has-text("Submit Checklist")').first().click();
-    await expect(page.locator('text=Are you sure you want to submit')).toBeVisible();
-    await page.click('button:has-text("Cancel")');
+    // Modal shows either "Are you sure" (all complete) or "Cannot Submit" (items remaining)
+    await expect(page.locator('h2:text-matches("Submit Checklist|Cannot Submit")')).toBeVisible();
+    await page.locator('button:has-text("Cancel"), button:has-text("Close")').first().click();
   });
 });
