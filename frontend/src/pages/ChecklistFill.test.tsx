@@ -9,7 +9,7 @@ import api from '../services/api';
 vi.mock('../services/api', () => ({
   default: {
     getChecklist: vi.fn(),
-    updateChecklistItems: vi.fn().mockResolvedValue(undefined),
+    updateChecklistItems: vi.fn().mockResolvedValue({ version: 1 }),
     submitChecklist: vi.fn().mockResolvedValue(undefined),
     uploadImages: vi.fn().mockResolvedValue({ images: ['img-1'] }),
     deleteImage: vi.fn().mockResolvedValue({ images: [] }),
@@ -219,8 +219,8 @@ describe('ChecklistFill', () => {
     });
   });
 
-  // 7. Submit button opens confirmation modal with completion count text
-  it('opens confirmation modal with completion count when submit is clicked', async () => {
+  // 7. Submit button shows "Cannot Submit" when items are incomplete
+  it('shows Cannot Submit with incomplete items when not all items are filled', async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => {
@@ -230,31 +230,52 @@ describe('ChecklistFill', () => {
     await user.click(submitButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText(/out of.*items completed/i)).toBeInTheDocument();
+      expect(screen.getByText('Cannot Submit')).toBeInTheDocument();
     });
     expect(screen.getByText('0 out of 5 items completed.')).toBeInTheDocument();
-    expect(screen.getByText(/are you sure you want to submit/i)).toBeInTheDocument();
+    expect(screen.getByText(/all items must be checked/i)).toBeInTheDocument();
+    // Should show "Go to" buttons to jump to incomplete items
+    expect(screen.getAllByRole('button', { name: 'Go to' }).length).toBeGreaterThan(0);
   });
 
-  // 8. Confirm submit calls api.submitChecklist and navigates
-  it('calls api.submitChecklist and navigates on confirm', async () => {
+  // 8. Confirm submit calls api.submitChecklist when all items completed
+  it('calls api.submitChecklist and navigates when all items are completed', async () => {
+    // Use a single-machine checklist so all items are visible at once
+    const simpleChecklist = makeChecklist({
+      id: 'test-cl-1',
+      lineName: 'Line 91',
+      operatorName: 'Test Operator',
+      version: 1,
+      machines: [{
+        name: 'Filler',
+        categories: [{
+          name: 'Rinse',
+          items: [
+            makeChecklistItem({ description: 'Task A', completed: true, completedBy: 'Test', completedAt: '2026-04-09T00:00:00Z' }),
+            makeChecklistItem({ description: 'Task B', completed: true, completedBy: 'Test', completedAt: '2026-04-09T00:00:00Z' }),
+          ],
+        }],
+      }],
+    });
+    vi.mocked(api.getChecklist).mockResolvedValue(simpleChecklist);
+
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => {
-      expect(screen.getByText('Flush water lines')).toBeInTheDocument();
+      expect(screen.getByText('Task A')).toBeInTheDocument();
     });
+
     const submitButtons = screen.getAllByRole('button', { name: /submit checklist/i });
     await user.click(submitButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText(/are you sure/i)).toBeInTheDocument();
+      expect(screen.getByText(/are you sure you want to submit/i)).toBeInTheDocument();
     });
 
     const confirmBtn = screen.getByRole('button', { name: 'Submit' });
     await user.click(confirmBtn);
 
     await waitFor(() => {
-      expect(api.updateChecklistItems).toHaveBeenCalledWith('test-cl-1', expect.any(Array), 1);
       expect(api.submitChecklist).toHaveBeenCalledWith('test-cl-1');
       expect(mockNavigate).toHaveBeenCalledWith('/');
     });
@@ -301,8 +322,8 @@ describe('ChecklistFill', () => {
     expect(screen.getByText('Hide comment')).toBeInTheDocument();
   });
 
-  // 11. Cancel button in submit modal closes the modal
-  it('closes the submit modal when Cancel is clicked', async () => {
+  // 11. Close button in submit modal closes the modal
+  it('closes the submit modal when Close is clicked', async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => {
@@ -313,13 +334,13 @@ describe('ChecklistFill', () => {
     await user.click(submitButtons[0]);
 
     await waitFor(() => {
-      expect(screen.getByText(/are you sure/i)).toBeInTheDocument();
+      expect(screen.getByText('Cannot Submit')).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/are you sure/i)).not.toBeInTheDocument();
+      expect(screen.queryByText('Cannot Submit')).not.toBeInTheDocument();
     });
   });
 

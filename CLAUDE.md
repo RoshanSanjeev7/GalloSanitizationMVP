@@ -135,19 +135,34 @@ E2E tests are in `/tests/` with helpers in `tests/helpers.ts`.
 - Frontend uses CSS Modules for component styling
 - API client (`services/api.ts`) auto-injects JWT and handles 401 logout
 
-## Graphify Knowledge Graph (Localized RAG)
+## Obsidian Knowledge Vault
 
-A knowledge graph of this codebase lives at `graphify-out/`. Use it as a localized RAG system when answering questions about this codebase:
+A hand-crafted Obsidian vault lives at `graphify-out/obsidian/` with 32 pages and 238+ backlinks documenting the architecture, subsystems, decisions, and runbooks.
 
-- **Graph data:** `graphify-out/graph.json` — 371 nodes, 376 edges covering all modules, routes, components, and their relationships
-- **Interactive HTML:** `graphify-out/graph.html` — open in browser to visualize the full architecture
-- **Audit report:** `graphify-out/GRAPH_REPORT.md` — community structure, god nodes, surprising connections
-- **Obsidian vault:** `graphify-out/obsidian/` — 467 interlinked notes, one per entity, with community overview notes
+### Vault Rules (MUST FOLLOW when modifying the vault)
 
-When querying the codebase (e.g. "how does X connect to Y", "what depends on Z", "explain the auth flow"):
-1. First check `graphify-out/graph.json` for structural relationships and community membership
-2. Use `/graphify query "<question>"` for graph-traversal-based answers
-3. Use `/graphify path "A" "B"` to trace dependency chains between concepts
-4. Use `/graphify explain "Node"` for detailed context on any entity
+When adding or updating vault pages:
 
-To keep the graph current after code changes, run `/graphify . --update`.
+1. **Every `[[backlink]]` must point to a page that exists.** Check the filename matches exactly. No broken links.
+2. **Every backlink must connect ideas that genuinely relate.** Ask: "Would clicking this link teach me something useful in this context?" If not, don't add it.
+3. **Embed backlinks in prose, not as standalone lists.** Write: "The [[Optimistic Concurrency]] system prevents this via conditional writes." NOT: "- [[Optimistic Concurrency]]"
+4. **Add a "See also" section** at the bottom with 2-3 related pages that provide useful next reading.
+5. **No page should exist unless a developer would actually read it.** No auto-generated function-level pages. Every page should have real content.
+6. **When adding a new feature**, update the relevant existing pages AND create a new page if the feature is substantial enough. Add backlinks in BOTH directions (the new page links to existing ones, and existing pages link back).
+7. **Tag pages** in YAML frontmatter: #architecture, #backend, #frontend, #database, #decision, #runbook, #release
+
+### Vault Structure (32 pages)
+- **Home.md** — entry point
+- **Tier 2 (Core):** System Architecture, Checklist Workflow, DynamoDB Tables, Authentication, API Endpoints, Frontend Pages
+- **Tier 3 (Subsystems):** WebSocket System, Optimistic Concurrency, Per-Machine Auto-Save, Auto-Save and Conflict Resolution, Presence Indicators, Toast Notifications, Offline Queue, Audit Log, Input Validation, Rate Limiting, Image Handling, Roles and Permissions
+- **Tier 4 (Decisions):** Concurrency Scenarios, Admin Safety, Email Uniqueness, JWT Design, Denied Is Final, WebSocket Adapter Pattern, Release 1 Bulletproofing, Release 2 Real-time, Environment Variables
+- **Tier 5 (Runbooks):** Local Dev Setup, Demo Credentials, Running Tests, Troubleshooting
+
+### Graphify Knowledge Graph
+
+The AST-extracted graph data also lives at `graphify-out/`:
+- **Graph data:** `graphify-out/graph.json` — 371 nodes, 376 edges
+- **Interactive HTML:** `graphify-out/graph.html` — open in browser to visualize
+- **Audit report:** `graphify-out/GRAPH_REPORT.md` — community structure, god nodes
+
+To rebuild after code changes: `/graphify . --update`
