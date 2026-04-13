@@ -12,7 +12,8 @@ A bottling facility sanitation checklist management system. Operators fill out d
 
 - [[System Architecture]] -- how the pieces fit together
 - [[Checklist Workflow]] -- the core domain: create, fill, submit, approve/deny
-- [[DynamoDB Tables]] -- all six tables and their design
+- [[Factories]] -- multi-facility support (Modesto, Livingston, Fresno, Dry Creek)
+- [[DynamoDB Tables]] -- all seven tables and their design
 - [[Authentication]] -- JWT auth, middleware, token refresh
 - [[API Endpoints]] -- every backend route
 - [[Frontend Pages]] -- every page in the React app
