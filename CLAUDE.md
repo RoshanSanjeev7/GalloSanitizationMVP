@@ -137,7 +137,32 @@ E2E tests are in `/tests/` with helpers in `tests/helpers.ts`.
 
 ## Obsidian Knowledge Vault
 
-A hand-crafted Obsidian vault lives at `graphify-out/obsidian/` with 32 pages and 238+ backlinks documenting the architecture, subsystems, decisions, and runbooks.
+A hand-crafted Obsidian vault lives at `graphify-out/obsidian/` with 32+ pages and 238+ backlinks documenting the architecture, subsystems, decisions, and runbooks.
+
+### WHEN TO READ THE VAULT (MANDATORY)
+
+Before answering questions about the codebase architecture, design decisions, how subsystems work, or why something was built a certain way — **read the relevant vault page first.** The vault contains context that isn't obvious from reading code alone (design rationale, concurrency scenarios, deployment constraints).
+
+- Question about how checklists work → read `graphify-out/obsidian/Checklist Workflow.md`
+- Question about race conditions → read `graphify-out/obsidian/Concurrency Scenarios.md` and `graphify-out/obsidian/Optimistic Concurrency.md`
+- Question about WebSocket → read `graphify-out/obsidian/WebSocket System.md`
+- Question about auth → read `graphify-out/obsidian/Authentication.md`
+- Question about why a decision was made → check the relevant decision page (ADR) in `graphify-out/obsidian/`
+- Not sure which page → read `graphify-out/obsidian/Home.md` for the index
+
+### WHEN TO UPDATE THE VAULT (MANDATORY)
+
+After completing any of these, you MUST update the vault:
+
+1. **New feature or subsystem** → Create a new page AND update related existing pages with backlinks in both directions
+2. **New API endpoint** → Update `API Endpoints.md`
+3. **New DynamoDB table or field** → Update `DynamoDB Tables.md`
+4. **New architectural decision** → Create a new decision page and link from relevant subsystem pages
+5. **Changed behavior** (e.g., dropdown → buttons) → Update `Frontend Pages.md` and any affected subsystem pages
+6. **Bug fix that changes how something works** → Update the relevant subsystem page
+7. **New environment variable** → Update `Environment Variables.md`
+
+If the change is trivial (typo fix, test-only change, CSS tweak) — skip the vault update.
 
 ### Vault Rules (MUST FOLLOW when modifying the vault)
 

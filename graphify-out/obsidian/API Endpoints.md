@@ -49,7 +49,7 @@ All endpoints are prefixed with `/api`. Every endpoint except `POST /api/auth/lo
 | GET | `/checklists/notifications` | Admin | Submitted + in-progress checklists for admin notification bell |
 | POST | `/checklists/mark-all-viewed` | Admin | Batch mark checklists as viewed |
 | GET | `/checklists/:id` | JWT | Get single checklist (auto-marks viewed for admin) |
-| POST | `/checklists` | JWT | Create checklist from line's template |
+| POST | `/checklists` | JWT | Create checklist from line's template (409 if in-progress exists for line) |
 | PUT | `/checklists/:id/items` | JWT | Update all machines (uses [[Optimistic Concurrency]] via `conditionalPutChecklist`) |
 | PUT | `/checklists/:id/machines/:machineIdx` | JWT | Update single machine (uses [[Per-Machine Auto-Save]] via `updateChecklistMachine`) |
 | POST | `/checklists/:id/submit` | JWT | Submit (conditional on `in_progress` + version) |
