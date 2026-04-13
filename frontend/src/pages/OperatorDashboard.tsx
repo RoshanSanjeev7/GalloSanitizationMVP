@@ -115,12 +115,20 @@ export default function OperatorDashboard() {
   // Sort is handled server-side (newest first by default)
   // For "oldest", the operator dashboard doesn't have a sort toggle, so we just use server order
 
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const handleCreate = async () => {
     if (!selectedLine) return;
-    await api.createChecklist({ lineId: selectedLine });
-    setShowModal(false);
-    setSelectedLine('');
-    await loadData(tab);
+    setCreateError(null);
+    try {
+      await api.createChecklist({ lineId: selectedLine });
+      setShowModal(false);
+      setSelectedLine('');
+      await loadData(tab);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to create checklist';
+      setCreateError(msg);
+    }
   };
 
   const formatDate = (iso: string) => {
@@ -237,8 +245,13 @@ export default function OperatorDashboard() {
               </option>
             ))}
           </select>
+          {createError && (
+            <div style={{ padding: '8px 12px', marginTop: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 13, color: '#dc2626' }}>
+              {createError}
+            </div>
+          )}
           <div className="modal-actions">
-            <button className="btn btn-outline" onClick={() => setShowModal(false)}>
+            <button className="btn btn-outline" onClick={() => { setShowModal(false); setCreateError(null); }}>
               Cancel
             </button>
             <button

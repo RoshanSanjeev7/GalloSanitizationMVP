@@ -187,6 +187,13 @@ router.post('/', async (req: AuthRequest, res) => {
     return;
   }
 
+  // Check if there's already an in-progress checklist for this line
+  const existing = await queryChecklists({ status: 'in_progress', lineId });
+  if (existing.length > 0) {
+    res.status(409).json({ error: `An in-progress checklist already exists for ${line.name}. Complete or submit it before creating a new one.`, existingId: existing[0].id });
+    return;
+  }
+
   const templates = await getTemplatesByLineId(lineId);
   const template = templates[0];
   if (!template) {
