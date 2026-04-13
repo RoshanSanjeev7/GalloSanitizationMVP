@@ -4,7 +4,6 @@ import {
   getAllTemplates,
   getTemplate,
   putTemplate,
-  deleteTemplate as deleteTemplateDynamo,
   queryChecklists,
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
@@ -16,12 +15,15 @@ router.use(authMiddleware);
 
 router.get('/', async (req: AuthRequest, res) => {
   const templates = await getAllTemplates();
+  const includeDeleted = req.query.includeDeleted === 'true' && req.userRole === 'admin';
+
+  let filtered = includeDeleted ? templates : templates.filter(t => !t.deleted);
+
   // Operators only see published templates
   if (req.userRole !== 'admin') {
-    res.json(templates.filter(t => t.published !== false));
-    return;
+    filtered = filtered.filter(t => t.published !== false);
   }
-  res.json(templates);
+  res.json(filtered);
 });
 
 router.get('/:id', async (req, res) => {
@@ -110,9 +112,35 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
     return;
   }
 
-  await deleteTemplateDynamo(req.params.id as string);
+  // Soft delete: mark as deleted with 30-day TTL for auto-cleanup
+  const now = new Date();
+  (template as any).deleted = true;
+  (template as any).deletedAt = now.toISOString();
+  (template as any).deleteTtl = Math.floor(now.getTime() / 1000) + 30 * 24 * 60 * 60; // 30 days
+  await putTemplate(template);
+
   res.status(204).send();
-  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_deleted', targetType: 'template', targetId: req.params.id as string, detail: `Deleted template "${template.title}"` }).catch(() => {});
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_deleted', targetType: 'template', targetId: req.params.id as string, detail: `Soft-deleted template "${template.title}" (restoreable for 30 days)` }).catch(() => {});
+});
+
+router.post('/:id/restore', adminOnly, async (req: AuthRequest, res) => {
+  const template = await getTemplate(req.params.id as string);
+  if (!template) {
+    res.status(404).json({ error: 'Template not found' });
+    return;
+  }
+  if (!template.deleted) {
+    res.status(400).json({ error: 'Template is not deleted' });
+    return;
+  }
+
+  (template as any).deleted = false;
+  (template as any).deletedAt = null;
+  delete (template as any).deleteTtl;
+  await putTemplate(template);
+
+  res.json(template);
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_restored', targetType: 'template', targetId: template.id, detail: `Restored template "${template.title}"` }).catch(() => {});
 });
 
 export default router;

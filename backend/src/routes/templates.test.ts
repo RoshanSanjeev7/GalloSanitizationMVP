@@ -30,13 +30,12 @@ vi.mock('../data/dynamo.js', () => ({
   getTemplatesByLineId: vi.fn().mockResolvedValue([]),
 }));
 
-import { getAllTemplates, getTemplate, putTemplate, deleteTemplate } from '../data/dynamo.js';
+import { getAllTemplates, getTemplate, putTemplate } from '../data/dynamo.js';
 import { app } from '../index.js';
 
 const mockedGetAllTemplates = vi.mocked(getAllTemplates);
 const mockedGetTemplate = vi.mocked(getTemplate);
 const mockedPutTemplate = vi.mocked(putTemplate);
-const mockedDeleteTemplate = vi.mocked(deleteTemplate);
 
 describe('Templates routes', () => {
   const adminToken = makeAdminToken();
@@ -147,17 +146,117 @@ describe('Templates routes', () => {
       expect(res.status).toBe(404);
     });
 
-    it('returns 204 on successful deletion', async () => {
-      const tmpl = makeTemplate({ id: 't1' });
+    it('returns 204 on successful deletion (soft-delete)', async () => {
+      const tmpl = makeTemplate({ id: 't1', title: 'Test Template' });
       mockedGetTemplate.mockResolvedValue(tmpl);
-      mockedDeleteTemplate.mockResolvedValue(undefined);
+      mockedPutTemplate.mockResolvedValue(undefined);
 
       const res = await request(app)
         .delete('/api/templates/t1')
         .set('Authorization', `Bearer ${adminToken}`);
 
       expect(res.status).toBe(204);
-      expect(mockedDeleteTemplate).toHaveBeenCalledWith('t1');
+      expect(mockedPutTemplate).toHaveBeenCalledOnce();
+      const savedTemplate = mockedPutTemplate.mock.calls[0][0] as any;
+      expect(savedTemplate.deleted).toBe(true);
+      expect(savedTemplate.deletedAt).toBeDefined();
+      expect(savedTemplate.deleteTtl).toBeGreaterThan(0);
+    });
+  });
+
+  // ── POST /api/templates/:id/restore ────────────────────────────────
+
+  describe('POST /api/templates/:id/restore', () => {
+    it('returns 404 when template is not found', async () => {
+      mockedGetTemplate.mockResolvedValue(undefined);
+
+      const res = await request(app)
+        .post('/api/templates/nonexistent/restore')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(404);
+    });
+
+    it('returns 400 when template is not deleted', async () => {
+      const tmpl = makeTemplate({ id: 't1' });
+      mockedGetTemplate.mockResolvedValue(tmpl);
+
+      const res = await request(app)
+        .post('/api/templates/t1/restore')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/not deleted/i);
+    });
+
+    it('restores a soft-deleted template', async () => {
+      const tmpl = { ...makeTemplate({ id: 't1', title: 'Deleted Template' }), deleted: true, deletedAt: new Date().toISOString(), deleteTtl: 9999999 } as any;
+      mockedGetTemplate.mockResolvedValue(tmpl);
+      mockedPutTemplate.mockResolvedValue(undefined);
+
+      const res = await request(app)
+        .post('/api/templates/t1/restore')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(mockedPutTemplate).toHaveBeenCalledOnce();
+      const savedTemplate = mockedPutTemplate.mock.calls[0][0] as any;
+      expect(savedTemplate.deleted).toBe(false);
+      expect(savedTemplate.deletedAt).toBeNull();
+      expect(savedTemplate.deleteTtl).toBeUndefined();
+    });
+
+    it('returns 403 when called by an operator', async () => {
+      const res = await request(app)
+        .post('/api/templates/t1/restore')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(403);
+    });
+  });
+
+  // ── GET /api/templates (soft-delete filtering) ─────────────────────
+
+  describe('GET /api/templates (soft-delete filtering)', () => {
+    it('excludes deleted templates by default', async () => {
+      const t1 = makeTemplate({ id: 't1', title: 'Active' });
+      const t2 = { ...makeTemplate({ id: 't2', title: 'Deleted' }), deleted: true, deletedAt: new Date().toISOString() } as any;
+      mockedGetAllTemplates.mockResolvedValue([t1, t2]);
+
+      const res = await request(app)
+        .get('/api/templates')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].title).toBe('Active');
+    });
+
+    it('includes deleted templates when includeDeleted=true for admin', async () => {
+      const t1 = makeTemplate({ id: 't1', title: 'Active' });
+      const t2 = { ...makeTemplate({ id: 't2', title: 'Deleted' }), deleted: true, deletedAt: new Date().toISOString() } as any;
+      mockedGetAllTemplates.mockResolvedValue([t1, t2]);
+
+      const res = await request(app)
+        .get('/api/templates?includeDeleted=true')
+        .set('Authorization', `Bearer ${adminToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(2);
+    });
+
+    it('ignores includeDeleted param for operators', async () => {
+      const t1 = makeTemplate({ id: 't1', title: 'Active' });
+      const t2 = { ...makeTemplate({ id: 't2', title: 'Deleted' }), deleted: true, deletedAt: new Date().toISOString() } as any;
+      mockedGetAllTemplates.mockResolvedValue([t1, t2]);
+
+      const res = await request(app)
+        .get('/api/templates?includeDeleted=true')
+        .set('Authorization', `Bearer ${operatorToken}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveLength(1);
+      expect(res.body[0].title).toBe('Active');
     });
   });
 });
