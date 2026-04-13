@@ -17,12 +17,15 @@ import {
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 import type { Checklist, ChecklistMachine, Activity } from '../types/index.js';
-import type { WebSocketBroadcaster } from '../ws/broadcaster.js';
 import { logAudit } from '../data/audit.js';
-
-function getBroadcaster(req: AuthRequest): WebSocketBroadcaster | null {
-  return req.app.get('broadcaster') || null;
-}
+import { getBroadcaster } from '../utils/broadcast.js';
+import {
+  PAGINATION_MAX,
+  PAGINATION_DEFAULT_CHECKLISTS,
+  NOTIF_PAGE_SIZE,
+  MARK_VIEWED_BATCH_SIZE,
+  MARK_VIEWED_MAX,
+} from '../config/constants.js';
 
 const router = Router();
 
@@ -31,31 +34,31 @@ router.use(authMiddleware);
 // Validate that a machines payload has the expected structure
 function validateMachines(machines: unknown): machines is ChecklistMachine[] {
   if (!Array.isArray(machines)) return false;
-  return machines.every(
-    (m: unknown) =>
-      typeof m === 'object' && m !== null &&
-      typeof (m as any).name === 'string' &&
-      Array.isArray((m as any).categories) &&
-      (m as any).categories.every(
-        (c: unknown) =>
-          typeof c === 'object' && c !== null &&
-          typeof (c as any).name === 'string' &&
-          Array.isArray((c as any).items) &&
-          (c as any).items.every(
-            (i: unknown) =>
-              typeof i === 'object' && i !== null &&
-              typeof (i as any).description === 'string' &&
-              ((i as any).completed === null || typeof (i as any).completed === 'boolean') &&
-              ((i as any).issue === null || (i as any).issue === undefined || typeof (i as any).issue === 'string') &&
-              (!(i as any).images || Array.isArray((i as any).images)),
-          ),
-      ),
-  );
+  return machines.every((m) => {
+    if (typeof m !== 'object' || m === null) return false;
+    const machine = m as Record<string, unknown>;
+    if (typeof machine.name !== 'string' || !Array.isArray(machine.categories)) return false;
+    return (machine.categories as unknown[]).every((c) => {
+      if (typeof c !== 'object' || c === null) return false;
+      const cat = c as Record<string, unknown>;
+      if (typeof cat.name !== 'string' || !Array.isArray(cat.items)) return false;
+      return (cat.items as unknown[]).every((i) => {
+        if (typeof i !== 'object' || i === null) return false;
+        const item = i as Record<string, unknown>;
+        return (
+          typeof item.description === 'string' &&
+          (item.completed === null || typeof item.completed === 'boolean') &&
+          (item.issue === null || item.issue === undefined || typeof item.issue === 'string') &&
+          (!item.images || Array.isArray(item.images))
+        );
+      });
+    });
+  });
 }
 
 router.get('/', async (req: AuthRequest, res) => {
   const { status, operatorId, lineId, search, date } = req.query as Record<string, string>;
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+  const limit = Math.min(PAGINATION_MAX, Math.max(1, parseInt(req.query.limit as string, 10) || PAGINATION_DEFAULT_CHECKLISTS));
   const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
 
   // Handle comma-separated statuses (e.g., 'approved,denied' for the completed tab)
@@ -109,13 +112,12 @@ router.post('/mark-all-viewed', adminOnly, async (req: AuthRequest, res) => {
     queryChecklists({ status: 'submitted' }),
     queryChecklists({ status: 'in_progress' }),
   ]);
-  const unviewed = [...submitted, ...inProgress].filter((c) => !c.viewedAt).slice(0, 500);
+  const unviewed = [...submitted, ...inProgress].filter((c) => !c.viewedAt).slice(0, MARK_VIEWED_MAX);
   const user = await getUser(req.userId!);
   const viewerName = user?.name || 'Admin';
   const now = new Date().toISOString();
 
-  // Process in batches of 25
-  const batchSize = 25;
+  const batchSize = MARK_VIEWED_BATCH_SIZE;
   let count = 0;
   for (let i = 0; i < unviewed.length; i += batchSize) {
     const batch = unviewed.slice(i, i + batchSize);
@@ -135,7 +137,7 @@ router.post('/mark-all-viewed', adminOnly, async (req: AuthRequest, res) => {
 });
 
 router.get('/notifications', adminOnly, async (req: AuthRequest, res) => {
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+  const limit = Math.min(PAGINATION_MAX, Math.max(1, parseInt(req.query.limit as string, 10) || NOTIF_PAGE_SIZE));
   const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
 
   const [submitted, inProgress] = await Promise.all([
@@ -236,6 +238,7 @@ router.post('/', async (req: AuthRequest, res) => {
 
   await putChecklist(checklist);
   res.status(201).json(checklist);
+  // Fire-and-forget: audit/broadcast failures must not block the HTTP response
   logAudit({ userId: req.userId!, userName: user.name, userRole: req.userRole!, action: 'checklist_created', targetType: 'checklist', targetId: checklist.id, detail: `Created checklist for ${line.name}` }).catch(() => {});
 });
 
@@ -264,10 +267,11 @@ router.put('/:id/machines/:machineIdx', async (req: AuthRequest, res) => {
   // Detect new comments by comparing old machine items vs new machine items
   const activities: Activity[] = [];
   const oldItems = checklist.machines[machineIdx].categories.flatMap(c => c.items);
-  const newItems = machine.categories.flatMap((c: any) => c.items);
-  const oldComments = new Set(oldItems.map((i: any) => i.issue).filter(Boolean));
-  const newComments = newItems.map((i: any) => i.issue).filter(Boolean);
-  const addedComments = newComments.filter((c: string) => !oldComments.has(c));
+  const typedMachine = machine as ChecklistMachine;
+  const newItems = typedMachine.categories.flatMap(c => c.items);
+  const oldComments = new Set(oldItems.map(i => i.issue).filter(Boolean));
+  const newComments = newItems.map(i => i.issue).filter((c): c is string => c !== null && c !== undefined);
+  const addedComments = newComments.filter((c) => !oldComments.has(c));
 
   if (addedComments.length > 0) {
     const user = await getUser(req.userId!);
@@ -297,19 +301,21 @@ router.put('/:id/machines/:machineIdx', async (req: AuthRequest, res) => {
       const oldCats = checklist.machines[machineIdx].categories;
       const newCats = machine.categories;
       const user = activities.length > 0 ? activities[0].by : (await getUser(req.userId!))?.name || 'Unknown';
-      for (let ci = 0; ci < newCats.length; ci++) {
-        const oldCat = oldCats[ci];
-        const newCat = newCats[ci];
+      for (let catIdx = 0; catIdx < newCats.length; catIdx++) {
+        const oldCat = oldCats[catIdx];
+        const newCat = newCats[catIdx];
         if (!oldCat || !newCat) continue;
-        for (let ii = 0; ii < newCat.items.length; ii++) {
-          const oldItem = oldCat.items[ii];
-          const newItem = newCat.items[ii];
+        for (let itemIdx = 0; itemIdx < newCat.items.length; itemIdx++) {
+          const oldItem = oldCat.items[itemIdx];
+          const newItem = newCat.items[itemIdx];
           if (!oldItem || !newItem) continue;
           if (oldItem.completed !== newItem.completed) {
-            bc.broadcastToChecklist(checklist.id, { type: 'item_update', checklistId: checklist.id, machineIdx, catIdx: ci, itemIdx: ii, completed: newItem.completed, completedBy: newItem.completedBy, completedAt: newItem.completedAt, by: user, at: new Date().toISOString() }, req.userId).catch(() => {});
+            // Fire-and-forget: broadcast failures must not block the HTTP response
+            bc.broadcastToChecklist(checklist.id, { type: 'item_update', checklistId: checklist.id, machineIdx, catIdx, itemIdx, completed: newItem.completed, completedBy: newItem.completedBy, completedAt: newItem.completedAt, by: user, at: new Date().toISOString() }, req.userId).catch(() => {});
           }
           if (oldItem.issue !== newItem.issue) {
-            bc.broadcastToChecklist(checklist.id, { type: 'comment_update', checklistId: checklist.id, machineIdx, catIdx: ci, itemIdx: ii, issue: newItem.issue, by: user, at: new Date().toISOString() }, req.userId).catch(() => {});
+            // Fire-and-forget
+            bc.broadcastToChecklist(checklist.id, { type: 'comment_update', checklistId: checklist.id, machineIdx, catIdx, itemIdx, issue: newItem.issue, by: user, at: new Date().toISOString() }, req.userId).catch(() => {});
           }
         }
       }
@@ -352,12 +358,12 @@ router.put('/:id/items', async (req: AuthRequest, res) => {
     res.status(400).json({ error: 'Invalid machines structure' });
     return;
   }
-  if (Array.isArray(machines)) {
+  if (Array.isArray(machines) && validateMachines(machines)) {
     const oldItems = checklist.machines.flatMap(m => m.categories.flatMap(c => c.items));
-    const newItems = machines.flatMap((m: any) => m.categories.flatMap((c: any) => c.items));
-    const oldComments = new Set(oldItems.map((i: any) => i.issue).filter(Boolean));
-    const newComments = newItems.map((i: any) => i.issue).filter(Boolean);
-    const addedComments = newComments.filter((c: string) => !oldComments.has(c));
+    const newItems = machines.flatMap(m => m.categories.flatMap(c => c.items));
+    const oldComments = new Set(oldItems.map(i => i.issue).filter(Boolean));
+    const newComments = newItems.map(i => i.issue).filter((c): c is string => c !== null && c !== undefined);
+    const addedComments = newComments.filter((c) => !oldComments.has(c));
 
     if (addedComments.length > 0) {
       if (!checklist.activities) checklist.activities = [];
@@ -413,9 +419,11 @@ router.post('/:id/submit', async (req: AuthRequest, res) => {
     await conditionalStatusTransition(checklist, 'in_progress', checklist.version);
     checklist.version = checklist.version + 1;
     res.json(checklist);
+    // Fire-and-forget: audit/broadcast failures must not block the HTTP response
     logAudit({ userId: req.userId!, userName: checklist.operatorName, userRole: req.userRole!, action: 'checklist_submitted', targetType: 'checklist', targetId: checklist.id, detail: `Submitted ${checklist.lineName} checklist` }).catch(() => {});
     const bc = getBroadcaster(req);
     if (bc) {
+      // Fire-and-forget
       bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'submitted', by: checklist.operatorName, at: checklist.submittedAt }, req.userId).catch(() => {});
       // Also notify dashboard subscribers
       bc.broadcastToDashboard({
@@ -456,8 +464,10 @@ router.post('/:id/approve', adminOnly, async (req: AuthRequest, res) => {
     res.json(checklist);
     const bc = getBroadcaster(req);
     const approver = await getUser(req.userId!);
+    // Fire-and-forget: audit/broadcast failures must not block the HTTP response
     logAudit({ userId: req.userId!, userName: approver?.name || 'Admin', userRole: 'admin', action: 'checklist_approved', targetType: 'checklist', targetId: checklist.id, detail: `Approved ${checklist.lineName} checklist` }).catch(() => {});
     if (bc) {
+      // Fire-and-forget
       bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'approved', by: approver?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {});
       bc.broadcastToDashboard({
         type: 'dashboard_refresh',
@@ -496,8 +506,10 @@ router.post('/:id/deny', adminOnly, async (req: AuthRequest, res) => {
     res.json(checklist);
     const bc = getBroadcaster(req);
     const denier = await getUser(req.userId!);
+    // Fire-and-forget: audit/broadcast failures must not block the HTTP response
     logAudit({ userId: req.userId!, userName: denier?.name || 'Admin', userRole: 'admin', action: 'checklist_denied', targetType: 'checklist', targetId: checklist.id, detail: `Denied ${checklist.lineName} checklist` }).catch(() => {});
     if (bc) {
+      // Fire-and-forget
       bc.broadcastToChecklist(checklist.id, { type: 'status_change', checklistId: checklist.id, status: 'denied', by: denier?.name || 'Admin', at: new Date().toISOString() }, req.userId).catch(() => {});
       bc.broadcastToDashboard({
         type: 'dashboard_refresh',
@@ -519,8 +531,10 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
   try {
     await conditionalDeleteChecklist(req.params.id as string);
     res.status(204).send();
+    // Fire-and-forget: audit/broadcast failures must not block the HTTP response
     logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'checklist_deleted', targetType: 'checklist', targetId: req.params.id as string, detail: 'Deleted checklist' }).catch(() => {});
     const bc = getBroadcaster(req);
+    // Fire-and-forget
     if (bc) bc.broadcastToChecklist(req.params.id as string, { type: 'checklist_deleted', checklistId: req.params.id }, req.userId).catch(() => {});
   } catch (err: unknown) {
     if (err instanceof Error && err.name === 'ConditionalCheckFailedException') {
@@ -607,7 +621,7 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
   const pageW = doc.page.width - 100;
   const pageH = doc.page.height;
 
-  const C = {
+  const PDF_COLORS = {
     dark: '#1a1a1a',
     text: '#333333',
     muted: '#666666',
@@ -619,18 +633,18 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
 
   // Thin horizontal line
   const drawLine = (y: number) => {
-    doc.save().strokeColor(C.border).lineWidth(0.5)
+    doc.save().strokeColor(PDF_COLORS.border).lineWidth(0.5)
       .moveTo(LEFT, y).lineTo(LEFT + pageW, y).stroke().restore();
   };
 
   // Status indicator: checkmark, X, or dash
   const drawStatus = (x: number, y: number, status: boolean | null) => {
     if (status === true) {
-      doc.font('Helvetica-Bold').fontSize(11).fillColor(C.green).text('\u2713', x, y, { lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(PDF_COLORS.green).text('\u2713', x, y, { lineBreak: false });
     } else if (status === false) {
-      doc.font('Helvetica-Bold').fontSize(11).fillColor(C.red).text('\u2717', x, y, { lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(PDF_COLORS.red).text('\u2717', x, y, { lineBreak: false });
     } else {
-      doc.font('Helvetica').fontSize(11).fillColor(C.light).text('\u2014', x, y, { lineBreak: false });
+      doc.font('Helvetica').fontSize(11).fillColor(PDF_COLORS.light).text('\u2014', x, y, { lineBreak: false });
     }
   };
 
@@ -641,10 +655,10 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
   let y = 50;
 
   // Title
-  doc.font('Helvetica-Bold').fontSize(20).fillColor(C.dark)
+  doc.font('Helvetica-Bold').fontSize(20).fillColor(PDF_COLORS.dark)
     .text(checklist.lineName, LEFT, y, { lineBreak: false });
   y += 26;
-  doc.font('Helvetica').fontSize(10).fillColor(C.muted)
+  doc.font('Helvetica').fontSize(10).fillColor(PDF_COLORS.muted)
     .text(`${statusLabel[checklist.status] || checklist.status}  \u2022  ${formatDate(start)}`, LEFT, y, { lineBreak: false });
   y += 22;
   drawLine(y);
@@ -663,8 +677,8 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
   ];
 
   for (const [label, value] of summaryRows) {
-    doc.font('Helvetica').fontSize(9).fillColor(C.muted).text(label, LEFT, y, { lineBreak: false });
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(C.dark).text(value, LEFT + 120, y, { lineBreak: false });
+    doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.muted).text(label, LEFT, y, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(PDF_COLORS.dark).text(value, LEFT + 120, y, { lineBreak: false });
     y += 16;
   }
 
@@ -672,7 +686,7 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
   y += 10;
   drawLine(y);
   y += 14;
-  doc.font('Helvetica-Bold').fontSize(12).fillColor(C.dark).text('Machine Progress', LEFT, y, { lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(12).fillColor(PDF_COLORS.dark).text('Machine Progress', LEFT, y, { lineBreak: false });
   y += 20;
 
   for (const machine of checklist.machines) {
@@ -680,14 +694,14 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
     const done = items.filter(i => i.completed !== null).length;
     const pct = items.length > 0 ? (done / items.length) * 100 : 0;
 
-    doc.font('Helvetica').fontSize(9).fillColor(C.text).text(machine.name, LEFT, y, { lineBreak: false });
-    doc.font('Helvetica').fontSize(9).fillColor(C.muted).text(`${done}/${items.length}`, LEFT + pageW - 36, y, { width: 36, align: 'right', lineBreak: false });
+    doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.text).text(machine.name, LEFT, y, { lineBreak: false });
+    doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.muted).text(`${done}/${items.length}`, LEFT + pageW - 36, y, { width: 36, align: 'right', lineBreak: false });
     y += 14;
 
     // Simple progress bar
-    doc.rect(LEFT, y, pageW, 5).fill(C.border);
+    doc.rect(LEFT, y, pageW, 5).fill(PDF_COLORS.border);
     if (pct > 0) {
-      doc.rect(LEFT, y, Math.max((pageW * pct) / 100, 3), 5).fill(pct === 100 ? C.green : C.dark);
+      doc.rect(LEFT, y, Math.max((pageW * pct) / 100, 3), 5).fill(pct === 100 ? PDF_COLORS.green : PDF_COLORS.dark);
     }
     y += 16;
   }
@@ -697,7 +711,7 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
     y += 6;
     drawLine(y);
     y += 14;
-    doc.font('Helvetica-Bold').fontSize(12).fillColor(C.dark).text(`Notes & Issues (${allNotes.length})`, LEFT, y, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(12).fillColor(PDF_COLORS.dark).text(`Notes & Issues (${allNotes.length})`, LEFT, y, { lineBreak: false });
     y += 18;
 
     for (const note of allNotes) {
@@ -705,10 +719,10 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
       const noteH = doc.heightOfString(note.note, { width: pageW - 10 });
       if (y + noteH + 20 > pageH - 50) { doc.addPage(); y = 50; }
 
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(C.dark).text(note.task, LEFT, y, { lineBreak: false });
-      doc.font('Helvetica').fontSize(8).fillColor(C.muted).text(note.machine, LEFT + pageW - 70, y, { width: 70, align: 'right', lineBreak: false });
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(PDF_COLORS.dark).text(note.task, LEFT, y, { lineBreak: false });
+      doc.font('Helvetica').fontSize(8).fillColor(PDF_COLORS.muted).text(note.machine, LEFT + pageW - 70, y, { width: 70, align: 'right', lineBreak: false });
       y += 14;
-      doc.font('Helvetica').fontSize(9).fillColor(C.text).text(note.note, LEFT + 10, y, { width: pageW - 10 });
+      doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.text).text(note.note, LEFT + 10, y, { width: pageW - 10 });
       y += noteH + 10;
     }
   }
@@ -722,12 +736,12 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
     let cy = 50;
 
     // Machine header
-    doc.font('Helvetica-Bold').fontSize(16).fillColor(C.dark).text(machine.name, LEFT, cy, { lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(16).fillColor(PDF_COLORS.dark).text(machine.name, LEFT, cy, { lineBreak: false });
     cy += 22;
 
     const machineItems = machine.categories.flatMap(c => c.items);
     const machineDone = machineItems.filter(i => i.completed !== null).length;
-    doc.font('Helvetica').fontSize(9).fillColor(C.muted)
+    doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.muted)
       .text(`${machineDone} of ${machineItems.length} tasks completed`, LEFT, cy, { lineBreak: false });
     cy += 16;
     drawLine(cy);
@@ -739,9 +753,9 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
       if (cy > pageH - 80) { doc.addPage(); cy = 50; }
 
       // Category header
-      doc.font('Helvetica-Bold').fontSize(11).fillColor(C.dark)
+      doc.font('Helvetica-Bold').fontSize(11).fillColor(PDF_COLORS.dark)
         .text(category.name, LEFT, cy, { lineBreak: false });
-      doc.font('Helvetica').fontSize(9).fillColor(C.muted)
+      doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.muted)
         .text(`${catDone}/${category.items.length}`, LEFT + pageW - 40, cy + 1, { width: 40, align: 'right', lineBreak: false });
       cy += 18;
       drawLine(cy);
@@ -762,7 +776,7 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
 
         // Status + description
         drawStatus(LEFT, cy, item.completed);
-        doc.font('Helvetica').fontSize(9).fillColor(C.text)
+        doc.font('Helvetica').fontSize(9).fillColor(PDF_COLORS.text)
           .text(item.description, LEFT + 22, cy, { width: pageW - 40 });
         let lineY = cy + Math.max(descH, 14);
 
@@ -771,14 +785,14 @@ router.get('/:id/pdf', adminOnly, async (req, res) => {
           const timestamp = item.completedAt
             ? new Date(item.completedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })
             : '';
-          doc.font('Helvetica').fontSize(7).fillColor(C.light)
+          doc.font('Helvetica').fontSize(7).fillColor(PDF_COLORS.light)
             .text(`${item.completedBy}${timestamp ? ' \u2014 ' + timestamp : ''}`, LEFT + 22, lineY, { lineBreak: false });
           lineY += 12;
         }
 
         // Issue
         if (item.issue) {
-          doc.font('Helvetica-Oblique').fontSize(8).fillColor(C.red)
+          doc.font('Helvetica-Oblique').fontSize(8).fillColor(PDF_COLORS.red)
             .text(item.issue, LEFT + 22, lineY, { width: pageW - 50 });
           doc.font('Helvetica').fontSize(8);
           lineY += doc.heightOfString(item.issue, { width: pageW - 50 }) + 6;

@@ -4,20 +4,23 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth.js';
 import crypto from 'node:crypto';
 import { uploadImage, getImageUrl, getImageUrls, deleteImage } from '../data/s3.js';
 import { getChecklist, getUser, appendChecklistImages, removeChecklistImage } from '../data/dynamo.js';
-import type { WebSocketBroadcaster } from '../ws/broadcaster.js';
-
-function getBroadcaster(req: AuthRequest): WebSocketBroadcaster | null {
-  return req.app.get('broadcaster') || null;
-}
+import { getBroadcaster } from '../utils/broadcast.js';
+import {
+  ALLOWED_IMAGE_TYPES,
+  MAX_IMAGE_FILE_SIZE,
+  MAX_IMAGES_PER_UPLOAD,
+  MAX_IMAGES_PER_ITEM,
+  MAX_IMAGES_PER_CHECKLIST,
+  MAX_IMAGE_URL_BATCH,
+} from '../config/constants.js';
 
 const router = Router();
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: { fileSize: MAX_IMAGE_FILE_SIZE },
   fileFilter: (_req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Only JPEG, PNG, WebP, and HEIC are allowed.'));
@@ -29,7 +32,7 @@ router.use(authMiddleware);
 
 router.post(
   '/:id/images',
-  upload.array('images', 10),
+  upload.array('images', MAX_IMAGES_PER_UPLOAD),
   async (req: AuthRequest, res) => {
     const id = req.params.id as string;
     const machineIdx = parseInt(req.body.machineIdx, 10);
@@ -66,18 +69,18 @@ router.post(
       return;
     }
 
-    // Per-item limit: 20 images
-    if ((item.images?.length || 0) + files.length > 20) {
-      res.status(400).json({ error: 'Maximum 20 images per item' });
+    // Per-item limit
+    if ((item.images?.length || 0) + files.length > MAX_IMAGES_PER_ITEM) {
+      res.status(400).json({ error: `Maximum ${MAX_IMAGES_PER_ITEM} images per item` });
       return;
     }
 
-    // Per-checklist limit: 200 images
+    // Per-checklist limit
     const totalImages = checklist.machines.flatMap(m =>
       m.categories.flatMap(c => c.items.flatMap(i => i.images || []))
     ).length;
-    if (totalImages + files.length > 200) {
-      res.status(400).json({ error: 'Maximum 200 images per checklist' });
+    if (totalImages + files.length > MAX_IMAGES_PER_CHECKLIST) {
+      res.status(400).json({ error: `Maximum ${MAX_IMAGES_PER_CHECKLIST} images per checklist` });
       return;
     }
 
@@ -103,6 +106,7 @@ router.post(
 
     // Return updated images array
     res.json({ images: [...(item.images || []), ...newKeys] });
+    // Fire-and-forget: broadcast failures must not block the HTTP response
     const bc = getBroadcaster(req);
     if (bc) bc.broadcastToChecklist(id, { type: 'image_update', checklistId: id, machineIdx, catIdx, itemIdx, images: [...(item.images || []), ...newKeys], by: uploader?.name || 'Unknown', at: new Date().toISOString() }, req.userId).catch(() => {});
   }
@@ -121,7 +125,7 @@ router.post('/:id/image-urls', async (req: AuthRequest, res) => {
     res.status(403).json({ error: 'Access denied to requested image keys' });
     return;
   }
-  const cappedKeys = keys.slice(0, 50);
+  const cappedKeys = keys.slice(0, MAX_IMAGE_URL_BATCH);
   const urls = await getImageUrls(cappedKeys);
   res.json({ urls });
 });
@@ -165,6 +169,7 @@ router.delete('/:id/images', async (req: AuthRequest, res) => {
   await removeChecklistImage(id, machineIdx, catIdx, itemIdx, remainingImages);
 
   res.json({ images: remainingImages });
+  // Fire-and-forget
   const bc = getBroadcaster(req);
   if (bc) bc.broadcastToChecklist(id, { type: 'image_update', checklistId: id, machineIdx, catIdx, itemIdx, images: remainingImages, by: 'System', at: new Date().toISOString() }, req.userId).catch(() => {});
 });

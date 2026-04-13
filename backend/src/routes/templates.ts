@@ -8,6 +8,7 @@ import {
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 import { logAudit } from '../data/audit.js';
+import { TEMPLATE_DELETE_RETENTION_DAYS } from '../config/constants.js';
 
 const router = Router();
 
@@ -48,6 +49,7 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
   await putTemplate(template);
 
   res.status(201).json(template);
+  // Fire-and-forget: audit failures must not block the HTTP response
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_created', targetType: 'template', targetId: template.id, detail: `Created template "${template.title}"` }).catch(() => {});
 });
 
@@ -63,10 +65,11 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
   if (title) template.title = title;
   if (lineId) template.lineId = lineId;
   if (machines) template.machines = machines;
-  (template as any).updatedAt = new Date().toISOString();
+  template.updatedAt = new Date().toISOString();
 
   await putTemplate(template);
   res.json(template);
+  // Fire-and-forget
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_updated', targetType: 'template', targetId: template.id, detail: `Updated template "${template.title}"` }).catch(() => {});
 });
 
@@ -79,10 +82,11 @@ router.post('/:id/publish', adminOnly, async (req: AuthRequest, res) => {
   }
 
   const { published } = req.body;
-  (template as any).published = published !== false;
-  (template as any).updatedAt = new Date().toISOString();
+  template.published = published !== false;
+  template.updatedAt = new Date().toISOString();
   await putTemplate(template);
   res.json(template);
+  // Fire-and-forget
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: published !== false ? 'template_published' : 'template_unpublished', targetType: 'template', targetId: template.id, detail: `${published !== false ? 'Published' : 'Unpublished'} template "${template.title}"` }).catch(() => {});
 });
 
@@ -112,15 +116,16 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
     return;
   }
 
-  // Soft delete: mark as deleted with 30-day TTL for auto-cleanup
+  // Soft delete: mark as deleted with TTL for auto-cleanup
   const now = new Date();
-  (template as any).deleted = true;
-  (template as any).deletedAt = now.toISOString();
-  (template as any).deleteTtl = Math.floor(now.getTime() / 1000) + 30 * 24 * 60 * 60; // 30 days
+  template.deleted = true;
+  template.deletedAt = now.toISOString();
+  template.deleteTtl = Math.floor(now.getTime() / 1000) + TEMPLATE_DELETE_RETENTION_DAYS * 24 * 60 * 60;
   await putTemplate(template);
 
   res.status(204).send();
-  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_deleted', targetType: 'template', targetId: req.params.id as string, detail: `Soft-deleted template "${template.title}" (restoreable for 30 days)` }).catch(() => {});
+  // Fire-and-forget
+  logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_deleted', targetType: 'template', targetId: req.params.id as string, detail: `Soft-deleted template "${template.title}" (restoreable for ${TEMPLATE_DELETE_RETENTION_DAYS} days)` }).catch(() => {});
 });
 
 router.post('/:id/restore', adminOnly, async (req: AuthRequest, res) => {
@@ -134,12 +139,13 @@ router.post('/:id/restore', adminOnly, async (req: AuthRequest, res) => {
     return;
   }
 
-  (template as any).deleted = false;
-  (template as any).deletedAt = null;
-  delete (template as any).deleteTtl;
+  template.deleted = false;
+  template.deletedAt = null;
+  template.deleteTtl = undefined;
   await putTemplate(template);
 
   res.json(template);
+  // Fire-and-forget
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'template_restored', targetType: 'template', targetId: template.id, detail: `Restored template "${template.title}"` }).catch(() => {});
 });
 

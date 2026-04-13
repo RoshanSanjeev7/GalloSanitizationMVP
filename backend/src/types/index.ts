@@ -34,7 +34,9 @@ export interface Template {
   machines: MachineTemplate[];
   deleted?: boolean;
   deletedAt?: string | null;
-  deleteTtl?: number; // DynamoDB TTL epoch seconds for auto-cleanup
+  deleteTtl?: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface ChecklistItem {

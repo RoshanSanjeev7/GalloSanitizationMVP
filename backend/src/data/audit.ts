@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid';
-import { PutCommand, QueryCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, QueryCommand, ScanCommand, type QueryCommandInput } from '@aws-sdk/lib-dynamodb';
 import { docClient } from './dynamo.js';
 import { config } from '../config/env.js';
 
@@ -45,41 +45,52 @@ export async function getAuditLogs(filters: {
 
   if (filters.userId) {
     // Use userId-index
-    const params: any = {
+    let keyExpr = 'userId = :uid';
+    const exprValues: Record<string, string> = { ':uid': filters.userId };
+    const exprNames: Record<string, string> = {};
+
+    if (filters.startDate && filters.endDate) {
+      keyExpr += ' AND #ts BETWEEN :start AND :end';
+      exprNames['#ts'] = 'timestamp';
+      exprValues[':start'] = filters.startDate;
+      exprValues[':end'] = filters.endDate;
+    } else if (filters.startDate) {
+      keyExpr += ' AND #ts >= :start';
+      exprNames['#ts'] = 'timestamp';
+      exprValues[':start'] = filters.startDate;
+    }
+
+    const params: QueryCommandInput = {
       TableName: TABLE,
       IndexName: 'userId-index',
-      KeyConditionExpression: 'userId = :uid',
-      ExpressionAttributeValues: { ':uid': filters.userId } as Record<string, unknown>,
+      KeyConditionExpression: keyExpr,
+      ExpressionAttributeValues: exprValues,
       ScanIndexForward: false,
+      ...(Object.keys(exprNames).length > 0 && { ExpressionAttributeNames: exprNames }),
     };
-    if (filters.startDate && filters.endDate) {
-      params.KeyConditionExpression += ' AND #ts BETWEEN :start AND :end';
-      params.ExpressionAttributeNames = { '#ts': 'timestamp' };
-      params.ExpressionAttributeValues[':start'] = filters.startDate;
-      params.ExpressionAttributeValues[':end'] = filters.endDate;
-    } else if (filters.startDate) {
-      params.KeyConditionExpression += ' AND #ts >= :start';
-      params.ExpressionAttributeNames = { '#ts': 'timestamp' };
-      params.ExpressionAttributeValues[':start'] = filters.startDate;
-    }
     const result = await docClient.send(new QueryCommand(params));
     items = (result.Items || []) as AuditEntry[];
   } else if (filters.action) {
     // Use timestamp-index (action is the partition key)
-    const params: any = {
+    let keyExpr = '#action = :act';
+    const exprValues: Record<string, string> = { ':act': filters.action };
+    const exprNames: Record<string, string> = { '#action': 'action' };
+
+    if (filters.startDate && filters.endDate) {
+      keyExpr += ' AND #ts BETWEEN :start AND :end';
+      exprNames['#ts'] = 'timestamp';
+      exprValues[':start'] = filters.startDate;
+      exprValues[':end'] = filters.endDate;
+    }
+
+    const params: QueryCommandInput = {
       TableName: TABLE,
       IndexName: 'timestamp-index',
-      KeyConditionExpression: '#action = :act',
-      ExpressionAttributeNames: { '#action': 'action' } as Record<string, string>,
-      ExpressionAttributeValues: { ':act': filters.action } as Record<string, unknown>,
+      KeyConditionExpression: keyExpr,
+      ExpressionAttributeNames: exprNames,
+      ExpressionAttributeValues: exprValues,
       ScanIndexForward: false,
     };
-    if (filters.startDate && filters.endDate) {
-      params.KeyConditionExpression += ' AND #ts BETWEEN :start AND :end';
-      params.ExpressionAttributeNames['#ts'] = 'timestamp';
-      params.ExpressionAttributeValues[':start'] = filters.startDate;
-      params.ExpressionAttributeValues[':end'] = filters.endDate;
-    }
     const result = await docClient.send(new QueryCommand(params));
     items = (result.Items || []) as AuditEntry[];
   } else {

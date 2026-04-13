@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api, { type Line, type Template, type MachineTemplate } from '../services/api';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
+import { TEMPLATE_RETENTION_DAYS } from '../config/constants';
 import s from './CreateTemplate.module.css';
 
 interface TaskState {
@@ -511,7 +512,7 @@ export default function CreateTemplate() {
             Are you sure you want to delete the template for <strong>{selectedLine?.name}</strong>?
           </p>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
-            The template will be moved to the deleted section and can be restored within 30 days. After 30 days it will be permanently removed.
+            The template will be moved to the deleted section and can be restored within {TEMPLATE_RETENTION_DAYS} days. After {TEMPLATE_RETENTION_DAYS} days it will be permanently removed.
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn btn-outline btn-sm" onClick={() => setShowDeleteConfirm(false)}>
@@ -532,11 +533,11 @@ export default function CreateTemplate() {
           <div style={{ marginTop: 32, padding: 20, background: '#fef2f2', borderRadius: 12, border: '1px solid #fca5a5' }}>
             <h3 style={{ fontSize: 15, marginBottom: 12, color: '#dc2626' }}>Deleted Templates</h3>
             <p style={{ fontSize: 12, color: '#991b1b', marginBottom: 12 }}>
-              These templates will be permanently deleted after 30 days.
+              These templates will be permanently deleted after {TEMPLATE_RETENTION_DAYS} days.
             </p>
             {deletedTemplates.map((t) => {
               const deletedDate = t.deletedAt ? new Date(t.deletedAt) : new Date();
-              const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24)));
+              const daysLeft = Math.max(0, TEMPLATE_RETENTION_DAYS - Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24)));
               const lineName = lines.find(l => l.id === t.lineId)?.name || 'Unknown Line';
               return (
                 <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #fecaca' }}>

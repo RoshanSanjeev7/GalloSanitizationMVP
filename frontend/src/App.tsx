@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from './store';
 import Spinner from './components/Spinner';
+import ErrorBoundary from './components/ErrorBoundary';
 import OfflineBanner from './components/OfflineBanner';
 import { useWebSocket } from './hooks/useWebSocket';
 import ReconnectBanner from './components/ReconnectBanner';
@@ -54,6 +55,7 @@ export default function App() {
     <BrowserRouter>
       <WebSocketProvider>
         <OfflineBanner />
+        <ErrorBoundary>
         <Suspense fallback={<Spinner label="Loading..." />}>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -124,6 +126,7 @@ export default function App() {
             />
           </Routes>
         </Suspense>
+        </ErrorBoundary>
       </WebSocketProvider>
     </BrowserRouter>
   );

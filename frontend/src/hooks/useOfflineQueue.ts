@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { queueSave, getQueuedSaves, removeSave, clearExpired, getQueueCount } from '../services/offlineQueue';
-import api from '../services/api';
+import api, { type ChecklistMachine } from '../services/api';
 
 export function useOfflineQueue() {
   const [queueCount, setQueueCount] = useState(0);
@@ -44,7 +44,7 @@ export function useOfflineQueue() {
           await api.updateChecklistMachine(
             save.checklistId,
             save.machineIdx,
-            save.machine as any,
+            save.machine as ChecklistMachine,
             save.version,
           );
           if (save.id) await removeSave(save.id);

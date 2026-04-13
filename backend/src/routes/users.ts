@@ -11,13 +11,14 @@ import {
 } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 import { logAudit } from '../data/audit.js';
+import { PAGINATION_MAX, PAGINATION_DEFAULT_USERS } from '../config/constants.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
 router.get('/', async (req, res) => {
-  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string, 10) || 100));
+  const limit = Math.min(PAGINATION_MAX, Math.max(1, parseInt(req.query.limit as string, 10) || PAGINATION_DEFAULT_USERS));
   const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
 
   const users = await getAllUsers();
@@ -51,6 +52,7 @@ router.post('/', adminOnly, async (req: AuthRequest, res) => {
 
   const { password: _, ...userPublic } = user;
   res.status(201).json(userPublic);
+  // Fire-and-forget: audit failures must not block the HTTP response
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'user_created', targetType: 'user', targetId: user.id, detail: `Created user ${user.name} (${user.email}) as ${user.role}` }).catch(() => {});
 });
 
@@ -78,6 +80,7 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
 
   const { password: _, ...userPublic } = user;
   res.json(userPublic);
+  // Fire-and-forget
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'user_role_changed', targetType: 'user', targetId: user.id, detail: `Changed ${user.name} role to ${role}` }).catch(() => {});
 });
 
@@ -111,6 +114,7 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
     await deleteUserDynamo(user.id);
   }
   res.status(204).send();
+  // Fire-and-forget
   logAudit({ userId: req.userId!, userName: 'Admin', userRole: 'admin', action: 'user_deleted', targetType: 'user', targetId: user.id, detail: `Deleted user ${user.name} (${user.email})` }).catch(() => {});
 });
 

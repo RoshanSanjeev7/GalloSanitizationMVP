@@ -2,13 +2,15 @@ import { useEffect, useState, useRef } from 'react';
 import { wsClient } from '../services/websocket';
 import { updateMachineItem } from '../utils/checklist';
 import type { ChecklistMachine } from '../services/api';
-
-interface PresenceUser {
-  id: string;
-  name: string;
-  role: string;
-  machine: number | null;
-}
+import type {
+  ItemUpdateMessage,
+  CommentUpdateMessage,
+  ImageUpdateMessage,
+  PresenceMessage,
+  StatusChangeMessage,
+  ChecklistDeletedMessage,
+  PresenceUser,
+} from '../types/websocket';
 
 export function useChecklistSync(
   checklistId: string | undefined,
@@ -26,7 +28,8 @@ export function useChecklistSync(
 
     wsClient.subscribe(checklistId);
 
-    const offItemUpdate = wsClient.on('item_update', (msg: any) => {
+    const offItemUpdate = wsClient.on('item_update', (data) => {
+      const msg = data as ItemUpdateMessage;
       if (msg.checklistId !== checklistId) return;
       setMachines((prev) =>
         updateMachineItem(prev, msg.machineIdx, msg.catIdx, msg.itemIdx, (item) => ({
@@ -38,7 +41,8 @@ export function useChecklistSync(
       );
     });
 
-    const offCommentUpdate = wsClient.on('comment_update', (msg: any) => {
+    const offCommentUpdate = wsClient.on('comment_update', (data) => {
+      const msg = data as CommentUpdateMessage;
       if (msg.checklistId !== checklistId) return;
       setMachines((prev) =>
         updateMachineItem(prev, msg.machineIdx, msg.catIdx, msg.itemIdx, (item) => ({
@@ -48,7 +52,8 @@ export function useChecklistSync(
       );
     });
 
-    const offImageUpdate = wsClient.on('image_update', (msg: any) => {
+    const offImageUpdate = wsClient.on('image_update', (data) => {
+      const msg = data as ImageUpdateMessage;
       if (msg.checklistId !== checklistId) return;
       setMachines((prev) =>
         updateMachineItem(prev, msg.machineIdx, msg.catIdx, msg.itemIdx, (item) => ({
@@ -58,19 +63,22 @@ export function useChecklistSync(
       );
     });
 
-    const offPresence = wsClient.on('presence', (msg: any) => {
+    const offPresence = wsClient.on('presence', (data) => {
+      const msg = data as PresenceMessage;
       if (msg.checklistId !== checklistId) return;
       // Filter out current user from presence display
       const myId = currentUser.current?.id;
       setPresence(msg.users.filter((u: PresenceUser) => u.id !== myId));
     });
 
-    const offStatus = wsClient.on('status_change', (msg: any) => {
+    const offStatus = wsClient.on('status_change', (data) => {
+      const msg = data as StatusChangeMessage;
       if (msg.checklistId !== checklistId) return;
       setStatusChanged({ status: msg.status, by: msg.by });
     });
 
-    const offDeleted = wsClient.on('checklist_deleted', (msg: any) => {
+    const offDeleted = wsClient.on('checklist_deleted', (data) => {
+      const msg = data as ChecklistDeletedMessage;
       if (msg.checklistId !== checklistId) return;
       setIsDeleted(true);
     });

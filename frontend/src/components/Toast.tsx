@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { TOAST_DISMISS_MS } from '../config/constants';
 import s from './Toast.module.css';
 
 export interface ToastData {
@@ -25,7 +26,7 @@ export default function ToastContainer({ toasts, onDismiss }: Props) {
 
 function ToastItem({ toast, onDismiss }: { toast: ToastData; onDismiss: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000);
+    const timer = setTimeout(onDismiss, TOAST_DISMISS_MS);
     return () => clearTimeout(timer);
   }, [onDismiss]);
 
