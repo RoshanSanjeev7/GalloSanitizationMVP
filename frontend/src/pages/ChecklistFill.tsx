@@ -7,6 +7,7 @@ import { useImageUrlsForMachines } from '../hooks/useImageUrls';
 import { useChecklistSync } from '../hooks/useChecklistSync';
 import PresenceAvatars from '../components/PresenceAvatars';
 import { wsClient } from '../services/websocket';
+import { useOfflineQueue } from '../hooks/useOfflineQueue';
 import cl from '../styles/checklist.module.css';
 import s from './ChecklistFill.module.css';
 import Spinner from '../components/Spinner';
@@ -33,6 +34,7 @@ export default function ChecklistFill() {
   const imageUrls = useImageUrlsForMachines(id, machines, activeMachine);
   const { presence, isDeleted, statusChanged } = useChecklistSync(id, machines, setMachines, setVersion);
 
+  const { queueCount, syncing, enqueue, syncQueue } = useOfflineQueue();
   const currentUser = api.getStoredUser();
 
   useEffect(() => {
@@ -136,6 +138,8 @@ export default function ChecklistFill() {
             setSaveStatus('conflict');
           } else {
             setSaveStatus('error');
+            // Queue for offline sync if it's a network error (not 409 conflict)
+            enqueue(id, activeMachine, machines[activeMachine], version || 0);
           }
         } finally {
           savingRef.current = false;
@@ -228,6 +232,14 @@ export default function ChecklistFill() {
           <div style={{ padding: '12px 16px', marginBottom: 12, background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 14, color: '#dc2626' }}>
             This checklist has been deleted.
             <button className="btn btn-outline btn-sm" style={{ marginLeft: 8 }} onClick={() => navigate('/')}>Go to Dashboard</button>
+          </div>
+        )}
+        {queueCount > 0 && (
+          <div style={{ padding: '12px 16px', marginBottom: 12, background: '#fef3c7', border: '1px solid #fde047', borderRadius: 8, fontSize: 13, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span>{queueCount} unsaved change{queueCount > 1 ? 's' : ''} queued{syncing ? ' (syncing...)' : ''}</span>
+            {!syncing && navigator.onLine && (
+              <button className="btn btn-outline btn-sm" onClick={syncQueue}>Sync Now</button>
+            )}
           </div>
         )}
 
