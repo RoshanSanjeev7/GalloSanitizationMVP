@@ -469,7 +469,7 @@ export default function AdminDashboard() {
               }}
               style={{ width: 160, flex: 'none' }}
             >
-              <option value="">All Factories</option>
+              <option value="">Select a Factory</option>
               {factories.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.name}

@@ -325,7 +325,7 @@ export default function CreateTemplate() {
                   setActiveMachine(0);
                 }}
               >
-                <option value="">All Factories</option>
+                <option value="">Select a Factory</option>
                 {factories.map((f) => (
                   <option key={f.id} value={f.id}>
                     {f.name} — {f.location}
