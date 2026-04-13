@@ -328,18 +328,41 @@ export default function SubmissionReview() {
           </div>
         )}
 
-        <select
-          className="form-select"
-          value={activeMachine}
-          onChange={(e) => setActiveMachine(Number(e.target.value))}
-          style={{ marginBottom: 16 }}
-        >
-          {machines.map((m, idx) => (
-            <option key={idx} value={idx}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+          {machines.map((m, idx) => {
+            const total = m.categories.reduce((sum: number, c: any) => sum + c.items.length, 0);
+            const done = m.categories.reduce((sum: number, c: any) => sum + c.items.filter((i: any) => i.completed !== null).length, 0);
+            const isActive = idx === activeMachine;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+            return (
+              <button
+                key={idx}
+                onClick={() => setActiveMachine(idx)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: isActive ? '2px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
+                  background: isActive ? 'var(--primary, #5B2333)' : '#fff',
+                  color: isActive ? '#fff' : 'var(--text, #333)',
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4,
+                  minWidth: 90,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span>{m.name}</span>
+                <span style={{ fontSize: 11, opacity: 0.8 }}>
+                  {done}/{total} {pct === 100 ? '✓' : `${pct}%`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
         <div className={s.reviewLayout}>
           <div>

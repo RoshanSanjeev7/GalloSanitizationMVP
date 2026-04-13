@@ -14,11 +14,10 @@ test.describe('Checklist Fill', () => {
     await expect(page.locator('h2')).toContainText('Deep Clean');
   });
 
-  test('shows machine selector with options', async ({ page }) => {
-    const select = page.locator('select.form-select');
-    await expect(select).toBeVisible();
-    const options = select.locator('option');
-    expect(await options.count()).toBeGreaterThan(0);
+  test('shows machine selector buttons', async ({ page }) => {
+    // Machine buttons should be visible (replaced dropdown with button bar)
+    const machineButtons = page.locator('button:has-text("/")');
+    expect(await machineButtons.count()).toBeGreaterThan(0);
   });
 
   test('shows collapsible categories with counts', async ({ page }) => {
@@ -34,10 +33,11 @@ test.describe('Checklist Fill', () => {
   });
 
   test('can switch between machines', async ({ page }) => {
-    const select = page.locator('select.form-select');
-    const machineCount = await select.locator('option').count();
+    // Machine buttons contain "name\ndone/total"
+    const machineButtons = page.locator('button:has-text("/")');
+    const machineCount = await machineButtons.count();
     if (machineCount > 1) {
-      await select.selectOption({ index: 1 });
+      await machineButtons.nth(1).click();
       await page.waitForTimeout(300);
       await expect(page.locator('text=/\\d+\\/\\d+/').first()).toBeVisible();
     }
