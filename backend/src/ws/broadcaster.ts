@@ -6,6 +6,7 @@ export interface WebSocketBroadcaster {
   broadcastToChecklist(checklistId: string, message: object, excludeUserId?: string): Promise<void>;
   broadcastPresence(checklistId: string): Promise<void>;
   broadcastPresenceSummary(): Promise<void>;
+  broadcastToDashboard(message: object): Promise<void>;
   getChecklistPresence(checklistId: string): Promise<PresenceUser[]>;
 }
 

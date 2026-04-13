@@ -117,6 +117,21 @@ export interface ErrorMessage {
   message: string;
 }
 
+export interface NewSubmissionMessage {
+  type: 'new_submission';
+  checklistId: string;
+  lineName: string;
+  operatorName: string;
+  submittedAt: string;
+}
+
+export interface DashboardRefreshMessage {
+  type: 'dashboard_refresh';
+  reason: string;
+  checklistId: string;
+  status: string;
+}
+
 export type ServerMessage =
   | ItemUpdateMessage
   | CommentUpdateMessage
@@ -126,7 +141,9 @@ export type ServerMessage =
   | PresenceMessage
   | PresenceSummaryMessage
   | ConnectedMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | NewSubmissionMessage
+  | DashboardRefreshMessage;
 
 // ─── Connection Record ──────────────────────────────────────────────
 export interface ConnectionRecord {
