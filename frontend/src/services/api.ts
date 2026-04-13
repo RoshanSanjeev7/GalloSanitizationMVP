@@ -432,6 +432,31 @@ async function markAllViewed(): Promise<{ marked: number }> {
   return request<{ marked: number }>('/checklists/mark-all-viewed', { method: 'POST' });
 }
 
+// ─── Audit ─────────────────────────────────────────────────────────
+export interface AuditEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  detail: string;
+  timestamp: string;
+}
+
+export interface AuditResponse {
+  items: AuditEntry[];
+  total: number;
+  hasMore: boolean;
+}
+
+async function getAuditLogs(params: Record<string, string> = {}): Promise<AuditResponse> {
+  const query = new URLSearchParams(params).toString();
+  const endpoint = query ? `/audit?${query}` : '/audit';
+  return requestWithRetry<AuditResponse>(endpoint);
+}
+
 async function downloadChecklistPdf(id: string): Promise<void> {
   const token = getToken();
   const res = await fetch(`${API_BASE}/checklists/${id}/pdf`, {
@@ -485,6 +510,7 @@ const api = {
   deleteImage,
   downloadChecklistPdf,
   markAllViewed,
+  getAuditLogs,
 };
 
 export default api;

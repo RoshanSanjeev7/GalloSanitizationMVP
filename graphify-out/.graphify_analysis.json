@@ -1,0 +1,845 @@
+{
+  "communities": {
+    "0": [
+      "api_approvechecklist",
+      "api_createchecklist",
+      "api_createline",
+      "api_createtemplate",
+      "api_createuser",
+      "api_delay",
+      "api_deletechecklist",
+      "api_deleteimage",
+      "api_deletetemplate",
+      "api_deleteuser",
+      "api_denychecklist",
+      "api_downloadchecklistpdf",
+      "api_getchecklist",
+      "api_getchecklists",
+      "api_getimageurl",
+      "api_getimageurls",
+      "api_getlines",
+      "api_getme",
+      "api_getnotifications",
+      "api_getstoreduser",
+      "api_gettemplate",
+      "api_gettemplates",
+      "api_gettoken",
+      "api_getusers",
+      "api_login",
+      "api_logout",
+      "api_markallviewed",
+      "api_refreshtokenifneeded",
+      "api_request",
+      "api_requestwithretry",
+      "api_submitchecklist",
+      "api_updatechecklistitems",
+      "api_updatechecklistmachine",
+      "api_updatetemplate",
+      "api_updateuserrole",
+      "api_uploadimages",
+      "frontend_src_services_api_ts"
+    ],
+    "1": [
+      "backend_src_data_dynamo_ts",
+      "backend_src_data_seed_dynamo_test_ts",
+      "backend_src_data_seed_dynamo_ts",
+      "dynamo_appendchecklistimages",
+      "dynamo_conditionaldeletechecklist",
+      "dynamo_conditionalputchecklist",
+      "dynamo_conditionalstatustransition",
+      "dynamo_createuserwithemaillock",
+      "dynamo_deletechecklist",
+      "dynamo_deletetemplate",
+      "dynamo_deleteuser",
+      "dynamo_deleteuserwithemaillock",
+      "dynamo_getallchecklists",
+      "dynamo_getalllines",
+      "dynamo_getalltemplates",
+      "dynamo_getallusers",
+      "dynamo_getchecklist",
+      "dynamo_getchecklistsbyoperator",
+      "dynamo_getchecklistsbystatus",
+      "dynamo_getline",
+      "dynamo_gettemplate",
+      "dynamo_gettemplatesbylineid",
+      "dynamo_getuser",
+      "dynamo_getuserbyemail",
+      "dynamo_markchecklistviewed",
+      "dynamo_putchecklist",
+      "dynamo_putline",
+      "dynamo_puttemplate",
+      "dynamo_putuser",
+      "dynamo_querychecklists",
+      "dynamo_removechecklistimage",
+      "dynamo_updatechecklistmachine",
+      "seed_dynamo_putsafe",
+      "seed_dynamo_seedifempty"
+    ],
+    "2": [
+      "frontend_src_services_websocket_ts",
+      "websocket_websocketclient",
+      "websocket_websocketclient_cleanup",
+      "websocket_websocketclient_connect",
+      "websocket_websocketclient_connected",
+      "websocket_websocketclient_disconnect",
+      "websocket_websocketclient_machinechange",
+      "websocket_websocketclient_notifystatus",
+      "websocket_websocketclient_on",
+      "websocket_websocketclient_onidle",
+      "websocket_websocketclient_onstatuschange",
+      "websocket_websocketclient_opensocket",
+      "websocket_websocketclient_reconnecting",
+      "websocket_websocketclient_schedulereconnect",
+      "websocket_websocketclient_send",
+      "websocket_websocketclient_startheartbeat",
+      "websocket_websocketclient_startidledetection",
+      "websocket_websocketclient_stopheartbeat",
+      "websocket_websocketclient_subscribe",
+      "websocket_websocketclient_subscribedashboard",
+      "websocket_websocketclient_unsubscribe",
+      "websocket_websocketclient_unsubscribedashboard"
+    ],
+    "3": [
+      "apigw_ws_apigatewaybroadcaster",
+      "apigw_ws_apigatewaybroadcaster_broadcastpresence",
+      "apigw_ws_apigatewaybroadcaster_broadcastpresencesummary",
+      "apigw_ws_apigatewaybroadcaster_broadcasttochecklist",
+      "apigw_ws_apigatewaybroadcaster_getchecklistpresence",
+      "apigw_ws_apigatewaybroadcaster_init",
+      "apigw_ws_apigatewaybroadcaster_sendtoconnection",
+      "backend_src_ws_apigw_ws_ts",
+      "backend_src_ws_broadcaster_ts",
+      "backend_src_ws_local_ws_ts",
+      "backend_src_ws_messages_ts",
+      "broadcaster_createbroadcaster",
+      "local_ws_localwsbroadcaster",
+      "local_ws_localwsbroadcaster_broadcastpresence",
+      "local_ws_localwsbroadcaster_broadcastpresencesummary",
+      "local_ws_localwsbroadcaster_broadcasttochecklist",
+      "local_ws_localwsbroadcaster_getchecklistpresence",
+      "local_ws_localwsbroadcaster_handleconnection",
+      "local_ws_localwsbroadcaster_handlemessage",
+      "local_ws_localwsbroadcaster_init"
+    ],
+    "4": [
+      "backend_src_config_env_ts",
+      "backend_src_index_ts",
+      "backend_src_lambda_ts",
+      "backend_src_routes_auth_ts",
+      "backend_src_routes_checklists_ts",
+      "backend_src_routes_images_ts",
+      "backend_src_routes_lines_ts",
+      "backend_src_routes_templates_ts",
+      "backend_src_routes_users_ts",
+      "checklists_drawline",
+      "checklists_drawstatus",
+      "checklists_formatdate",
+      "checklists_formattime",
+      "checklists_getbroadcaster",
+      "checklists_validatemachines",
+      "images_getbroadcaster",
+      "index_startserver"
+    ],
+    "5": [
+      "createtemplate_addcategory",
+      "createtemplate_addmachine",
+      "createtemplate_addtask",
+      "createtemplate_buildmachines",
+      "createtemplate_emptymachine",
+      "createtemplate_handlecreateline",
+      "createtemplate_handledelete",
+      "createtemplate_handlelineselect",
+      "createtemplate_handlesave",
+      "createtemplate_removecategory",
+      "createtemplate_removemachine",
+      "createtemplate_removetask",
+      "createtemplate_updatecategory",
+      "createtemplate_updatemachinename",
+      "createtemplate_updatetask",
+      "frontend_src_pages_createtemplate_tsx"
+    ],
+    "6": [
+      "backend_src_tests_auth_flow_integration_test_ts",
+      "backend_src_tests_bulletproof_test_ts",
+      "backend_src_tests_checklist_workflow_integration_test_ts",
+      "backend_src_tests_factories_ts",
+      "bulletproof_test_makeconditionalcheckfailederror",
+      "factories_makeadmintoken",
+      "factories_makechecklist",
+      "factories_makechecklistitem",
+      "factories_makeline",
+      "factories_makeoperatortoken",
+      "factories_makesubmittedchecklist",
+      "factories_maketemplate",
+      "factories_makeuser",
+      "factories_makeuserpublic",
+      "factories_nextid",
+      "frontend_src_tests_factories_ts"
+    ],
+    "7": [
+      "frontend_src_pages_submissionreview_tsx",
+      "submissionreview_buildmachines",
+      "submissionreview_deletecomment",
+      "submissionreview_formatfulldate",
+      "submissionreview_handleapprove",
+      "submissionreview_handledeny",
+      "submissionreview_handlephotodelete",
+      "submissionreview_handlephotoupload",
+      "submissionreview_handlesaveedits",
+      "submissionreview_itemkey",
+      "submissionreview_setcommenttext",
+      "submissionreview_setitemstatus",
+      "submissionreview_togglecomment"
+    ],
+    "8": [
+      "checklistfill_buildmachines",
+      "checklistfill_collapsekey",
+      "checklistfill_confirmsubmit",
+      "checklistfill_handlephotodelete",
+      "checklistfill_handlephotoupload",
+      "checklistfill_itemkey",
+      "checklistfill_loadchecklist",
+      "checklistfill_setcommenttext",
+      "checklistfill_setitemstatus",
+      "checklistfill_togglecollapse",
+      "checklistfill_togglecomment",
+      "frontend_src_pages_checklistfill_tsx"
+    ],
+    "9": [
+      "admindashboard_confirmdelete",
+      "admindashboard_formatdate",
+      "admindashboard_formattime",
+      "admindashboard_handleclick",
+      "admindashboard_handledatefilterchange",
+      "admindashboard_handledelete",
+      "admindashboard_handlelinefilterchange",
+      "admindashboard_handleloadmore",
+      "admindashboard_handlesearchchange",
+      "admindashboard_handletabchange",
+      "admindashboard_statusparamsfortab",
+      "frontend_src_pages_admindashboard_tsx"
+    ],
+    "10": [
+      "checklist_collapsekey",
+      "checklist_formatdate",
+      "checklist_formatdatetime",
+      "checklist_formatfulldate",
+      "checklist_formatstamp",
+      "checklist_formattime",
+      "checklist_itemkey",
+      "checklist_statuscolor",
+      "checklist_statusicon",
+      "checklist_updatemachineitem",
+      "frontend_src_utils_checklist_ts"
+    ],
+    "11": [
+      "backend_src_data_pdf_generator_ts",
+      "backend_src_data_s3_test_ts",
+      "backend_src_data_s3_ts",
+      "backend_src_lambda_pdf_test_ts",
+      "backend_src_lambda_pdf_ts",
+      "lambda_pdf_handler",
+      "pdf_generator_generatepdfbuffer",
+      "s3_deleteimage",
+      "s3_getimageurl",
+      "s3_getimageurls",
+      "s3_uploadimage"
+    ],
+    "12": [
+      "backend_src_data_connections_ts",
+      "connections_deleteconnection",
+      "connections_getallconnections",
+      "connections_getconnectionsbychannel",
+      "connections_getconnectionsbychecklist",
+      "connections_putconnection",
+      "connections_touchconnection",
+      "connections_ttlfromnow",
+      "connections_updateconnectionmachine",
+      "connections_updateconnectionsubscription"
+    ],
+    "13": [
+      "backend_src_data_seed_ts",
+      "backend_src_data_store_test_ts",
+      "backend_src_data_store_ts",
+      "seed_seedifempty",
+      "seed_tochecklistmachines",
+      "store_getstore",
+      "store_load",
+      "store_save",
+      "store_setstore"
+    ],
+    "14": [
+      "frontend_src_pages_operatordashboard_tsx",
+      "operatordashboard_formatdate",
+      "operatordashboard_formattime",
+      "operatordashboard_handlecreate",
+      "operatordashboard_handleloadmore",
+      "operatordashboard_handletabchange",
+      "operatordashboard_statusparamsfortab"
+    ],
+    "15": [
+      "frontend_src_pages_roleassignment_tsx",
+      "roleassignment_confirmrolechange",
+      "roleassignment_handleadd",
+      "roleassignment_handledelete",
+      "roleassignment_handlerolechange",
+      "roleassignment_loadusers"
+    ],
+    "16": [
+      "auth_adminonly",
+      "auth_authmiddleware",
+      "auth_test_mockreq",
+      "auth_test_mockres",
+      "backend_src_middleware_auth_test_ts",
+      "backend_src_middleware_auth_ts"
+    ],
+    "17": [
+      "checklistdetail_collapsekey",
+      "checklistdetail_formatfulldate",
+      "checklistdetail_togglecollapse",
+      "frontend_src_pages_checklistdetail_tsx"
+    ],
+    "18": [
+      "helpers_checklistrow",
+      "helpers_login",
+      "helpers_logout",
+      "tests_helpers_ts"
+    ],
+    "19": [
+      "avatar_avatar",
+      "avatar_getinitials",
+      "frontend_src_components_avatar_tsx"
+    ],
+    "20": [
+      "frontend_src_hooks_useimageurls_ts",
+      "useimageurls_useimageurls",
+      "useimageurls_useimageurlsformachines"
+    ],
+    "21": [
+      "admindashboard_test_mockchecklistresponse",
+      "admindashboard_test_renderdashboard",
+      "frontend_src_pages_admindashboard_test_tsx"
+    ],
+    "22": [
+      "frontend_src_pages_operatordashboard_test_tsx",
+      "operatordashboard_test_mockchecklistresponse",
+      "operatordashboard_test_renderdashboard"
+    ],
+    "23": [
+      "backend_src_data_sqs_test_ts",
+      "backend_src_data_sqs_ts",
+      "sqs_sendpdfgenerationmessage"
+    ],
+    "24": [
+      "app_protectedroute",
+      "frontend_src_app_tsx"
+    ],
+    "25": [
+      "frontend_src_components_offlinebanner_tsx",
+      "offlinebanner_offlinebanner"
+    ],
+    "26": [
+      "frontend_src_components_loadingbar_tsx",
+      "loadingbar_loadingbar"
+    ],
+    "27": [
+      "footer_handlelogout",
+      "frontend_src_components_footer_tsx"
+    ],
+    "28": [
+      "frontend_src_components_reconnectbanner_tsx",
+      "reconnectbanner_reconnectbanner"
+    ],
+    "29": [
+      "frontend_src_components_modal_tsx",
+      "modal_modal"
+    ],
+    "30": [
+      "frontend_src_components_spinner_tsx",
+      "spinner_spinner"
+    ],
+    "31": [
+      "frontend_src_components_presenceavatars_tsx",
+      "presenceavatars_getinitials"
+    ],
+    "32": [
+      "frontend_src_tests_render_helpers_tsx",
+      "render_helpers_renderwithproviders"
+    ],
+    "33": [
+      "frontend_src_hooks_usechecklistsync_ts",
+      "usechecklistsync_usechecklistsync"
+    ],
+    "34": [
+      "frontend_src_hooks_usewebsocket_ts",
+      "usewebsocket_usewebsocket"
+    ],
+    "35": [
+      "frontend_src_hooks_usepresencesummary_ts",
+      "usepresencesummary_usepresencesummary"
+    ],
+    "36": [
+      "checklistfill_test_buildchecklist",
+      "frontend_src_pages_checklistfill_test_tsx"
+    ],
+    "37": [
+      "frontend_src_pages_login_tsx",
+      "login_handlesubmit"
+    ],
+    "38": [
+      "api_test_mockfetchresponse",
+      "frontend_src_services_api_test_ts"
+    ],
+    "39": [
+      "frontend_src_store_slices_authslice_test_ts",
+      "frontend_src_store_slices_authslice_ts"
+    ],
+    "40": [
+      "tests_user_management_spec_ts",
+      "user_management_spec_uid"
+    ],
+    "41": [
+      "playwright_config_ts"
+    ],
+    "42": [
+      "eslint_config_js"
+    ],
+    "43": [
+      "frontend_vite_config_ts"
+    ],
+    "44": [
+      "frontend_vitest_config_ts"
+    ],
+    "45": [
+      "frontend_src_main_tsx"
+    ],
+    "46": [
+      "frontend_src_test_setup_ts"
+    ],
+    "47": [
+      "frontend_src_css_modules_d_ts"
+    ],
+    "48": [
+      "frontend_src_vite_env_d_ts"
+    ],
+    "49": [
+      "frontend_src_components_offlinebanner_test_tsx"
+    ],
+    "50": [
+      "frontend_src_components_modal_test_tsx"
+    ],
+    "51": [
+      "frontend_src_components_statusbadge_tsx"
+    ],
+    "52": [
+      "frontend_src_components_footer_test_tsx"
+    ],
+    "53": [
+      "frontend_src_components_statusbadge_test_tsx"
+    ],
+    "54": [
+      "frontend_src_components_avatar_test_tsx"
+    ],
+    "55": [
+      "frontend_src_tests_api_url_property_test_ts"
+    ],
+    "56": [
+      "frontend_src_pages_settings_tsx"
+    ],
+    "57": [
+      "frontend_src_pages_settings_test_tsx"
+    ],
+    "58": [
+      "frontend_src_pages_checklistdetail_test_tsx"
+    ],
+    "59": [
+      "frontend_src_pages_submissionreview_test_tsx"
+    ],
+    "60": [
+      "frontend_src_pages_createtemplate_test_tsx"
+    ],
+    "61": [
+      "frontend_src_pages_login_test_tsx"
+    ],
+    "62": [
+      "frontend_src_pages_roleassignment_test_tsx"
+    ],
+    "63": [
+      "frontend_src_store_index_test_ts"
+    ],
+    "64": [
+      "frontend_src_store_index_ts"
+    ],
+    "65": [
+      "tests_scalability_seed_spec_ts"
+    ],
+    "66": [
+      "tests_notifications_spec_ts"
+    ],
+    "67": [
+      "tests_auth_spec_ts"
+    ],
+    "68": [
+      "tests_scalability_pdf_spec_ts"
+    ],
+    "69": [
+      "tests_checklist_fill_spec_ts"
+    ],
+    "70": [
+      "tests_admin_dashboard_spec_ts"
+    ],
+    "71": [
+      "tests_submission_review_spec_ts"
+    ],
+    "72": [
+      "tests_settings_spec_ts"
+    ],
+    "73": [
+      "tests_scalability_pagination_spec_ts"
+    ],
+    "74": [
+      "tests_scalability_jwt_spec_ts"
+    ],
+    "75": [
+      "tests_scalability_code_splitting_spec_ts"
+    ],
+    "76": [
+      "tests_scalability_network_spec_ts"
+    ],
+    "77": [
+      "tests_scalability_batch_images_spec_ts"
+    ],
+    "78": [
+      "tests_scalability_conflict_spec_ts"
+    ],
+    "79": [
+      "tests_create_template_spec_ts"
+    ],
+    "80": [
+      "tests_checklist_lifecycle_spec_ts"
+    ],
+    "81": [
+      "tests_checklist_detail_spec_ts"
+    ],
+    "82": [
+      "tests_operator_dashboard_spec_ts"
+    ],
+    "83": [
+      "backend_vitest_config_ts"
+    ],
+    "84": [
+      "backend_src_types_index_ts"
+    ],
+    "85": [
+      "backend_src_config_env_test_ts"
+    ],
+    "86": [
+      "backend_src_data_dynamo_query_test_ts"
+    ],
+    "87": [
+      "backend_src_routes_checklists_test_ts"
+    ],
+    "88": [
+      "backend_src_routes_users_test_ts"
+    ],
+    "89": [
+      "backend_src_routes_auth_test_ts"
+    ],
+    "90": [
+      "backend_src_routes_images_test_ts"
+    ],
+    "91": [
+      "backend_src_routes_templates_test_ts"
+    ],
+    "92": [
+      "backend_src_routes_lines_test_ts"
+    ],
+    "93": [
+      "backend_src_routes_tests_checklist_lifecycle_property_test_ts"
+    ],
+    "94": [
+      "backend_src_ws_tests_connections_test_ts"
+    ],
+    "95": [
+      "backend_src_ws_tests_local_ws_test_ts"
+    ]
+  },
+  "cohesion": {
+    "0": 0.1,
+    "1": 0.07,
+    "2": 0.15,
+    "3": 0.12,
+    "4": 0.16,
+    "5": 0.16,
+    "6": 0.21,
+    "7": 0.21,
+    "8": 0.24,
+    "9": 0.17,
+    "10": 0.22,
+    "11": 0.22,
+    "12": 0.29,
+    "13": 0.28,
+    "14": 0.29,
+    "15": 0.53,
+    "16": 0.33,
+    "17": 0.67,
+    "18": 0.5,
+    "19": 0.67,
+    "20": 1.0,
+    "21": 0.67,
+    "22": 0.67,
+    "23": 0.67,
+    "24": 1.0,
+    "25": 1.0,
+    "26": 1.0,
+    "27": 1.0,
+    "28": 1.0,
+    "29": 1.0,
+    "30": 1.0,
+    "31": 1.0,
+    "32": 1.0,
+    "33": 1.0,
+    "34": 1.0,
+    "35": 1.0,
+    "36": 1.0,
+    "37": 1.0,
+    "38": 1.0,
+    "39": 1.0,
+    "40": 1.0,
+    "41": 1.0,
+    "42": 1.0,
+    "43": 1.0,
+    "44": 1.0,
+    "45": 1.0,
+    "46": 1.0,
+    "47": 1.0,
+    "48": 1.0,
+    "49": 1.0,
+    "50": 1.0,
+    "51": 1.0,
+    "52": 1.0,
+    "53": 1.0,
+    "54": 1.0,
+    "55": 1.0,
+    "56": 1.0,
+    "57": 1.0,
+    "58": 1.0,
+    "59": 1.0,
+    "60": 1.0,
+    "61": 1.0,
+    "62": 1.0,
+    "63": 1.0,
+    "64": 1.0,
+    "65": 1.0,
+    "66": 1.0,
+    "67": 1.0,
+    "68": 1.0,
+    "69": 1.0,
+    "70": 1.0,
+    "71": 1.0,
+    "72": 1.0,
+    "73": 1.0,
+    "74": 1.0,
+    "75": 1.0,
+    "76": 1.0,
+    "77": 1.0,
+    "78": 1.0,
+    "79": 1.0,
+    "80": 1.0,
+    "81": 1.0,
+    "82": 1.0,
+    "83": 1.0,
+    "84": 1.0,
+    "85": 1.0,
+    "86": 1.0,
+    "87": 1.0,
+    "88": 1.0,
+    "89": 1.0,
+    "90": 1.0,
+    "91": 1.0,
+    "92": 1.0,
+    "93": 1.0,
+    "94": 1.0,
+    "95": 1.0
+  },
+  "gods": [
+    {
+      "id": "websocket_websocketclient",
+      "label": "WebSocketClient",
+      "edges": 21
+    },
+    {
+      "id": "api_request",
+      "label": "request()",
+      "edges": 19
+    },
+    {
+      "id": "api_requestwithretry",
+      "label": "requestWithRetry()",
+      "edges": 9
+    },
+    {
+      "id": "local_ws_localwsbroadcaster",
+      "label": "LocalWsBroadcaster",
+      "edges": 8
+    },
+    {
+      "id": "factories_nextid",
+      "label": "nextId()",
+      "edges": 7
+    },
+    {
+      "id": "apigw_ws_apigatewaybroadcaster",
+      "label": "ApiGatewayBroadcaster",
+      "edges": 7
+    },
+    {
+      "id": "factories_makechecklist",
+      "label": "makeChecklist()",
+      "edges": 5
+    },
+    {
+      "id": "api_gettoken",
+      "label": "getToken()",
+      "edges": 5
+    },
+    {
+      "id": "connections_ttlfromnow",
+      "label": "ttlFromNow()",
+      "edges": 5
+    },
+    {
+      "id": "checklistfill_itemkey",
+      "label": "itemKey()",
+      "edges": 4
+    }
+  ],
+  "surprises": [
+    {
+      "source": "makeUserPublic()",
+      "target": "nextId()",
+      "source_files": [
+        "frontend/src/__tests__/factories.ts",
+        "backend/src/__tests__/factories.ts"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; peripheral node `makeUserPublic()` unexpectedly reaches hub `nextId()`"
+    }
+  ],
+  "labels": {
+    "0": "Community 0",
+    "1": "Community 1",
+    "2": "Community 2",
+    "3": "Community 3",
+    "4": "Community 4",
+    "5": "Community 5",
+    "6": "Community 6",
+    "7": "Community 7",
+    "8": "Community 8",
+    "9": "Community 9",
+    "10": "Community 10",
+    "11": "Community 11",
+    "12": "Community 12",
+    "13": "Community 13",
+    "14": "Community 14",
+    "15": "Community 15",
+    "16": "Community 16",
+    "17": "Community 17",
+    "18": "Community 18",
+    "19": "Community 19",
+    "20": "Community 20",
+    "21": "Community 21",
+    "22": "Community 22",
+    "23": "Community 23",
+    "24": "Community 24",
+    "25": "Community 25",
+    "26": "Community 26",
+    "27": "Community 27",
+    "28": "Community 28",
+    "29": "Community 29",
+    "30": "Community 30",
+    "31": "Community 31",
+    "32": "Community 32",
+    "33": "Community 33",
+    "34": "Community 34",
+    "35": "Community 35",
+    "36": "Community 36",
+    "37": "Community 37",
+    "38": "Community 38",
+    "39": "Community 39",
+    "40": "Community 40",
+    "41": "Community 41",
+    "42": "Community 42",
+    "43": "Community 43",
+    "44": "Community 44",
+    "45": "Community 45",
+    "46": "Community 46",
+    "47": "Community 47",
+    "48": "Community 48",
+    "49": "Community 49",
+    "50": "Community 50",
+    "51": "Community 51",
+    "52": "Community 52",
+    "53": "Community 53",
+    "54": "Community 54",
+    "55": "Community 55",
+    "56": "Community 56",
+    "57": "Community 57",
+    "58": "Community 58",
+    "59": "Community 59",
+    "60": "Community 60",
+    "61": "Community 61",
+    "62": "Community 62",
+    "63": "Community 63",
+    "64": "Community 64",
+    "65": "Community 65",
+    "66": "Community 66",
+    "67": "Community 67",
+    "68": "Community 68",
+    "69": "Community 69",
+    "70": "Community 70",
+    "71": "Community 71",
+    "72": "Community 72",
+    "73": "Community 73",
+    "74": "Community 74",
+    "75": "Community 75",
+    "76": "Community 76",
+    "77": "Community 77",
+    "78": "Community 78",
+    "79": "Community 79",
+    "80": "Community 80",
+    "81": "Community 81",
+    "82": "Community 82",
+    "83": "Community 83",
+    "84": "Community 84",
+    "85": "Community 85",
+    "86": "Community 86",
+    "87": "Community 87",
+    "88": "Community 88",
+    "89": "Community 89",
+    "90": "Community 90",
+    "91": "Community 91",
+    "92": "Community 92",
+    "93": "Community 93",
+    "94": "Community 94",
+    "95": "Community 95"
+  },
+  "questions": [
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 0` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.1 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 1` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.07 - nodes in this community are weakly interconnected."
+    },
+    {
+      "type": "low_cohesion",
+      "question": "Should `Community 3` be split into smaller, more focused modules?",
+      "why": "Cohesion score 0.12 - nodes in this community are weakly interconnected."
+    }
+  ]
+}
