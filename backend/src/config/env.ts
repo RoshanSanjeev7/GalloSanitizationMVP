@@ -28,5 +28,6 @@ export const config = {
     templates: process.env.DYNAMODB_TABLE_TEMPLATES || 'SanitizationTemplates',
     checklists: process.env.DYNAMODB_TABLE_CHECKLISTS || 'SanitizationChecklists',
     connections: process.env.DYNAMODB_TABLE_CONNECTIONS || 'SanitizationConnections',
+    auditLog: process.env.DYNAMODB_TABLE_AUDIT_LOG || 'SanitizationAuditLog',
   },
 };
