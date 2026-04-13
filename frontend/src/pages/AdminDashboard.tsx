@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import type { RootState } from '../store';
-import api, { type Checklist, type Line } from '../services/api';
+import api, { type Checklist, type Line, type Factory } from '../services/api';
 import Avatar from '../components/Avatar';
 import StatusBadge from '../components/StatusBadge';
 import Footer from '../components/Footer';
@@ -33,6 +33,8 @@ export default function AdminDashboard() {
   const location = useLocation();
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [lines, setLines] = useState<Line[]>([]);
+  const [factories, setFactories] = useState<Factory[]>([]);
+  const [factoryFilter, setFactoryFilter] = useState('');
   const [tab, setTab] = useState<Tab>('submitted');
   const [search, setSearch] = useState('');
   const [lineFilter, setLineFilter] = useState('');
@@ -120,13 +122,15 @@ export default function AdminDashboard() {
     setLoading(true);
     setOffset(0);
     try {
-      const [, lns] = await Promise.all([
+      const [, lns, , , fcts] = await Promise.all([
         fetchChecklists(currentTab, 0, search, lineFilter, false, dateFilter),
         api.getLines(),
         fetchCounts(),
         fetchNotifications(),
+        api.getFactories(),
       ]);
       setLines(lns);
+      setFactories(fcts);
     } catch {
       // 401 handled by api interceptor
     } finally {
@@ -454,6 +458,25 @@ export default function AdminDashboard() {
             onChange={(e) => handleSearchChange(e.target.value)}
             style={{ flex: 1 }}
           />
+          {factories.length > 1 && (
+            <select
+              className="form-select"
+              value={factoryFilter}
+              onChange={(e) => {
+                setFactoryFilter(e.target.value);
+                setLineFilter('');
+                handleLineFilterChange('');
+              }}
+              style={{ width: 160, flex: 'none' }}
+            >
+              <option value="">All Factories</option>
+              {factories.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className="form-select"
             value={lineFilter}
@@ -461,7 +484,7 @@ export default function AdminDashboard() {
             style={{ width: 140, flex: 'none' }}
           >
             <option value="">All Lines</option>
-            {lines.map((l) => (
+            {(factoryFilter ? lines.filter(l => l.factoryId === factoryFilter) : lines).map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
               </option>

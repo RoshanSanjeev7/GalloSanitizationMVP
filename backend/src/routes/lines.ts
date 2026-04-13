@@ -13,14 +13,15 @@ router.get('/', async (_req, res) => {
 });
 
 router.post('/', adminOnly, async (req: AuthRequest, res) => {
-  const { name } = req.body;
+  const { name, factoryId } = req.body;
 
   if (!name || !name.trim()) {
     res.status(400).json({ error: 'Line name is required' });
     return;
   }
 
-  const line = { id: uuid(), name: name.trim() };
+  const line: { id: string; name: string; factoryId?: string } = { id: uuid(), name: name.trim() };
+  if (factoryId) line.factoryId = factoryId;
   await putLine(line);
   res.status(201).json(line);
 });

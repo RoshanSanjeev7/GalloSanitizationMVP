@@ -1,14 +1,23 @@
+export interface Factory {
+  id: string;
+  name: string;
+  location: string;
+  createdAt?: string;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   password: string;
   role: 'operator' | 'admin';
+  factoryIds?: string[];
 }
 
 export interface Line {
   id: string;
   name: string;
+  factoryId?: string;
 }
 
 export interface TaskTemplate {
@@ -64,6 +73,7 @@ export interface Checklist {
   templateId: string;
   lineId: string;
   lineName: string;
+  factoryId?: string;
   operatorId: string;
   operatorName: string;
   status: 'in_progress' | 'submitted' | 'approved' | 'denied';

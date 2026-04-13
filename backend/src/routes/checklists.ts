@@ -85,6 +85,15 @@ router.get('/', async (req: AuthRequest, res) => {
 
   checklists.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
+  // Scope operators to their assigned factories (admins see all)
+  if (req.userRole === 'operator') {
+    const currentUser = await getUser(req.userId!);
+    if (currentUser?.factoryIds && currentUser.factoryIds.length > 0) {
+      const factorySet = new Set(currentUser.factoryIds);
+      checklists = checklists.filter((c) => !c.factoryId || factorySet.has(c.factoryId));
+    }
+  }
+
   // Apply search filter (case-insensitive match on operatorName or lineName)
   if (search) {
     const searchLower = search.toLowerCase();
@@ -206,7 +215,7 @@ router.post('/', async (req: AuthRequest, res) => {
     return;
   }
 
-  const checklist = {
+  const checklist: Record<string, unknown> = {
     id: uuid(),
     templateId: template.id,
     lineId: line.id,
@@ -236,10 +245,13 @@ router.post('/', async (req: AuthRequest, res) => {
     })),
   };
 
-  await putChecklist(checklist);
+  // Stamp the factory from the line onto the checklist
+  if (line.factoryId) checklist.factoryId = line.factoryId;
+
+  await putChecklist(checklist as Checklist);
   res.status(201).json(checklist);
   // Fire-and-forget: audit/broadcast failures must not block the HTTP response
-  logAudit({ userId: req.userId!, userName: user.name, userRole: req.userRole!, action: 'checklist_created', targetType: 'checklist', targetId: checklist.id, detail: `Created checklist for ${line.name}` }).catch(() => {});
+  logAudit({ userId: req.userId!, userName: user.name, userRole: req.userRole!, action: 'checklist_created', targetType: 'checklist', targetId: checklist.id as string, detail: `Created checklist for ${line.name}` }).catch(() => {});
 });
 
 router.put('/:id/machines/:machineIdx', async (req: AuthRequest, res) => {

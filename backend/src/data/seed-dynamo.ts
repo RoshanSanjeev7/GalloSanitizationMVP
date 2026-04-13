@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
-import type { User, Line, Template, Checklist, ChecklistItem, MachineTemplate } from '../types/index.js';
-import { getAllUsers, putUser, putLine, putTemplate, putChecklist } from './dynamo.js';
+import type { User, Line, Template, Checklist, ChecklistItem, MachineTemplate, Factory } from '../types/index.js';
+import { getAllUsers, putUser, putLine, putTemplate, putChecklist, putFactory } from './dynamo.js';
 
 /** Wraps a put call to silently ignore ConditionalCheckFailedException (item already exists). */
 async function putSafe(fn: () => Promise<void>): Promise<void> {
@@ -616,6 +616,37 @@ export async function seedIfEmpty(): Promise<void> {
     return;
   }
 
+  /* ---- Factories ---- */
+  const factoryModesto: Factory = {
+    id: uuid(),
+    name: 'Modesto Winery',
+    location: 'Modesto, CA',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+  const factoryLivingston: Factory = {
+    id: uuid(),
+    name: 'Livingston Winery',
+    location: 'Livingston, CA',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+  const factoryFresno: Factory = {
+    id: uuid(),
+    name: 'Fresno Winery',
+    location: 'Fresno, CA',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+  const factoryDryCreek: Factory = {
+    id: uuid(),
+    name: 'Dry Creek Facility',
+    location: 'Healdsburg, CA',
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+
+  await putSafe(() => putFactory(factoryModesto));
+  await putSafe(() => putFactory(factoryLivingston));
+  await putSafe(() => putFactory(factoryFresno));
+  await putSafe(() => putFactory(factoryDryCreek));
+
   /* ---- Users ---- */
   const admin: User = {
     id: uuid(),
@@ -631,6 +662,7 @@ export async function seedIfEmpty(): Promise<void> {
     email: 'gsanchez@gallo.com',
     password: 'operator123',
     role: 'operator',
+    factoryIds: [factoryModesto.id, factoryLivingston.id],
   };
 
   const operator2: User = {
@@ -639,6 +671,7 @@ export async function seedIfEmpty(): Promise<void> {
     email: 'mrivera@gallo.com',
     password: 'operator123',
     role: 'operator',
+    factoryIds: [factoryModesto.id, factoryFresno.id],
   };
 
   await putSafe(() => putUser(admin));
@@ -646,9 +679,9 @@ export async function seedIfEmpty(): Promise<void> {
   await putSafe(() => putUser(operator2));
 
   /* ---- Lines ---- */
-  const line91: Line = { id: uuid(), name: 'Line 91' };
-  const line92: Line = { id: uuid(), name: 'Line 92' };
-  const line93: Line = { id: uuid(), name: 'Line 93' };
+  const line91: Line = { id: uuid(), name: 'Line 91', factoryId: factoryModesto.id };
+  const line92: Line = { id: uuid(), name: 'Line 92', factoryId: factoryModesto.id };
+  const line93: Line = { id: uuid(), name: 'Line 93', factoryId: factoryLivingston.id };
 
   await putSafe(() => putLine(line91));
   await putSafe(() => putLine(line92));

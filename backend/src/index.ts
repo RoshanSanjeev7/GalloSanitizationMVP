@@ -12,6 +12,7 @@ import templateRoutes from './routes/templates.js';
 import checklistRoutes from './routes/checklists.js';
 import imageRoutes from './routes/images.js';
 import auditRoutes from './routes/audit.js';
+import factoryRoutes from './routes/factories.js';
 
 const app = express();
 
@@ -66,6 +67,7 @@ app.post('/api/checklists', checklistCreateLimiter);
 app.use('/api/checklists', checklistRoutes);
 app.use('/api/checklists', imageRoutes);
 app.use('/api/audit', auditRoutes);
+app.use('/api/factories', factoryRoutes);
 
 // Seed on startup (skip in test and production environments), then listen
 if (!process.env.VITEST) {
