@@ -41,20 +41,27 @@ export function useOfflineQueue() {
 
       for (const save of saves) {
         try {
-          await api.updateChecklistItems(save.checklistId, [save.machine] as any, save.version);
+          await api.updateChecklistMachine(
+            save.checklistId,
+            save.machineIdx,
+            save.machine as any,
+            save.version,
+          );
           if (save.id) await removeSave(save.id);
         } catch (err: unknown) {
           const status = err instanceof Error ? (err as Error & { status?: number }).status : undefined;
-          if (status === 409) {
-            // Version conflict — discard stale save
+          if (status === 409 || status === 400 || status === 404) {
+            // Stale, invalid, or deleted — discard
             if (save.id) await removeSave(save.id);
           }
-          // Network errors: leave in queue for next sync
+          // Network errors (no status): leave in queue for next sync
         }
       }
     } finally {
       syncingRef.current = false;
       setSyncing(false);
+      // Small delay to ensure IndexedDB transaction commits before re-reading count
+      await new Promise((r) => setTimeout(r, 100));
       await updateCount();
     }
   }, [updateCount]);
