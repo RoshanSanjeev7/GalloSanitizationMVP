@@ -195,9 +195,12 @@ router.post('/', async (req: AuthRequest, res) => {
   }
 
   const templates = await getTemplatesByLineId(lineId);
-  const template = templates[0];
+  // Operators can only use published templates
+  const template = req.userRole === 'admin'
+    ? templates[0]
+    : templates.find(t => t.published !== false);
   if (!template) {
-    res.status(400).json({ error: 'No template available for this line. Ask an admin to create one.' });
+    res.status(400).json({ error: 'No published template available for this line. Ask an admin to create and publish one.' });
     return;
   }
 

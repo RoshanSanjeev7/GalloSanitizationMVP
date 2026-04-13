@@ -268,13 +268,32 @@ export default function CreateTemplate() {
             &larr; Back
           </button>
           {lineId && (
-            <button
-              className="btn btn-primary btn-sm"
-              onClick={handleSave}
-              disabled={!isValid || loading}
-            >
-              {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Template'}
-            </button>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {isEditing && (() => {
+                const tpl = templates.find(t => t.lineId === lineId);
+                const isPublished = tpl?.published !== false;
+                return (
+                  <button
+                    className={isPublished ? 'btn btn-outline btn-sm' : 'btn btn-green btn-sm'}
+                    onClick={async () => {
+                      if (!editingId) return;
+                      const result = await api.publishTemplate(editingId, !isPublished);
+                      setTemplates(prev => prev.map(t => t.id === editingId ? { ...t, published: result.published } : t));
+                    }}
+                    style={!isPublished ? { background: '#16a34a', color: '#fff', border: 'none' } : {}}
+                  >
+                    {isPublished ? 'Unpublish' : 'Publish'}
+                  </button>
+                );
+              })()}
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleSave}
+                disabled={!isValid || loading}
+              >
+                {loading ? 'Saving...' : isEditing ? 'Save Changes' : 'Create Template'}
+              </button>
+            </div>
           )}
         </div>
 
@@ -303,11 +322,21 @@ export default function CreateTemplate() {
 
           {lineId && isEditing && (() => {
             const tpl = templates.find(t => t.lineId === lineId);
-            return tpl?.updatedAt ? (
-              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>
-                Last updated: {new Date(tpl.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at {new Date(tpl.updatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}
-                {tpl.createdAt && <> &middot; Created: {new Date(tpl.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>}
-              </p>
+            return tpl ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 6,
+                  background: tpl.published !== false ? '#dcfce7' : '#fef3c7',
+                  color: tpl.published !== false ? '#166534' : '#92400e',
+                }}>
+                  {tpl.published !== false ? 'Published' : 'Draft'}
+                </span>
+                {tpl.updatedAt && (
+                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                    Updated {new Date(tpl.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
             ) : null;
           })()}
 

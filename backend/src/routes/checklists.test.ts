@@ -478,7 +478,7 @@ describe('Checklists Routes', () => {
         .send({ lineId: 'line-2' });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toContain('No template available');
+      expect(res.body.error).toContain('No published template available');
     });
 
     it('returns 404 when line does not exist', async () => {
@@ -517,7 +517,7 @@ describe('Checklists Routes', () => {
         .send({ lineId: 'line-1' });
 
       expect(res.status).toBe(400);
-      expect(res.body.error).toContain('No template available');
+      expect(res.body.error).toContain('No published template available');
     });
   });
 

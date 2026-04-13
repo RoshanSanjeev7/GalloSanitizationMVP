@@ -21,7 +21,7 @@ There are exactly four states and three transitions. There is no way to move bac
 
 An operator picks a production line from the dashboard. The backend first checks if an in-progress checklist already exists for that line — **only one in-progress checklist is allowed per line** to prevent duplicates. If one exists, the request is rejected with a 409 and the operator is told to complete or submit it first.
 
-If no duplicate exists, the backend looks up the first template assigned to that line via the `lineId-index` GSI on the Templates table (see [[DynamoDB Tables]]). It stamps a new checklist with `status: 'in_progress'`, `version: 1`, and a `machines` array generated from the template's structure -- every task starts with `completed: null`, `completedBy: null`, and an empty `images` array.
+If no duplicate exists, the backend looks up the first **published** template assigned to that line (operators can only use published templates; admins can use any). Templates start as drafts (`published: false`) and must be explicitly published by an admin before operators can create checklists from them. The backend looks up the first published template via the `lineId-index` GSI on the Templates table (see [[DynamoDB Tables]]). It stamps a new checklist with `status: 'in_progress'`, `version: 1`, and a `machines` array generated from the template's structure -- every task starts with `completed: null`, `completedBy: null`, and an empty `images` array.
 
 The checklist is written with a plain `putChecklist` (no condition) because it's a brand-new item with a fresh UUID. The creation is logged to the [[Audit Log]] as `checklist_created`.
 
