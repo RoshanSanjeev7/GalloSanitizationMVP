@@ -264,22 +264,41 @@ export default function ChecklistFill() {
           {new Date(checklist.startTime).toLocaleString()}
         </p>
 
-        <select
-          className="form-select"
-          value={activeMachine}
-          onChange={(e) => setActiveMachine(Number(e.target.value))}
-          style={{ marginBottom: 16 }}
-        >
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
           {machines.map((m, idx) => {
             const total = m.categories.reduce((sum, c) => sum + c.items.length, 0);
             const done = m.categories.reduce((sum, c) => sum + c.items.filter(i => i.completed !== null).length, 0);
+            const isActive = idx === activeMachine;
+            const pct = total > 0 ? Math.round((done / total) * 100) : 0;
             return (
-              <option key={idx} value={idx}>
-                {m.name} ({done}/{total})
-              </option>
+              <button
+                key={idx}
+                onClick={() => setActiveMachine(idx)}
+                style={{
+                  padding: '8px 14px',
+                  borderRadius: 8,
+                  border: isActive ? '2px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
+                  background: isActive ? 'var(--primary, #5B2333)' : '#fff',
+                  color: isActive ? '#fff' : 'var(--text, #333)',
+                  fontSize: 13,
+                  fontWeight: isActive ? 600 : 400,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 4,
+                  minWidth: 90,
+                  transition: 'all 0.15s',
+                }}
+              >
+                <span>{m.name}</span>
+                <span style={{ fontSize: 11, opacity: 0.8 }}>
+                  {done}/{total} {pct === 100 ? '✓' : `${pct}%`}
+                </span>
+              </button>
             );
           })}
-        </select>
+        </div>
 
         {currentMachine.categories.map((cat, catIdx) => {
           const isCollapsed = collapsed[collapseKey(catIdx)] ?? false;
@@ -460,24 +479,40 @@ export default function ChecklistFill() {
         })}
 
         {machines.length > 1 && (
-          <div className={s.machineNav}>
-            <button
-              className={s.machineNavBtn}
-              onClick={() => { setActiveMachine((prev) => prev - 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              disabled={activeMachine === 0}
-            >
-              &larr; {activeMachine > 0 ? machines[activeMachine - 1].name : ''}
-            </button>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {activeMachine + 1} / {machines.length}
-            </span>
-            <button
-              className={s.machineNavBtn}
-              onClick={() => { setActiveMachine((prev) => prev + 1); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-              disabled={activeMachine === machines.length - 1}
-            >
-              {activeMachine < machines.length - 1 ? machines[activeMachine + 1].name : ''} &rarr;
-            </button>
+          <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
+            {machines.map((m, idx) => {
+              const total = m.categories.reduce((sum, c) => sum + c.items.length, 0);
+              const done = m.categories.reduce((sum, c) => sum + c.items.filter(i => i.completed !== null).length, 0);
+              const isActive = idx === activeMachine;
+              const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => { setActiveMachine(idx); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: 8,
+                    border: isActive ? '2px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
+                    background: isActive ? 'var(--primary, #5B2333)' : '#fff',
+                    color: isActive ? '#fff' : 'var(--text, #333)',
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 400,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 4,
+                    minWidth: 90,
+                    transition: 'all 0.15s',
+                  }}
+                >
+                  <span>{m.name}</span>
+                  <span style={{ fontSize: 11, opacity: 0.8 }}>
+                    {done}/{total} {pct === 100 ? '✓' : `${pct}%`}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 

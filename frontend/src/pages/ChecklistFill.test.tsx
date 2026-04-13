@@ -104,17 +104,13 @@ describe('ChecklistFill', () => {
     expect(screen.getByText('Inspect gaskets')).toBeInTheDocument();
   });
 
-  // 3. Renders machine selector dropdown
-  it('renders machine selector dropdown with machine names', async () => {
+  // 3. Renders machine selector buttons (top + bottom)
+  it('renders machine selector buttons with machine names', async () => {
     renderPage();
     await waitFor(() => {
-      expect(screen.getByRole('combobox')).toBeInTheDocument();
+      expect(screen.getAllByText('Filler').length).toBeGreaterThanOrEqual(1);
     });
-    const select = screen.getByRole('combobox') as HTMLSelectElement;
-    const options = Array.from(select.options);
-    expect(options).toHaveLength(2);
-    expect(options[0].textContent).toContain('Filler');
-    expect(options[1].textContent).toContain('Labeler');
+    expect(screen.getAllByText('Labeler').length).toBeGreaterThanOrEqual(1);
   });
 
   // 4. Shows submit button at top and bottom
@@ -345,15 +341,15 @@ describe('ChecklistFill', () => {
   });
 
   // 12. Switching machines shows different items
-  it('shows different items when switching machines via dropdown', async () => {
+  it('shows different items when switching machines via button', async () => {
     const user = userEvent.setup();
     renderPage();
     await waitFor(() => {
       expect(screen.getByText('Flush water lines')).toBeInTheDocument();
     });
 
-    const select = screen.getByRole('combobox');
-    await user.selectOptions(select, '1');
+    // Click the first Labeler machine button (top bar)
+    await user.click(screen.getAllByText('Labeler')[0]);
 
     await waitFor(() => {
       expect(screen.getByText('Wipe rollers')).toBeInTheDocument();

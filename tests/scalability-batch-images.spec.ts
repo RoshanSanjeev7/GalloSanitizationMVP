@@ -53,7 +53,7 @@ test.describe('Scalability: Batch Image URLs', () => {
       await row.click();
       await page.waitForURL(/\/checklist\/.*\/fill/);
       // Page should load successfully — screenshot captures the state
-      await expect(page.locator('select.form-select')).toBeVisible();
+      await expect(page.locator('button:has-text("/")')).toBeVisible();
     }
   });
 });
