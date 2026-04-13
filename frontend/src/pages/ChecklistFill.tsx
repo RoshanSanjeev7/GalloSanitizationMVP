@@ -30,9 +30,16 @@ export default function ChecklistFill() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const savingRef = useRef(false);
   const savePromiseRef = useRef<Promise<void> | null>(null);
+  const remoteUpdateRef = useRef(false); // true when setMachines is from WebSocket, not user action
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const imageUrls = useImageUrlsForMachines(id, machines, activeMachine);
-  const { presence, isDeleted, statusChanged } = useChecklistSync(id, machines, setMachines, setVersion);
+
+  // Wrap setMachines for WebSocket sync — marks updates as remote so auto-save skips them
+  const setMachinesRemote = useRef((fn: React.SetStateAction<ChecklistMachine[]>) => {
+    remoteUpdateRef.current = true;
+    setMachines(fn);
+  }).current;
+  const { presence, isDeleted, statusChanged } = useChecklistSync(id, machines, setMachinesRemote, setVersion);
 
   const { queueCount, syncing, enqueue, syncQueue } = useOfflineQueue();
   const currentUser = api.getStoredUser();
@@ -120,6 +127,11 @@ export default function ChecklistFill() {
   useEffect(() => {
     if (!hasLoadedRef.current) {
       hasLoadedRef.current = true;
+      return;
+    }
+    // Skip auto-save when machines changed from a remote WebSocket update
+    if (remoteUpdateRef.current) {
+      remoteUpdateRef.current = false;
       return;
     }
     if (!id) return;
