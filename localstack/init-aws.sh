@@ -44,6 +44,10 @@ awslocal dynamodb create-table \
     }
   ]'
 
+awslocal dynamodb update-time-to-live \
+  --table-name SanitizationTemplates \
+  --time-to-live-specification Enabled=true,AttributeName=deleteTtl
+
 # Checklists table
 awslocal dynamodb create-table \
   --table-name SanitizationChecklists \

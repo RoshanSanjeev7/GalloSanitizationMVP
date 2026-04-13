@@ -225,10 +225,14 @@ export interface Template {
   machines: MachineTemplate[];
   createdAt?: string;
   updatedAt?: string;
+  deleted?: boolean;
+  deletedAt?: string | null;
 }
 
-async function getTemplates(): Promise<Template[]> {
-  return requestWithRetry<Template[]>('/templates');
+async function getTemplates(params: Record<string, string> = {}): Promise<Template[]> {
+  const query = new URLSearchParams(params).toString();
+  const endpoint = query ? `/templates?${query}` : '/templates';
+  return requestWithRetry<Template[]>(endpoint);
 }
 
 async function getTemplate(id: string): Promise<Template> {
@@ -262,6 +266,10 @@ async function publishTemplate(id: string, published: boolean): Promise<Template
 
 async function deleteTemplate(id: string): Promise<void> {
   await request(`/templates/${id}`, { method: 'DELETE' });
+}
+
+async function restoreTemplate(id: string): Promise<Template> {
+  return request<Template>(`/templates/${id}/restore`, { method: 'POST' });
 }
 
 // ─── Checklists ─────────────────────────────────────────────────────
@@ -503,6 +511,7 @@ const api = {
   updateTemplate,
   publishTemplate,
   deleteTemplate,
+  restoreTemplate,
   getChecklists,
   getNotifications,
   getChecklist,

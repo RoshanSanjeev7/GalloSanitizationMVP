@@ -42,7 +42,7 @@ export default function CreateTemplate() {
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
-    Promise.all([api.getLines(), api.getTemplates()]).then(([lns, tpls]) => {
+    Promise.all([api.getLines(), api.getTemplates({ includeDeleted: 'true' })]).then(([lns, tpls]) => {
       setLines(lns);
       setTemplates(tpls);
       setInitialLoading(false);
@@ -59,7 +59,7 @@ export default function CreateTemplate() {
       return;
     }
 
-    const existing = templates.find(t => t.lineId === newLineId);
+    const existing = templates.find(t => t.lineId === newLineId && !t.deleted);
     if (existing) {
       setEditingId(existing.id);
       setTitle(existing.title);
@@ -238,7 +238,8 @@ export default function CreateTemplate() {
     setDeleting(true);
     try {
       await api.deleteTemplate(editingId);
-      setTemplates(prev => prev.filter(t => t.id !== editingId));
+      const fresh = await api.getTemplates({ includeDeleted: 'true' });
+      setTemplates(fresh);
       setEditingId(null);
       setTitle('');
       setMachines([emptyMachine()]);
@@ -270,7 +271,7 @@ export default function CreateTemplate() {
           {lineId && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {isEditing && (() => {
-                const tpl = templates.find(t => t.lineId === lineId);
+                const tpl = templates.find(t => t.lineId === lineId && !t.deleted);
                 const isPublished = tpl?.published !== false;
                 return (
                   <button
@@ -310,7 +311,7 @@ export default function CreateTemplate() {
             >
               <option value="">Choose a line...</option>
               {lines.map((l) => {
-                const hasTemplate = templates.some(t => t.lineId === l.id);
+                const hasTemplate = templates.some(t => t.lineId === l.id && !t.deleted);
                 return (
                   <option key={l.id} value={l.id}>
                     {l.name}{hasTemplate ? ' — edit existing template' : ' — create new template'}
@@ -321,7 +322,7 @@ export default function CreateTemplate() {
           </div>
 
           {lineId && isEditing && (() => {
-            const tpl = templates.find(t => t.lineId === lineId);
+            const tpl = templates.find(t => t.lineId === lineId && !t.deleted);
             return tpl ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                 <span style={{
@@ -510,7 +511,7 @@ export default function CreateTemplate() {
             Are you sure you want to delete the template for <strong>{selectedLine?.name}</strong>?
           </p>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 24 }}>
-            This action cannot be undone. Any future checklists for this line will need a new template.
+            The template will be moved to the deleted section and can be restored within 30 days. After 30 days it will be permanently removed.
           </p>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button className="btn btn-outline btn-sm" onClick={() => setShowDeleteConfirm(false)}>
@@ -522,6 +523,43 @@ export default function CreateTemplate() {
           </div>
         </Modal>
       )}
+
+      {(() => {
+        const deletedTemplates = templates.filter(t => t.deleted);
+        if (deletedTemplates.length === 0) return null;
+
+        return (
+          <div style={{ marginTop: 32, padding: 20, background: '#fef2f2', borderRadius: 12, border: '1px solid #fca5a5' }}>
+            <h3 style={{ fontSize: 15, marginBottom: 12, color: '#dc2626' }}>Deleted Templates</h3>
+            <p style={{ fontSize: 12, color: '#991b1b', marginBottom: 12 }}>
+              These templates will be permanently deleted after 30 days.
+            </p>
+            {deletedTemplates.map((t) => {
+              const deletedDate = t.deletedAt ? new Date(t.deletedAt) : new Date();
+              const daysLeft = Math.max(0, 30 - Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24)));
+              const lineName = lines.find(l => l.id === t.lineId)?.name || 'Unknown Line';
+              return (
+                <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #fecaca' }}>
+                  <div>
+                    <span style={{ fontWeight: 500 }}>{t.title}</span>
+                    <span style={{ fontSize: 12, color: '#991b1b', marginLeft: 8 }}>{lineName} — {daysLeft} days remaining</span>
+                  </div>
+                  <button
+                    className="btn btn-outline btn-sm"
+                    onClick={async () => {
+                      await api.restoreTemplate(t.id);
+                      const fresh = await api.getTemplates({ includeDeleted: 'true' });
+                      setTemplates(fresh);
+                    }}
+                  >
+                    Restore
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
