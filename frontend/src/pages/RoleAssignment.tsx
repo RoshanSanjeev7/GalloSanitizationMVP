@@ -15,6 +15,7 @@ export default function RoleAssignment() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [factories, setFactories] = useState<Factory[]>([]);
+  const [selectedFactories, setSelectedFactories] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: UserPublic; newRole: string } | null>(null);
 
@@ -37,16 +38,20 @@ export default function RoleAssignment() {
     setLoading(true);
     setError('');
     try {
-      await api.createUser({
+      const newUser = await api.createUser({
         name,
         email,
         password,
         role,
       });
+      if (selectedFactories.length > 0) {
+        await api.updateUserFactories(newUser.id, selectedFactories);
+      }
       setName('');
       setEmail('');
       setPassword('');
       setRole('operator');
+      setSelectedFactories([]);
       await loadUsers();
     } catch (err) {
       setError((err as Error).message);
@@ -157,10 +162,30 @@ export default function RoleAssignment() {
               </button>
             </div>
           </div>
+          {factories.length > 0 && (
+            <div className="form-group">
+              <label className="form-label">Factory Assignment</label>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                {factories.map((f) => (
+                  <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedFactories.includes(f.id)}
+                      onChange={() => setSelectedFactories(prev =>
+                        prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id]
+                      )}
+                      style={{ accentColor: 'var(--primary)' }}
+                    />
+                    {f.name}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
           <button
             className="btn btn-primary btn-block"
             onClick={handleAdd}
-            disabled={!name || !email || !password || loading}
+            disabled={!name || !email || !password || selectedFactories.length === 0 || loading}
           >
             {loading ? 'Adding...' : 'Add User'}
           </button>
@@ -205,28 +230,22 @@ export default function RoleAssignment() {
                 </div>
               </div>
               {factories.length > 0 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingLeft: 48 }}>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)', alignSelf: 'center', marginRight: 4 }}>Factories:</span>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', paddingLeft: 48 }}>
                   {factories.map((f) => {
                     const assigned = (u.factoryIds || []).includes(f.id);
                     return (
-                      <button
+                      <label
                         key={f.id}
-                        onClick={() => handleToggleFactory(u, f.id)}
-                        style={{
-                          padding: '3px 10px',
-                          fontSize: 11,
-                          fontWeight: 600,
-                          borderRadius: 12,
-                          border: assigned ? '1px solid var(--primary, #5B2333)' : '1px solid var(--border, #e5e5e5)',
-                          background: assigned ? 'var(--primary, #5B2333)' : '#fff',
-                          color: assigned ? '#fff' : 'var(--text-secondary, #666)',
-                          cursor: 'pointer',
-                          transition: 'all 0.15s',
-                        }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}
                       >
+                        <input
+                          type="checkbox"
+                          checked={assigned}
+                          onChange={() => handleToggleFactory(u, f.id)}
+                          style={{ accentColor: 'var(--primary)' }}
+                        />
                         {f.name}
-                      </button>
+                      </label>
                     );
                   })}
                 </div>
