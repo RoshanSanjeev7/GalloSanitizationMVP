@@ -8,6 +8,10 @@ updated: 2026-04-13
 
 Chronological record of all wiki changes. Newest entries at the top.
 
+## [2026-04-13] lint | Wiki gaps filled from audit
+
+Added: API payload examples, DynamoDB Access Patterns page, Error Handling page, Frontend Hooks page, factory cascade docs, Known Limitations prioritization.
+
 ## [2026-04-13] rebuild | Wiki rebuilt from scratch using LLM knowledge base pattern
 
 Migrated from graphify-out/obsidian/ to wiki/. Added [[index]], [[log]], [[schema]]. Restructured into Architecture/, Subsystems/, Decisions/, Runbooks/, DevLog/ folders. 37 content pages with consistent frontmatter, embedded backlinks, and See also sections.

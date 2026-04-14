@@ -33,6 +33,9 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 - [[PDF Export]] -- PDFKit streaming + async SQS/Lambda generation
 - [[Input Validation]] -- Structure checks, MIME whitelists, image limits
 - [[Rate Limiting]] -- express-rate-limit in production only
+- [[DynamoDB Access Patterns]] -- GSI usage, query priority, and access patterns for all 6 tables
+- [[Error Handling]] -- HTTP error codes, backend/frontend error patterns, failure modes
+- [[Frontend Hooks]] -- All 6 custom React hooks: WebSocket, sync, presence, images, offline, toasts
 
 ## Decisions
 

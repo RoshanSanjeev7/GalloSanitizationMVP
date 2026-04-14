@@ -88,8 +88,211 @@ Image uploads go through [[Input Validation]] for MIME type checking and count l
 
 **[[Input Validation]]:** Checklist item updates run through `validateMachines()` which recursively checks the machines/categories/items structure. Image endpoints validate MIME types and enforce per-item (20) and per-checklist (200) limits.
 
+## Request/Response Examples
+
+### POST /api/auth/login
+
+**Request:**
+```json
+{
+  "email": "ymartinez@gallo.com",
+  "password": "admin123"
+}
+```
+
+**Response (200):**
+```json
+{
+  "user": {
+    "id": "a1b2c3d4-...",
+    "name": "Yolanda Martinez",
+    "email": "ymartinez@gallo.com",
+    "role": "admin",
+    "factoryIds": ["f1", "f2"]
+  },
+  "token": "eyJhbGciOiJIUzI1NiIs..."
+}
+```
+
+The `password` field is stripped from the response via destructuring (`const { password: _, ...userPublic } = user`). The token is a JWT with 8h expiry containing `userId` and `role`. See [[Authentication]].
+
+### POST /api/checklists
+
+Creates a new checklist from the published template for the given line. Returns 409 if an in-progress checklist already exists for that line.
+
+**Request:**
+```json
+{
+  "lineId": "line-uuid-here"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "new-uuid",
+  "templateId": "template-uuid",
+  "lineId": "line-uuid-here",
+  "lineName": "Line 91 - Red Wine Bottling",
+  "operatorId": "user-uuid",
+  "operatorName": "Gabriel Sanchez",
+  "factoryId": "factory-uuid",
+  "status": "in_progress",
+  "startTime": "2026-04-09T14:30:00.000Z",
+  "endTime": null,
+  "submittedAt": null,
+  "updatedAt": null,
+  "version": 1,
+  "machines": [
+    {
+      "name": "Filler",
+      "categories": [
+        {
+          "name": "Exterior Cleaning",
+          "items": [
+            {
+              "description": "Wipe down all exterior surfaces",
+              "machine": null,
+              "completed": null,
+              "completedBy": null,
+              "completedAt": null,
+              "issue": null,
+              "images": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+### PUT /api/checklists/:id/items
+
+Full-machine save. Replaces the entire `machines` array using [[Optimistic Concurrency]]. The client must send the current `version`; the server returns the updated checklist with `version` incremented.
+
+**Request:**
+```json
+{
+  "machines": [
+    {
+      "name": "Filler",
+      "categories": [
+        {
+          "name": "Exterior Cleaning",
+          "items": [
+            {
+              "description": "Wipe down all exterior surfaces",
+              "machine": null,
+              "completed": true,
+              "completedBy": "Gabriel Sanchez",
+              "completedAt": "2026-04-09T14:45:00.000Z",
+              "issue": null,
+              "images": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "version": 1
+}
+```
+
+**Response (200):** The full Checklist object with `version: 2`.
+
+**Error (409):** `{ "error": "Checklist has been modified by another user. Please refresh." }`
+
+### PUT /api/checklists/:id/machines/:machineIdx
+
+Per-machine save via [[Per-Machine Auto-Save]]. Uses `UpdateCommand SET machines[N]` so operators on different machines never conflict. Returns only the new version number.
+
+**Request:**
+```json
+{
+  "machine": {
+    "name": "Filler",
+    "categories": [
+      {
+        "name": "Exterior Cleaning",
+        "items": [
+          {
+            "description": "Wipe down all exterior surfaces",
+            "machine": null,
+            "completed": true,
+            "completedBy": "Gabriel Sanchez",
+            "completedAt": "2026-04-09T14:45:00.000Z",
+            "issue": null,
+            "images": []
+          }
+        ]
+      }
+    ]
+  },
+  "version": 1
+}
+```
+
+**Response (200):**
+```json
+{
+  "version": 2
+}
+```
+
+### POST /api/checklists/:id/images
+
+Multipart form data upload. Files are stored in S3 with keys like `{checklistId}/{machineIdx}-{catIdx}-{itemIdx}/{timestamp}-{uuid}-{filename}`. The image keys are atomically appended to the item's `images` array via `appendChecklistImages`.
+
+**Request:** `multipart/form-data`
+- `images` -- file field (up to 10 files, max 10MB each)
+- `machineIdx` -- integer
+- `catIdx` -- integer
+- `itemIdx` -- integer
+
+**Response (200):**
+```json
+{
+  "images": [
+    "checklist-uuid/0-0-0/1712678400000-a1b2c3d4-photo.jpg",
+    "checklist-uuid/0-0-0/1712678401000-e5f6g7h8-photo2.jpg"
+  ]
+}
+```
+
+See [[Image Handling]] for the full upload/retrieval/delete lifecycle.
+
+### POST /api/users
+
+Admin-only. Creates a user with atomic [[Email Uniqueness]] via `TransactWriteCommand`.
+
+**Request:**
+```json
+{
+  "name": "Jane Doe",
+  "email": "jdoe@gallo.com",
+  "password": "operator123",
+  "role": "operator"
+}
+```
+
+**Response (201):**
+```json
+{
+  "id": "new-uuid",
+  "name": "Jane Doe",
+  "email": "jdoe@gallo.com",
+  "role": "operator"
+}
+```
+
+**Error (409):** `{ "error": "Email already exists" }` -- the `TransactionCanceledException` from the email lock is mapped to 409.
+
+Note: the `password` field is never returned in any user response. The password is currently stored in plaintext; see [[Known Limitations]].
+
 ## See also
 
 - [[Authentication]] -- how auth headers are verified
 - [[Checklist Workflow]] -- the business logic behind the checklist endpoints
 - [[Rate Limiting]] -- which endpoints have specific rate limits
+- [[DynamoDB Access Patterns]] -- which GSIs power these endpoints

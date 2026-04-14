@@ -56,3 +56,5 @@ For concrete examples of every race condition and how the system handles it, see
 - [[Checklist Workflow]] -- the transitions being protected
 - [[Auto-Save and Conflict Resolution]] -- the frontend side of conflict handling
 - [[Concurrency Scenarios]] -- every race condition mapped out
+- [[Error Handling]] -- how ConditionalCheckFailedException maps to 409
+- [[DynamoDB Access Patterns]] -- the GSIs used alongside conditional writes

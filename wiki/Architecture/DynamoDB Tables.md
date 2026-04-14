@@ -126,3 +126,4 @@ See [[Audit Log]] for what gets logged and how the frontend displays it.
 - [[Optimistic Concurrency]] -- why the Checklists table needs a version field
 - [[Email Uniqueness]] -- why Users has EMAIL# lock items
 - [[WebSocket System]] -- what the Connections table tracks
+- [[DynamoDB Access Patterns]] -- which GSIs are used for what and query priority

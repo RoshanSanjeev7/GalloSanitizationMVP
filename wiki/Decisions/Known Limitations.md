@@ -6,50 +6,59 @@ updated: 2026-04-13
 
 # Known Limitations
 
-All MVP shortcuts and known issues that should be addressed before production deployment.
+All MVP shortcuts and known issues that should be addressed before production deployment. Items are prioritized by severity:
 
-## Plaintext Passwords
+- **P0 (production blocker):** Must fix before any real user data enters the system.
+- **P1 (should fix):** Causes real problems under moderate usage. Fix before scaling.
+- **P2 (acceptable for MVP):** Known tradeoff that works for demo/dev but needs improvement.
+
+## Plaintext Passwords -- P0
 
 User passwords are stored in DynamoDB without hashing. The [[Authentication]] system compares plaintext values directly. Before production, all password storage must migrate to bcrypt or argon2 with proper salt rounds.
 
-## In-Memory Rate Limiter
+## In-Memory Rate Limiter -- P1
 
 The [[Rate Limiting]] middleware uses `express-rate-limit` with its default in-memory store. This works for a single-process dev server but breaks with multiple processes -- each instance maintains its own counter. Production must switch to a Redis-backed store.
 
-## localStorage Token Storage
+## localStorage Token Storage -- P2
 
 The [[JWT Design]] stores the access token in `localStorage`, which is accessible to any JavaScript running on the page. An XSS vulnerability would allow token theft. Production should consider `httpOnly` cookies.
 
-## Missing Input Validation
+## Missing Input Validation -- P1
 
 Several fields lack validation: template structure (no schema validation on the `machines` array shape), email format (no regex check), and password complexity (no minimum length). See [[Input Validation]] for what IS validated.
 
-## Admin Delete Race Condition
+## Admin Delete Race Condition -- P1
 
 Two admins could theoretically delete each other simultaneously. Both `getAllUsers` queries return 2 admins, both pass the check, both proceed, leaving zero admins. The [[Admin Safety]] guards are not atomic. A production fix would use a single DynamoDB `TransactWriteCommand`. See [[Concurrency Scenarios]].
 
-## Single-Process WebSocket
+## Single-Process WebSocket -- P2
 
 The `LocalWsBroadcaster` in the [[WebSocket Adapter Pattern]] only broadcasts to connections on the same Node.js process. If the backend were scaled horizontally, messages would not reach clients on other instances. The production path uses API Gateway WebSocket.
 
-## Presence Ghost Users
+## Presence Ghost Users -- P2
 
 If a browser crashes without a clean WebSocket disconnect, the user's connection record persists until TTL expiry -- up to 30 minutes. During this window, the crashed user appears as a ghost in [[Presence Indicators]]. A production improvement would add server-side ping/pong detection.
 
-## Seed Data Fragility
+## Seed Data Fragility -- P2
 
 The `seedIfEmpty` function checks if ANY users exist, not whether specific seed users exist. If stale test data remains, the seed script skips seeding entirely. See [[Troubleshooting]] for workarounds.
 
-## No Frontend Route Protection by Role
+## No Frontend Route Protection by Role -- P2
 
 An operator who navigates directly to `/admin` will see the AdminDashboard with data filtered by their `operatorId`. Admin-only actions fail with 403 on the backend, but the operator can see other operators' names. A `ProtectedAdminRoute` wrapper could prevent this.
 
-## Operator Data Isolation Gap
+## Operator Data Isolation Gap -- P0
 
 The `GET /checklists` endpoint does NOT automatically filter by the requesting user's ID. The frontend sends `operatorId` as a query parameter, but an operator could craft an API request without it. The backend should enforce `operatorId = req.userId` when the requester is an operator. See [[Roles and Permissions]].
+
+## Factory Cascade Missing -- P1
+
+Deleting a factory (`DELETE /api/factories/:id`) hard-deletes the factory record but does not clean up references in Lines, Checklists, or Users. Lines retain a stale `factoryId`, checklists remain visible to users who had that factory, and users keep the factory in their `factoryIds` array. See [[Factories]] for the full cascade behavior analysis.
 
 ## See also
 
 - [[Troubleshooting]] -- workarounds for issues caused by these limitations
 - [[Environment Variables]] -- configuration that affects some of these behaviors
 - [[System Architecture]] -- the overall design context for these tradeoffs
+- [[Error Handling]] -- how these limitations manifest as error conditions
