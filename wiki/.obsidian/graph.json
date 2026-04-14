@@ -1,0 +1,16 @@
+{
+  "collapse-filter": false,
+  "showTags": true,
+  "showOrphans": false,
+  "showArrow": true,
+  "nodeSizeMultiplier": 1.2,
+  "linkDistance": 200,
+  "repelStrength": 10,
+  "colorGroups": [
+    { "query": "tag:#architecture", "color": { "a": 1, "rgb": 4556279 } },
+    { "query": "tag:#subsystem", "color": { "a": 1, "rgb": 2201331 } },
+    { "query": "tag:#decision", "color": { "a": 1, "rgb": 16753920 } },
+    { "query": "tag:#devlog", "color": { "a": 1, "rgb": 8421504 } },
+    { "query": "tag:#runbook", "color": { "a": 1, "rgb": 16711680 } }
+  ]
+}
