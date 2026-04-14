@@ -7,22 +7,27 @@ test.describe('Create Template', () => {
     await page.click('text=Edit Templates');
     await page.waitForURL('/templates/create');
     await expect(page.locator('text=Select a Line')).toBeVisible({ timeout: 10000 });
+    // Select Modesto factory (has lines in seed data; required before line selector shows options)
+    const factorySelect = page.locator('select.form-select').first();
+    await factorySelect.selectOption({ label: 'Modesto Winery — Modesto, CA' });
   });
 
   test('shows template page with line selector', async ({ page }) => {
     // beforeEach already confirms "Select a Line" is visible
-    await expect(page.locator('select')).toBeVisible();
+    await expect(page.locator('select.form-select').nth(1)).toBeVisible();
     await expect(page.locator('text=+ Create New Line')).toBeVisible();
   });
 
   test('shows template form after selecting a line', async ({ page }) => {
-    await page.locator('select').selectOption({ index: 1 });
+    const lineSelect = page.locator('select.form-select').nth(1);
+    await lineSelect.selectOption({ index: 1 });
     await expect(page.locator('text=Template Title')).toBeVisible();
     await expect(page.locator('text=Machines')).toBeVisible();
   });
 
   test('can fill in template form', async ({ page }) => {
-    await page.locator('select').selectOption({ index: 1 });
+    const lineSelect = page.locator('select.form-select').nth(1);
+    await lineSelect.selectOption({ index: 1 });
     await page.fill('input[placeholder*="Weekly Deep Clean"]', 'Test Template');
     await page.fill('input[placeholder*="Filler"]', 'Test Machine');
     await page.fill('input[placeholder*="Prep"]', 'Test Category');
@@ -44,7 +49,8 @@ test.describe('Create Template', () => {
   });
 
   test('cancel navigates back to admin', async ({ page }) => {
-    await page.locator('select').selectOption({ index: 1 });
+    const lineSelect = page.locator('select.form-select').nth(1);
+    await lineSelect.selectOption({ index: 1 });
     await page.click('button:has-text("Cancel")');
     await expect(page).toHaveURL('/admin');
   });

@@ -22,6 +22,8 @@ test.describe('User Management (Role Assignment)', () => {
     await page.fill('input[placeholder="user@gallo.com"]', email);
     await page.fill('input[placeholder="Enter password"]', 'test123');
     await page.locator('button:has-text("Administrator")').first().click();
+    // Select a factory (required — use first() to target the Add User form)
+    await page.locator('label:has-text("Modesto")').first().click();
     await page.click('button:has-text("Add User")');
     await expect(page.locator(`text=${email}`)).toBeVisible({ timeout: 10000 });
   });
@@ -31,6 +33,8 @@ test.describe('User Management (Role Assignment)', () => {
     await page.fill('input[placeholder="Enter full name"]', 'Login Test');
     await page.fill('input[placeholder="user@gallo.com"]', email);
     await page.fill('input[placeholder="Enter password"]', 'mypassword');
+    // Select a factory (required — use first() to target the Add User form)
+    await page.locator('label:has-text("Modesto")').first().click();
     await page.click('button:has-text("Add User")');
     await expect(page.locator(`text=${email}`)).toBeVisible({ timeout: 15000 });
 
@@ -47,6 +51,8 @@ test.describe('User Management (Role Assignment)', () => {
     await page.fill('input[placeholder="Enter full name"]', 'RoleChg User');
     await page.fill('input[placeholder="user@gallo.com"]', email);
     await page.fill('input[placeholder="Enter password"]', 'test123');
+    // Select a factory (required — use first() to target the Add User form)
+    await page.locator('label:has-text("Modesto")').first().click();
     await page.click('button:has-text("Add User")');
     await expect(page.locator(`text=${email}`)).toBeVisible();
 
@@ -70,6 +76,8 @@ test.describe('User Management (Role Assignment)', () => {
     await page.fill('input[placeholder="Enter full name"]', 'Delete Me');
     await page.fill('input[placeholder="user@gallo.com"]', email);
     await page.fill('input[placeholder="Enter password"]', 'test123');
+    // Select a factory (required — use first() to target the Add User form)
+    await page.locator('label:has-text("Modesto")').first().click();
     await page.click('button:has-text("Add User")');
     await expect(page.locator(`text=${email}`)).toBeVisible();
 
@@ -99,6 +107,8 @@ test.describe('User Management (Role Assignment)', () => {
     await page.fill('input[placeholder="Enter full name"]', 'Keep Me');
     await page.fill('input[placeholder="user@gallo.com"]', email);
     await page.fill('input[placeholder="Enter password"]', 'test123');
+    // Select a factory (required — use first() to target the Add User form)
+    await page.locator('label:has-text("Modesto")').first().click();
     await page.click('button:has-text("Add User")');
     await expect(page.locator(`text=${email}`)).toBeVisible();
 
