@@ -32,7 +32,7 @@ The `GET /api/checklists` endpoint applies factory filtering for operators autom
 
 ## Factory Management
 
-Admins can create and delete factories via `POST/DELETE /api/factories`. The RoleAssignment page shows factory assignment buttons for each operator — toggle a factory on/off to control which facilities the operator can access.
+Admins can create and delete factories via `POST/DELETE /api/factories`. The **Manage Factories** page (accessible from Settings) lets admins add new factories with a name and location, and delete existing ones with a confirmation modal. The RoleAssignment page shows factory assignment checkboxes for each user — check/uncheck a factory to control which facilities the user can access. When creating a new user, at least one factory must be selected before the "Add User" button is enabled.
 
 ## See also
 

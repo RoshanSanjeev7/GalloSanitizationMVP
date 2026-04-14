@@ -49,6 +49,7 @@ export default function Settings() {
         {user.role === 'admin' && (
           <div className={`card ${s.navCard}`} style={{ maxWidth: 400, margin: '16px auto 0' }}>
             <Link to="/settings/roles">Edit Role Assignments</Link>
+            <Link to="/settings/factories">Manage Factories</Link>
             <Link to="/settings/audit">Audit Log</Link>
           </div>
         )}
