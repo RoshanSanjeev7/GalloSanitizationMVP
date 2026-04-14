@@ -137,59 +137,42 @@ E2E tests are in `/tests/` with helpers in `tests/helpers.ts`.
 - Frontend uses CSS Modules for component styling
 - API client (`services/api.ts`) auto-injects JWT and handles 401 logout
 
-## Obsidian Knowledge Vault
+## Wiki (LLM-Maintained Knowledge Base)
 
-A hand-crafted Obsidian vault lives at `graphify-out/obsidian/` with 32+ pages and 238+ backlinks documenting the architecture, subsystems, decisions, and runbooks.
+A persistent, compounding wiki lives at `wiki/`. It documents the codebase architecture, subsystems, decisions, and dev knowledge. The LLM maintains it — you read it.
 
-### WHEN TO READ THE VAULT (MANDATORY)
+**Read `wiki/schema.md` for the full maintenance protocol.** Key points below.
 
-Before answering questions about the codebase architecture, design decisions, how subsystems work, or why something was built a certain way — **read the relevant vault page first.** The vault contains context that isn't obvious from reading code alone (design rationale, concurrency scenarios, deployment constraints).
+### WHEN TO READ (MANDATORY)
 
-- Question about how checklists work → read `graphify-out/obsidian/Checklist Workflow.md`
-- Question about race conditions → read `graphify-out/obsidian/Concurrency Scenarios.md` and `graphify-out/obsidian/Optimistic Concurrency.md`
-- Question about WebSocket → read `graphify-out/obsidian/WebSocket System.md`
-- Question about auth → read `graphify-out/obsidian/Authentication.md`
-- Question about why a decision was made → check the relevant decision page (ADR) in `graphify-out/obsidian/`
-- Not sure which page → read `graphify-out/obsidian/Home.md` for the index
+Before answering questions about architecture, decisions, or how subsystems work — **read `wiki/index.md` first to find the relevant page, then read that page.** The wiki contains context not obvious from code alone.
 
-### WHEN TO UPDATE THE VAULT (MANDATORY)
+### WHEN TO UPDATE (MANDATORY)
 
-After completing any of these, you MUST update the vault:
+After ANY of these, update the wiki:
+1. **Code change** → Update affected pages, append to `wiki/log.md`
+2. **New feature/subsystem** → Create page in appropriate subdirectory, update `wiki/index.md`
+3. **Question that produced useful analysis** → File it as a page (DevLog or Decision)
+4. **Bug investigation** → Add to DevLog
 
-1. **New feature or subsystem** → Create a new page AND update related existing pages with backlinks in both directions
-2. **New API endpoint** → Update `API Endpoints.md`
-3. **New DynamoDB table or field** → Update `DynamoDB Tables.md`
-4. **New architectural decision** → Create a new decision page and link from relevant subsystem pages
-5. **Changed behavior** (e.g., dropdown → buttons) → Update `Frontend Pages.md` and any affected subsystem pages
-6. **Bug fix that changes how something works** → Update the relevant subsystem page
-7. **New environment variable** → Update `Environment Variables.md`
+If trivial (typo, CSS tweak) — skip.
 
-If the change is trivial (typo fix, test-only change, CSS tweak) — skip the vault update.
+### Structure
+```
+wiki/
+  index.md           # Content catalog — read this first
+  log.md             # Chronological record of all changes
+  schema.md          # Full conventions and workflows
+  Architecture/      # 8 pages: System, DynamoDB, API, Auth, Factories, Workflow, Pages, Roles
+  Subsystems/        # 12 pages: WebSocket, Concurrency, AutoSave, Presence, Toast, Offline, Audit, etc.
+  Decisions/         # 8 pages: Concurrency Scenarios, Admin Safety, JWT, Known Limitations, etc.
+  Runbooks/          # 5 pages: Setup, Credentials, Tests, Troubleshooting, Env Vars
+  DevLog/            # Session notes: what was built, decisions made, patterns learned
+```
 
-### Vault Rules (MUST FOLLOW when modifying the vault)
+### Graphify AST Graph
 
-When adding or updating vault pages:
-
-1. **Every `[[backlink]]` must point to a page that exists.** Check the filename matches exactly. No broken links.
-2. **Every backlink must connect ideas that genuinely relate.** Ask: "Would clicking this link teach me something useful in this context?" If not, don't add it.
-3. **Embed backlinks in prose, not as standalone lists.** Write: "The [[Optimistic Concurrency]] system prevents this via conditional writes." NOT: "- [[Optimistic Concurrency]]"
-4. **Add a "See also" section** at the bottom with 2-3 related pages that provide useful next reading.
-5. **No page should exist unless a developer would actually read it.** No auto-generated function-level pages. Every page should have real content.
-6. **When adding a new feature**, update the relevant existing pages AND create a new page if the feature is substantial enough. Add backlinks in BOTH directions (the new page links to existing ones, and existing pages link back).
-7. **Tag pages** in YAML frontmatter: #architecture, #backend, #frontend, #database, #decision, #runbook, #release
-
-### Vault Structure (32 pages)
-- **Home.md** — entry point
-- **Tier 2 (Core):** System Architecture, Checklist Workflow, DynamoDB Tables, Authentication, API Endpoints, Frontend Pages
-- **Tier 3 (Subsystems):** WebSocket System, Optimistic Concurrency, Per-Machine Auto-Save, Auto-Save and Conflict Resolution, Presence Indicators, Toast Notifications, Offline Queue, Audit Log, Input Validation, Rate Limiting, Image Handling, Roles and Permissions
-- **Tier 4 (Decisions):** Concurrency Scenarios, Admin Safety, Email Uniqueness, JWT Design, Denied Is Final, WebSocket Adapter Pattern, Release 1 Bulletproofing, Release 2 Real-time, Environment Variables
-- **Tier 5 (Runbooks):** Local Dev Setup, Demo Credentials, Running Tests, Troubleshooting
-
-### Graphify Knowledge Graph
-
-The AST-extracted graph data also lives at `graphify-out/`:
-- **Graph data:** `graphify-out/graph.json` — 371 nodes, 376 edges
-- **Interactive HTML:** `graphify-out/graph.html` — open in browser to visualize
-- **Audit report:** `graphify-out/GRAPH_REPORT.md` — community structure, god nodes
-
-To rebuild after code changes: `/graphify . --update`
+The code-level AST graph lives at `graphify-out/`:
+- `graphify-out/graph.json` — 371 nodes, 376 edges
+- `graphify-out/graph.html` — interactive visualization
+- Rebuild: `/graphify . --update`
