@@ -64,7 +64,11 @@ Template validation ensures at least one machine with at least one category with
 
 ## Settings (`/settings`)
 
-User profile page. Shows name, email, and role. Admins see links to Role Assignment and Audit Log.
+User profile page. Shows name, email, and role. Admins see links to Role Assignment, Manage Factories, and Audit Log.
+
+## ManageFactories (`/settings/factories`)
+
+Admin-only. Create and delete [[Factories]]. Shows a form with name and location fields, and a list of existing factories with delete buttons. Delete shows a confirmation modal.
 
 ## RoleAssignment (`/settings/roles`)
 
