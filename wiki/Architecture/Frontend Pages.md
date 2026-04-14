@@ -61,3 +61,4 @@ Admin-only. Filterable table of all [[Audit Log]] entries. Filters by user, acti
 - [[Checklist Workflow]] -- the business flow these pages implement
 - [[Auto-Save and Conflict Resolution]] -- the save lifecycle on ChecklistFill
 - [[WebSocket System]] -- presence and real-time sync powering dashboard and fill pages
+- [[Frontend Hooks]] -- the 6 custom hooks used across these pages

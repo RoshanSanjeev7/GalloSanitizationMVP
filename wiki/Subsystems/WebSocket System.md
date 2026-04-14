@@ -71,3 +71,4 @@ Route handlers retrieve the broadcaster with `req.app.get('broadcaster')`. All b
 - [[Presence Indicators]] -- what the WebSocket presence data powers in the UI
 - [[Auto-Save and Conflict Resolution]] -- how saves and WebSocket deltas interact
 - [[DynamoDB Tables]] -- the Connections table tracking active WebSocket connections
+- [[Frontend Hooks]] -- `useWebSocket`, `useChecklistSync`, `usePresenceSummary` hooks

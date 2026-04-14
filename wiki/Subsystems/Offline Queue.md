@@ -52,3 +52,5 @@ The version field in queued saves may be stale by the time they replay. If anoth
 - [[Auto-Save and Conflict Resolution]] -- when the offline queue engages in the save lifecycle
 - [[Per-Machine Auto-Save]] -- the endpoint replayed on sync
 - [[Known Limitations]] -- offline queue limitations in multi-operator scenarios
+- [[Error Handling]] -- how offline errors are caught and queued
+- [[Frontend Hooks]] -- the `useOfflineQueue` hook that wraps this subsystem
