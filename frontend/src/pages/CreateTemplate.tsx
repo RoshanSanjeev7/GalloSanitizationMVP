@@ -310,30 +310,6 @@ export default function CreateTemplate() {
 
         <div className="card" style={{ marginBottom: 24 }}>
           <h3 style={{ fontSize: 15, marginBottom: 16 }}>Select a Line</h3>
-          {factories.length > 1 && (
-            <div className="form-group">
-              <label className="form-label">Factory</label>
-              <select
-                className="form-select"
-                value={factoryFilter}
-                onChange={(e) => {
-                  setFactoryFilter(e.target.value);
-                  setLineId('');
-                  setEditingId(null);
-                  setTitle('');
-                  setMachines([emptyMachine()]);
-                  setActiveMachine(0);
-                }}
-              >
-                <option value="">Select a Factory</option>
-                {factories.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name} — {f.location}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
           <div className="form-group">
             <label className="form-label">Production Line</label>
             <select

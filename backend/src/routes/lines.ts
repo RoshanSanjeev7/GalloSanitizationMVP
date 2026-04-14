@@ -1,14 +1,22 @@
 import { Router } from 'express';
 import { v4 as uuid } from 'uuid';
-import { getAllLines, putLine } from '../data/dynamo.js';
+import { getAllLines, putLine, getUser } from '../data/dynamo.js';
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 
 const router = Router();
 
 router.use(authMiddleware);
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req: AuthRequest, res) => {
   const lines = await getAllLines();
+  // Filter lines by user's assigned factories
+  const user = await getUser(req.userId!);
+  if (user?.factoryIds && user.factoryIds.length > 0) {
+    const factorySet = new Set(user.factoryIds);
+    const filtered = lines.filter(l => !l.factoryId || factorySet.has(l.factoryId));
+    res.json(filtered);
+    return;
+  }
   res.json(lines);
 });
 

@@ -85,8 +85,8 @@ router.get('/', async (req: AuthRequest, res) => {
 
   checklists.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
-  // Scope operators to their assigned factories (admins see all)
-  if (req.userRole === 'operator') {
+  // Scope all users (operators AND admins) to their assigned factories
+  {
     const currentUser = await getUser(req.userId!);
     if (currentUser?.factoryIds && currentUser.factoryIds.length > 0) {
       const factorySet = new Set(currentUser.factoryIds);

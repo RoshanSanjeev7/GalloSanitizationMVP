@@ -458,25 +458,6 @@ export default function AdminDashboard() {
             onChange={(e) => handleSearchChange(e.target.value)}
             style={{ flex: 1 }}
           />
-          {factories.length > 1 && (
-            <select
-              className="form-select"
-              value={factoryFilter}
-              onChange={(e) => {
-                setFactoryFilter(e.target.value);
-                setLineFilter('');
-                handleLineFilterChange('');
-              }}
-              style={{ width: 160, flex: 'none' }}
-            >
-              <option value="">Select a Factory</option>
-              {factories.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          )}
           <select
             className="form-select"
             value={lineFilter}
