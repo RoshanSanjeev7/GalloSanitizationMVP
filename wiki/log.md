@@ -1,12 +1,18 @@
 ---
 tags: [meta]
 created: 2026-04-09
-updated: 2026-04-13
+updated: 2026-04-14
 ---
 
 # Log
 
 Chronological record of all wiki changes. Newest entries at the top.
+
+## [2026-04-14] lint | Fixed contradictions and added solution designs
+
+Fixed admin scoping contradiction in Roles page. Marked ProtectedAdminRoute as resolved.
+Added demo user factory assignments. Added hierarchy diagram to Factories.
+Added recommended fix designs for P0/P1 Known Limitations.
 
 ## [2026-04-13] lint | Wiki gaps filled from audit
 

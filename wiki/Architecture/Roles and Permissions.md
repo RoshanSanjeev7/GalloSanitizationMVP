@@ -1,7 +1,7 @@
 ---
 tags: [architecture]
 created: 2026-04-09
-updated: 2026-04-13
+updated: 2026-04-14
 ---
 
 # Roles and Permissions
@@ -32,7 +32,7 @@ Everything operators can do, plus:
 - **Manage factories:** Create and delete [[Factories]].
 - **Export PDF:** Generate downloadable PDF reports (see [[PDF Export]]).
 - **View audit log:** Access the [[Audit Log]] page.
-- **View all checklists:** AdminDashboard shows checklists from all operators.
+- **View factory-scoped checklists:** AdminDashboard shows checklists from all operators within the admin's assigned [[Factories]]. The backend filters `GET /checklists` by `user.factoryIds` for ALL users, including admins -- admins do NOT see checklists from factories they are not assigned to.
 
 ## Backend Enforcement
 
@@ -51,7 +51,7 @@ Three mechanisms on the frontend:
 2. **`HomeRedirect`** -- the `/` route checks `user.role`: admins go to `/admin`, operators stay on `/`.
 3. **Conditional rendering** -- UI elements like "Delete", "Approve/Deny" are only rendered when `user.role === 'admin'`. This is purely cosmetic -- the backend is the true enforcement layer.
 
-There is no `AdminRoute` wrapper on the frontend. An operator who navigates directly to `/admin` will see the AdminDashboard with operator-filtered data, but admin-only actions fail with 403 on the backend. See [[Known Limitations]] for this gap.
+4. **`ProtectedAdminRoute`** -- wraps admin-only routes (`/admin`, `/settings/roles`, `/settings/factories`, `/settings/audit`, `/templates/create`, `/checklist/:id/review`). Redirects non-admin users to `/` if they navigate directly to an admin route.
 
 ## See also
 
