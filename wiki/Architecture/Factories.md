@@ -1,7 +1,7 @@
 ---
 tags: [architecture]
 created: 2026-04-13
-updated: 2026-04-13
+updated: 2026-04-14
 ---
 
 # Factories
@@ -18,6 +18,21 @@ The seed data includes four Gallo facilities:
 | Livingston Winery | Livingston, CA | Line 101, 102 |
 | Fresno Facility | Fresno, CA | Line 201, 202 |
 | Dry Creek Vineyard | Healdsburg, CA | Line 301 |
+
+## Data Hierarchy
+
+```
+Factory (Modesto Plant)
+  +-- Line 91
+  |    +-- Template: Weekly Deep Clean Checklist
+  |         +-- Checklist (in_progress, submitted, approved, denied)
+  +-- Line 92
+  |    +-- Template: Weekly Deep Clean Checklist
+  +-- Line 93
+       +-- Template: Weekly Deep Clean Checklist
+```
+
+Each factory contains production lines. Each line has one or more templates. Each template can generate checklists that move through the [[Checklist Workflow]] lifecycle. The `factoryId` is stamped on checklists at creation time to enable efficient scoped queries without joining through the line.
 
 ## How Factory Scoping Works
 
