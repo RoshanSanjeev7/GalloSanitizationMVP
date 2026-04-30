@@ -419,6 +419,19 @@ async function deleteChecklist(id: string): Promise<void> {
 }
 
 // ─── Images ────────────────────────────────────────────────────────
+/**
+ * Upload images for a checklist item using the presigned-URL flow:
+ *   1. POST /presign with file metadata → server returns one presigned
+ *      PUT URL per file.
+ *   2. PUT each file directly to S3 against its URL (no auth header —
+ *      the signature embeds the auth, and bytes never touch the API).
+ *   3. POST /finalize with the keys → server validates ownership,
+ *      atomically appends them to the checklist record, broadcasts WS.
+ *
+ * If the new path fails (older backend without /presign, network issue
+ * with S3 directly), fall back to the legacy multipart endpoint so users
+ * never see a hard failure during the rollout.
+ */
 async function uploadImages(
   checklistId: string,
   machineIdx: number,
@@ -427,26 +440,88 @@ async function uploadImages(
   files: File[],
 ): Promise<{ images: string[] }> {
   const token = getToken();
-  const formData = new FormData();
-  formData.append('machineIdx', String(machineIdx));
-  formData.append('catIdx', String(catIdx));
-  formData.append('itemIdx', String(itemIdx));
-  files.forEach((file) => formData.append('images', file));
+  const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
-  const res = await fetch(`${API_BASE}/checklists/${checklistId}/images`, {
-    method: 'POST',
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: formData,
-  });
+  try {
+    // Phase 1: presign.
+    const presignRes = await fetch(`${API_BASE}/checklists/${checklistId}/images/presign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader },
+      body: JSON.stringify({
+        machineIdx,
+        catIdx,
+        itemIdx,
+        files: files.map((f) => ({ name: f.name, mimeType: f.type, size: f.size })),
+      }),
+    });
+    if (!presignRes.ok) {
+      // 404 means an older backend without the new route; explicitly
+      // fall through. Any other failure (400, 403) is a real validation
+      // error and shouldn't be papered over with a slow fallback.
+      if (presignRes.status === 404) throw new Error('PRESIGN_NOT_AVAILABLE');
+      const data = await presignRes.json().catch(() => ({}));
+      throw new Error(data.error || 'Upload presign failed');
+    }
+    const { uploads } = (await presignRes.json()) as {
+      uploads: { key: string; putUrl: string; contentType: string }[];
+    };
+    if (uploads.length !== files.length) {
+      throw new Error('Presign response did not match file count');
+    }
 
-  if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || 'Upload failed');
+    // Phase 2: PUT each file straight to S3. Run in parallel for speed.
+    await Promise.all(
+      uploads.map((u, i) => {
+        const file = files[i];
+        if (!file) throw new Error('File array shrank during upload');
+        return fetch(u.putUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': u.contentType },
+          body: file,
+        }).then((r) => {
+          if (!r.ok) throw new Error(`S3 upload failed for ${file.name}`);
+        });
+      }),
+    );
+
+    // Phase 3: finalize.
+    const finalizeRes = await fetch(`${API_BASE}/checklists/${checklistId}/images/finalize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader },
+      body: JSON.stringify({
+        machineIdx,
+        catIdx,
+        itemIdx,
+        keys: uploads.map((u) => u.key),
+      }),
+    });
+    if (!finalizeRes.ok) {
+      const data = await finalizeRes.json().catch(() => ({}));
+      throw new Error(data.error || 'Upload finalize failed');
+    }
+    return finalizeRes.json();
+  } catch (err) {
+    // Fallback: legacy multipart endpoint. Triggered for "presign not
+    // available" specifically; a real validation failure already threw.
+    if (!(err instanceof Error) || err.message !== 'PRESIGN_NOT_AVAILABLE') throw err;
+
+    const formData = new FormData();
+    formData.append('machineIdx', String(machineIdx));
+    formData.append('catIdx', String(catIdx));
+    formData.append('itemIdx', String(itemIdx));
+    files.forEach((file) => formData.append('images', file));
+
+    const res = await fetch(`${API_BASE}/checklists/${checklistId}/images`, {
+      method: 'POST',
+      headers: { ...authHeader },
+      body: formData,
+    });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.error || 'Upload failed');
+    }
+    return res.json();
   }
-
-  return res.json();
 }
 
 async function getImageUrl(checklistId: string, key: string): Promise<string> {

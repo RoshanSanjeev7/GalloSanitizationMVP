@@ -1,7 +1,7 @@
 ---
 tags: [architecture]
 created: 2026-04-09
-updated: 2026-04-13
+updated: 2026-04-30
 ---
 
 # System Architecture
@@ -26,9 +26,15 @@ Vite's dev server proxies `/api` requests to port 4000, so the frontend never ta
 
 Express handles all HTTP routing, organized into route files by resource: `auth.ts`, `users.ts`, `lines.ts`, `templates.ts`, `checklists.ts`, `images.ts`, and `audit.ts`. Every route file applies `authMiddleware` (JWT verification), and write operations on admin-only resources additionally use `adminOnly`. See [[Authentication]] for how these middleware functions work.
 
+The Express app is constructed in `backend/src/app.ts` via a pure `createApp()` factory — no `.listen()`, no seed, no broadcaster init. Two entry points consume the factory:
+- **`backend/src/index.ts`** -- long-lived dev server. Calls `seedIfEmpty()`, `app.listen()`, and `LocalWsBroadcaster.init(server)`. This is what `npm run dev` runs.
+- **`backend/src/lambda-api.ts`** -- AWS Lambda handler wrapping the same app via `serverless-http`. Caches the bootstrapped handler across warm invocations; instantiates `ApiGatewayBroadcaster` instead of the local one.
+
+This split means the same Express routes run unchanged in both modes — see [[2026-04-30 Lambda Readiness and WS Hardening]] for the rationale.
+
 The data layer lives in `backend/src/data/dynamo.ts`, a single file containing every database operation -- gets, puts, scans, queries, conditional writes, and transactional writes. It talks to [[DynamoDB Tables]] through table names loaded from `config.tables.*`, which default to the `Sanitization*` naming convention but are overridable via [[Environment Variables]].
 
-SQS is used for asynchronous PDF generation: when a checklist is submitted, a message is sent to `pdf-generation-queue`, which triggers a Lambda function (`lambda-pdf.ts`) to generate and cache the PDF in S3. See [[PDF Export]] for the full synchronous and asynchronous generation flow.
+SQS is used for asynchronous PDF generation: when a checklist is submitted (with `ENABLE_ASYNC_PDF=true`), a message is sent to `pdf-generation-queue`, which triggers a Lambda function (`lambda-pdf.ts`) to generate and cache the PDF in S3. See [[PDF Export]] for the full synchronous and asynchronous generation flow.
 
 The [[WebSocket System]] is initialized at server startup. `createBroadcaster(config.wsMode)` dynamically imports either `LocalWsBroadcaster` (which creates a `ws` WebSocketServer attached to the HTTP server) or `ApiGatewayBroadcaster` (which posts messages to AWS API Gateway Management API). The broadcaster instance is stored on `app` via `app.set('broadcaster', broadcaster)` and retrieved in route handlers with `req.app.get('broadcaster')`.
 
@@ -42,10 +48,34 @@ A `WebSocketProvider` wraps the entire app, establishing the WebSocket connectio
 
 ## Infrastructure (Local Dev)
 
-LocalStack runs in Docker and emulates DynamoDB, S3, and SQS. The `docker-compose.yml` mounts `localstack/init-aws.sh`, which creates all six DynamoDB tables and the S3 bucket on container start. After LocalStack is healthy, `npm run localstack:seed` runs the seed script to populate demo data (users, lines, templates). See [[Local Dev Setup]] for the full procedure.
+LocalStack runs in Docker and emulates DynamoDB, S3, and SQS. The `docker-compose.yml` mounts `localstack/init-aws.sh`, which creates all seven DynamoDB tables (six core + `SanitizationRateLimits`) and the S3 bucket on container start. After LocalStack is healthy, `npm run localstack:seed` runs the seed script to populate demo data (users, lines, templates). See [[Local Dev Setup]] for the full procedure.
+
+## Hosting Model (Production Plan)
+
+Target topology — fully serverless, scales to zero between users:
+
+```
+Browser → CloudFront → S3 (frontend assets, static)
+                    ↘ API Gateway HTTP API → Lambda (lambda-api.ts wrapping Express)
+                                              ↓
+                                   DynamoDB · S3 · SQS · CloudWatch
+                    ↘ API Gateway WebSocket → Lambda (per-route message handlers)
+                                              ↓
+                                   DynamoDB SanitizationConnections
+
+         SQS pdf-generation-queue → Lambda (lambda-pdf.ts) → S3 + DynamoDB
+         EventBridge cron → Lambda (presence summary, cleanup)
+```
+
+Cost expectation at MVP traffic: <$5/month. At a single facility (~100 users): ~$20-40/month. Crossover with always-on Fargate (~$30-80/month flat) is around 1M sustained req/day, so serverless wins at MVP-to-mid scale and Fargate becomes preferable only at sustained heavy load.
+
+Cold-start mitigation: ARM (Graviton2) Lambda, esbuild bundling with tree-shaken `@aws-sdk` imports, provisioned concurrency for the API Lambda during business hours. Image upload bypasses Lambda entirely via presigned S3 URLs (planned). PDF generation is its own Lambda kept separate from the API Lambda so PDFKit doesn't bloat login-route cold starts.
+
+See [[2026-04-30 Lambda Readiness and WS Hardening]] for the foundational changes that enable this topology.
 
 ## See also
 
 - [[DynamoDB Tables]] -- the database schema backing everything above
 - [[WebSocket System]] -- how real-time messaging works
 - [[Authentication]] -- JWT verification and middleware chain
+- [[2026-04-30 Lambda Readiness and WS Hardening]] -- devlog for the Lambda-readiness foundation

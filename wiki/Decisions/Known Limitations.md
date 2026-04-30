@@ -1,7 +1,7 @@
 ---
 tags: [decision]
 created: 2026-04-09
-updated: 2026-04-14
+updated: 2026-04-30
 ---
 
 # Known Limitations
@@ -18,9 +18,9 @@ User passwords are stored in DynamoDB without hashing. The [[Authentication]] sy
 
 **Recommended fix:** Use bcrypt with 12 salt rounds. Hash on user creation (`POST /users`) and in the seed script. Compare with `bcrypt.compare()` in the login route. No password change endpoint exists -- add `PUT /auth/password`. Migration: re-run seed with hashed passwords, or batch-update existing users with a one-time script.
 
-## In-Memory Rate Limiter -- P1
+## ~~In-Memory Rate Limiter~~ -- RESOLVED 2026-04-30
 
-The [[Rate Limiting]] middleware uses `express-rate-limit` with its default in-memory store. This works for a single-process dev server but breaks with multiple processes -- each instance maintains its own counter. Production must switch to a Redis-backed store.
+**Status: Resolved.** Production rate limiters now use a DynamoDB-backed `Store` (`backend/src/middleware/rate-limit-store.ts`) backed by the `SanitizationRateLimits` table. Atomic conditional UpdateItem ensures multi-instance / Lambda deploys share the same counters. See [[Rate Limiting]] and [[2026-04-30 Lambda Readiness and WS Hardening]].
 
 ## localStorage Token Storage -- P2
 
@@ -39,13 +39,23 @@ Two admins could theoretically delete each other simultaneously. Both `getAllUse
 - Delete EMAIL# lock item
 The condition check and delete must be in the same transaction. Alternatively: use an atomic counter in a separate "admin_count" item.
 
-## Single-Process WebSocket -- P2
+## Single-Process WebSocket -- P2 (partially mitigated)
 
-The `LocalWsBroadcaster` in the [[WebSocket Adapter Pattern]] only broadcasts to connections on the same Node.js process. If the backend were scaled horizontally, messages would not reach clients on other instances. The production path uses API Gateway WebSocket.
+The `LocalWsBroadcaster` in the [[WebSocket Adapter Pattern]] still keeps an in-memory `Map` of connections, so broadcasts on a single node only reach clients on that node. The production path is `ApiGatewayBroadcaster` which uses DynamoDB exclusively and is multi-instance safe.
 
-## Presence Ghost Users -- P2
+**Remaining work:** drop the in-memory Map in `LocalWsBroadcaster` and rely on DynamoDB only (mirroring `ApiGatewayBroadcaster`). Tracked as Task #11 in the [[2026-04-30 Lambda Readiness and WS Hardening]] follow-up.
 
-If a browser crashes without a clean WebSocket disconnect, the user's connection record persists until TTL expiry -- up to 30 minutes. During this window, the crashed user appears as a ghost in [[Presence Indicators]]. A production improvement would add server-side ping/pong detection.
+## ~~Presence Ghost Users~~ -- RESOLVED 2026-04-30
+
+**Status: Resolved.** `LocalWsBroadcaster` now drives a server-side ping every 15 seconds with a 30-second pong timeout. Connections without a recent pong are terminated and removed from both the in-memory map and DynamoDB immediately. The 30-minute TTL is now only a backstop for catastrophic failures (process crash); typical dead-connection cleanup is sub-30s. See [[WebSocket System]] and [[2026-04-30 Lambda Readiness and WS Hardening]].
+
+## ~~No WebSocket Message Validation~~ -- RESOLVED 2026-04-30
+
+**Status: Resolved.** Every inbound WS frame is validated against a Zod discriminated union (`backend/src/ws/validate.ts`) before being routed. Invalid frames return a structured error with `code` and trip a strike counter; three consecutive invalid frames close the connection. See [[WebSocket System]].
+
+## ~~No Per-WebSocket-Message Rate Limiting~~ -- RESOLVED 2026-04-30
+
+**Status: Resolved.** A token-bucket rate limiter in `backend/src/ws/limiter.ts` enforces per-(userId, messageType) limits matching the bulletproofing plan. Over-limit frames return `RATE_LIMITED` with `retryAfterMs`; sustained floods (3 hits in 60s) close the connection. See [[Rate Limiting]] and [[WebSocket System]].
 
 ## Seed Data Fragility -- P2
 
@@ -79,3 +89,4 @@ Deleting a factory (`DELETE /api/factories/:id`) hard-deletes the factory record
 - [[Environment Variables]] -- configuration that affects some of these behaviors
 - [[System Architecture]] -- the overall design context for these tradeoffs
 - [[Error Handling]] -- how these limitations manifest as error conditions
+- [[2026-04-30 Lambda Readiness and WS Hardening]] -- closed several P1/P2 items above

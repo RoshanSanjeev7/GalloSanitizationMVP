@@ -1,7 +1,7 @@
 ---
 tags: [meta]
 created: 2026-04-09
-updated: 2026-04-13
+updated: 2026-04-30
 ---
 
 # Index
@@ -10,8 +10,8 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 
 ## Architecture
 
-- [[System Architecture]] -- Monorepo overview: Express backend, React frontend, DynamoDB, S3, WebSocket
-- [[DynamoDB Tables]] -- 6 tables: Users, Lines, Templates, Checklists, Connections, AuditLog
+- [[System Architecture]] -- Monorepo overview: Express backend, React frontend, DynamoDB, S3, WebSocket; Lambda hosting model
+- [[DynamoDB Tables]] -- 7 tables: Users, Lines, Templates, Checklists, Connections, AuditLog, RateLimits
 - [[API Endpoints]] -- Complete endpoint reference for all route groups
 - [[Authentication]] -- JWT with 8h expiry, authMiddleware, adminOnly
 - [[Factories]] -- Multi-facility support: Modesto, Livingston, Fresno, Dry Creek
@@ -62,6 +62,7 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 - [[2026-04-10 Release 2 WebSocket]] -- Real-time sync, presence, toasts, offline queue, audit log
 - [[2026-04-12 Code Cleanup]] -- Constants, shared utils, type safety, error handling, naming
 - [[2026-04-13 Factory Feature]] -- Multi-facility support with scoped access
+- [[2026-04-30 Lambda Readiness and WS Hardening]] -- app.ts/lambda-api.ts split, DynamoDB rate-limit store, Zod validation + ping/pong + rate limiter on WS, async PDF wiring
 
 ## See also
 
