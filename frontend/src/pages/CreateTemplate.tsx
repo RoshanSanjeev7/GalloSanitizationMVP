@@ -55,6 +55,12 @@ export default function CreateTemplate() {
   const [creatingFactory, setCreatingFactory] = useState(false);
   const [deleteFactoryTarget, setDeleteFactoryTarget] = useState<Factory | null>(null);
   const [factoryError, setFactoryError] = useState('');
+  // Inline-edit state for an existing factory in the modal. Only one
+  // factory edits at a time; clicking another row swaps the target.
+  const [editFactoryId, setEditFactoryId] = useState<string | null>(null);
+  const [editFactoryName, setEditFactoryName] = useState('');
+  const [editFactoryLocation, setEditFactoryLocation] = useState('');
+  const [savingFactoryEdit, setSavingFactoryEdit] = useState(false);
 
   useEffect(() => {
     Promise.all([api.getLines(), api.getTemplates({ includeDeleted: 'true' }), api.getFactories()]).then(([lns, tpls, fcts]) => {
@@ -131,6 +137,38 @@ export default function CreateTemplate() {
       setFactoryError((err as Error).message);
     } finally {
       setCreatingFactory(false);
+    }
+  };
+
+  const beginEditFactory = (f: Factory) => {
+    setEditFactoryId(f.id);
+    setEditFactoryName(f.name);
+    setEditFactoryLocation(f.location);
+    setFactoryError('');
+  };
+
+  const cancelEditFactory = () => {
+    setEditFactoryId(null);
+    setEditFactoryName('');
+    setEditFactoryLocation('');
+  };
+
+  const saveEditFactory = async () => {
+    if (!editFactoryId || !editFactoryName.trim() || !editFactoryLocation.trim()) return;
+    setSavingFactoryEdit(true);
+    setFactoryError('');
+    try {
+      await api.updateFactory(editFactoryId, {
+        name: editFactoryName.trim(),
+        location: editFactoryLocation.trim(),
+      });
+      const refreshed = await api.getFactories();
+      setFactories(refreshed);
+      cancelEditFactory();
+    } catch (err) {
+      setFactoryError((err as Error).message);
+    } finally {
+      setSavingFactoryEdit(false);
     }
   };
 
@@ -665,30 +703,85 @@ export default function CreateTemplate() {
             {factories.length === 0 ? (
               <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>No factories yet.</p>
             ) : (
-              factories.map((f) => (
-                <div
-                  key={f.id}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    padding: '10px 0',
-                    borderBottom: '1px solid var(--border-light)',
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{f.name}</div>
-                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.location}</div>
-                  </div>
-                  <button
-                    className="btn btn-red-outline btn-sm"
-                    style={{ fontSize: 11, padding: '4px 10px' }}
-                    onClick={() => setDeleteFactoryTarget(f)}
+              factories.map((f) => {
+                const isEditing = editFactoryId === f.id;
+                return (
+                  <div
+                    key={f.id}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '10px 0',
+                      borderBottom: '1px solid var(--border-light)',
+                    }}
                   >
-                    Delete
-                  </button>
-                </div>
-              ))
+                    {isEditing ? (
+                      <>
+                        <div style={{ display: 'flex', flex: 1, gap: 6, flexWrap: 'wrap' }}>
+                          <input
+                            className="form-input"
+                            value={editFactoryName}
+                            onChange={(e) => setEditFactoryName(e.target.value)}
+                            placeholder="Name"
+                            style={{ flex: 1, minWidth: 110, fontSize: 13 }}
+                            autoFocus
+                          />
+                          <input
+                            className="form-input"
+                            value={editFactoryLocation}
+                            onChange={(e) => setEditFactoryLocation(e.target.value)}
+                            placeholder="Location"
+                            style={{ flex: 1, minWidth: 110, fontSize: 13 }}
+                          />
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-primary btn-sm"
+                            style={{ fontSize: 11, padding: '4px 10px' }}
+                            onClick={saveEditFactory}
+                            disabled={!editFactoryName.trim() || !editFactoryLocation.trim() || savingFactoryEdit}
+                          >
+                            {savingFactoryEdit ? 'Saving…' : 'Save'}
+                          </button>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            style={{ fontSize: 11, padding: '4px 10px' }}
+                            onClick={cancelEditFactory}
+                            disabled={savingFactoryEdit}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13 }}>{f.name}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.location}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          <button
+                            className="btn btn-outline btn-sm"
+                            style={{ fontSize: 11, padding: '4px 10px' }}
+                            onClick={() => beginEditFactory(f)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn btn-red-outline btn-sm"
+                            style={{ fontSize: 11, padding: '4px 10px' }}
+                            onClick={() => setDeleteFactoryTarget(f)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
 
