@@ -1,12 +1,16 @@
 ---
 tags: [meta]
 created: 2026-04-09
-updated: 2026-04-14
+updated: 2026-04-30
 ---
 
 # Log
 
 Chronological record of all wiki changes. Newest entries at the top.
+
+## [2026-04-30] feature | Lambda readiness + WS hardening
+
+Added [[2026-04-30 Lambda Readiness and WS Hardening]] devlog entry. Updated [[WebSocket System]] with validation, ping/pong, JWT recheck, origin allowlist, per-IP cap, rate limiter, graceful shutdown, and `WsDebugPanel` sections. Updated [[Rate Limiting]] with the DynamoDB-backed Store and the WS rate limiter pointer. Updated [[PDF Export]] — async path is now wired (SQS publish + Lambda idempotency + presigned-URL status endpoint + frontend status-poll). Updated [[System Architecture]] with the `app.ts` / `lambda-api.ts` split and the production Lambda topology. Added `SanitizationRateLimits` to [[DynamoDB Tables]] (now 7 tables). [[Known Limitations]]: closed in-memory rate limiter, presence ghost users, no WS message validation, no per-WS rate limiting; partially mitigated single-process WebSocket.
 
 ## [2026-04-14] lint | Fixed contradictions and added solution designs
 

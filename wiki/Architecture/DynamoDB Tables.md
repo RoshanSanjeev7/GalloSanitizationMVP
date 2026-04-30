@@ -1,12 +1,12 @@
 ---
 tags: [architecture]
 created: 2026-04-09
-updated: 2026-04-13
+updated: 2026-04-30
 ---
 
 # DynamoDB Tables
 
-The application uses six DynamoDB tables, all created by `localstack/init-aws.sh` on container startup. Table names are configurable via [[Environment Variables]] but default to the `Sanitization*` prefix.
+The application uses seven DynamoDB tables, all created by `localstack/init-aws.sh` on container startup. Table names are configurable via [[Environment Variables]] but default to the `Sanitization*` prefix.
 
 ## SanitizationUsers
 
@@ -121,9 +121,21 @@ This table backs the [[WebSocket System]]. Each WebSocket connection gets a reco
 
 See [[Audit Log]] for what gets logged and how the frontend displays it.
 
+## SanitizationRateLimits
+
+| Attribute | Type | Notes |
+|-----------|------|-------|
+| `pk` (PK) | String | Rate-limit key, prefixed `rl:` (e.g. `rl:ip:1.2.3.4`) |
+| `count` | Number | Hits accumulated in the current window |
+| `resetAt` | Number | Epoch ms when the current window expires |
+| `ttl` | Number | Epoch seconds — DynamoDB auto-evicts expired counters |
+
+No GSIs. Used by `backend/src/middleware/rate-limit-store.ts` as the `Store` for `express-rate-limit` in production. See [[Rate Limiting]] for why this replaced the default in-memory store and how the atomic conditional UpdateItem works.
+
 ## See also
 
 - [[Optimistic Concurrency]] -- why the Checklists table needs a version field
 - [[Email Uniqueness]] -- why Users has EMAIL# lock items
 - [[WebSocket System]] -- what the Connections table tracks
+- [[Rate Limiting]] -- the RateLimits table backing express-rate-limit
 - [[DynamoDB Access Patterns]] -- which GSIs are used for what and query priority
