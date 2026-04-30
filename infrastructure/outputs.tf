@@ -23,16 +23,6 @@ output "images_bucket" {
   value       = aws_s3_bucket.images.bucket
 }
 
-output "pdfs_bucket" {
-  description = "S3 bucket for generated PDFs."
-  value       = aws_s3_bucket.pdfs.bucket
-}
-
-output "pdf_queue_url" {
-  description = "SQS queue URL for PDF generation jobs."
-  value       = aws_sqs_queue.pdf_queue.url
-}
-
 output "alerts_topic_arn" {
   description = "SNS topic ARN for CloudWatch alarms. Subscribe email/Slack/PagerDuty here."
   value       = aws_sns_topic.alerts.arn
@@ -41,11 +31,6 @@ output "alerts_topic_arn" {
 output "api_lambda_function_name" {
   description = "API Lambda function name — useful for `aws lambda update-function-code` deploys."
   value       = aws_lambda_function.api.function_name
-}
-
-output "pdf_lambda_function_name" {
-  description = "PDF Lambda function name — useful for deployment scripts."
-  value       = aws_lambda_function.pdf.function_name
 }
 
 # ─── DynamoDB table names ────────────────────────────────────────────

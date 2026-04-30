@@ -8,6 +8,10 @@ updated: 2026-04-30
 
 Chronological record of all wiki changes. Newest entries at the top.
 
+## [2026-04-30] simplify | PDF moved client-side; server stack ripped out
+
+After the first AWS deploy surfaced two PDF problems — blank downloads (API Gateway corrupting binary bytes as UTF-8) and silent spam-click failures (rate limiter returning 429s the UI swallowed) — moved PDF generation entirely into the browser via jsPDF. Deleted: `/pdf` route + handler (~250 lines), `/pdf/status` route, `lambda-pdf.ts`, `sqs.ts`, `pdf-generator.ts`, `pdfkit` dep, `pdfLimiter`, SQS queue + DLQ, PDF Lambda, IAM role, S3 PDFs bucket, DLQ alarm, `enable_async_pdf` variable, `.afm` font-copy step. Lambda zip dropped 2.4 MB → 1.4 MB. Added `frontend/src/utils/pdf.ts` (jsPDF-based generator that mirrors the previous layout exactly). Net: zero server CPU on PDF, no rate limiting needed, sub-100ms generation. See [[2026-04-30 PDF Simplification]] for the full story.
+
 ## [2026-04-30] deploy | First AWS deployment LIVE
 
 The Terraform stack went live in account `724591801208` (`aws-cse120-capstone-01r`, UC Merced capstone). API Gateway + Lambda + DynamoDB + S3 SPA + SQS + CloudWatch alarms — 41 resources. Verified end-to-end: `/health` responds, admin login returns a valid JWT, authenticated `/api/checklists` paginates the 56 seeded items, all 4 factories listed. SPA hosted on raw S3 website endpoint at `gallo-sanitization-dev-frontend-724591801208.s3-website-us-west-2.amazonaws.com`. AWS Budget set to $50/mo with email at 50% / 100%. Three deploy-time fixes (AWS_REGION reserved, S3 lifecycle filter, render-helpers TS cast) committed in `5a16a3b`. Two operational gotchas documented in [[Production Deployment]] (LOCALSTACK_ENDPOINT="" for seed, scan --select COUNT for verification). Full devlog at [[2026-04-30 First AWS Deployment]]. Real-time WS still off (API Gateway WebSocket not yet provisioned); everything else functional.

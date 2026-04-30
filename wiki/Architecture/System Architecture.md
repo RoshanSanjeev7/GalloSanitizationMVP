@@ -15,10 +15,11 @@ Browser (:3000)                      Backend (:4000)
   React SPA  ──── HTTP REST ──────>  Express
   wsClient   ──── WebSocket ──────>  LocalWsBroadcaster / ApiGatewayBroadcaster
                                        |
-                                       |── DynamoDB (6 tables)
-                                       |── S3 (checklist-images bucket)
-                                       +── SQS (pdf-generation-queue)
+                                       |── DynamoDB (8 tables)
+                                       +── S3 (checklist-images bucket)
 ```
+
+PDF generation runs **client-side** (jsPDF in the browser) — no server round-trip. See [[PDF Export]].
 
 Vite's dev server proxies `/api` requests to port 4000, so the frontend never talks to the backend directly by port in development. In production the backend serves the built frontend assets or sits behind a reverse proxy.
 
@@ -34,7 +35,7 @@ This split means the same Express routes run unchanged in both modes — see [[2
 
 The data layer lives in `backend/src/data/dynamo.ts`, a single file containing every database operation -- gets, puts, scans, queries, conditional writes, and transactional writes. It talks to [[DynamoDB Tables]] through table names loaded from `config.tables.*`, which default to the `Sanitization*` naming convention but are overridable via [[Environment Variables]].
 
-SQS is used for asynchronous PDF generation: when a checklist is submitted (with `ENABLE_ASYNC_PDF=true`), a message is sent to `pdf-generation-queue`, which triggers a Lambda function (`lambda-pdf.ts`) to generate and cache the PDF in S3. See [[PDF Export]] for the full synchronous and asynchronous generation flow.
+PDF generation runs entirely in the browser via jsPDF — no server-side route, no SQS, no S3 cache. See [[PDF Export]] and [[2026-04-30 PDF Simplification]] for why this used to be server-side and what was removed.
 
 The [[WebSocket System]] is initialized at server startup. `createBroadcaster(config.wsMode)` dynamically imports either `LocalWsBroadcaster` (which creates a `ws` WebSocketServer attached to the HTTP server) or `ApiGatewayBroadcaster` (which posts messages to AWS API Gateway Management API). The broadcaster instance is stored on `app` via `app.set('broadcaster', broadcaster)` and retrieved in route handlers with `req.app.get('broadcaster')`.
 
@@ -55,17 +56,16 @@ LocalStack runs in Docker and emulates DynamoDB, S3, and SQS. The `docker-compos
 Deployed to AWS account `724591801208` — see [[2026-04-30 First AWS Deployment]]. Fully serverless, scales to zero between users. Currently live URLs in [[Production Deployment]]:
 
 ```
-Browser → CloudFront → S3 (frontend assets, static)
+Browser → S3 website (frontend assets, static)
                     ↘ API Gateway HTTP API → Lambda (lambda-api.ts wrapping Express)
                                               ↓
-                                   DynamoDB · S3 · SQS · CloudWatch
-                    ↘ API Gateway WebSocket → Lambda (per-route message handlers)
-                                              ↓
-                                   DynamoDB SanitizationConnections
-
-         SQS pdf-generation-queue → Lambda (lambda-pdf.ts) → S3 + DynamoDB
-         EventBridge cron → Lambda (presence summary, cleanup)
+                                   DynamoDB · S3 (images) · CloudWatch
+                    ↘ (planned) API Gateway WebSocket → Lambda (per-route message handlers)
+                                                         ↓
+                                              DynamoDB SanitizationConnections
 ```
+
+PDF generation runs in the browser; no PDF Lambda, no SQS queue, no S3 cache.
 
 Cost expectation at MVP traffic: <$5/month. At a single facility (~100 users): ~$20-40/month. Crossover with always-on Fargate (~$30-80/month flat) is around 1M sustained req/day, so serverless wins at MVP-to-mid scale and Fargate becomes preferable only at sustained heavy load.
 

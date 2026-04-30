@@ -48,12 +48,6 @@ variable "lambda_api_provisioned_concurrency" {
   default     = 0
 }
 
-variable "enable_async_pdf" {
-  description = "Feature flag passed into the API Lambda. When true, POST /:id/submit publishes to SQS to trigger async PDF generation."
-  type        = bool
-  default     = true
-}
-
 # ─── Computed ────────────────────────────────────────────────────────
 # Helper local that every resource name uses, so renaming the project
 # or environment doesn't require sed across every .tf file.

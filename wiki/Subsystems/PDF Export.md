@@ -6,44 +6,53 @@ updated: 2026-04-30
 
 # PDF Export
 
-The system supports two modes of PDF generation: synchronous (direct HTTP streaming) and asynchronous (SQS queue + Lambda). Both use PDFKit to build the document, sharing the `generatePdfBuffer()` helper in `backend/src/data/pdf-generator.ts`.
+PDF generation runs **entirely in the browser**. Click "Export PDF" → jsPDF builds the document from the Checklist already loaded in the page → blob → `<a download>`. No server API call, no Lambda invocation, no S3 cache.
 
-## Synchronous Mode
+## Implementation
 
-`GET /checklists/:id/pdf` is an admin-only endpoint that generates a PDF with PDFKit and streams it directly to the HTTP response. Used as a fallback for when the async path isn't ready (e.g. checklists submitted before async rollout, or polling timed out).
+`frontend/src/utils/pdf.ts` — the canonical generator. Two exports:
 
-Important constraint: under Lambda hosting (see [[System Architecture]]), API Gateway has a 30-second hard timeout. Very large checklists may not finish streaming within that window — that's another reason to make the async path the default and the sync path the "force regenerate" admin tool.
+- **`generateChecklistPdf(checklist: Checklist): Blob`** — pure function, returns the PDF bytes. Synchronous; <100ms typical for a 50-item / 5-machine checklist.
+- **`downloadChecklistPdf(checklist: Checklist): void`** — wraps `generate*` and triggers a browser download with a sensible filename (`<lineName>-checklist-<id8>.pdf`).
 
-## Asynchronous Mode (SQS + Lambda)
+## Layout
 
-Wired up in [[2026-04-30 Lambda Readiness and WS Hardening]]:
+Mirrors what the previous server-side PDFKit renderer produced:
 
-1. **Submit triggers the queue.** When a checklist is submitted via `POST /checklists/:id/submit`, the backend publishes `{ checklistId }` to the `pdf-generation-queue` SQS queue **behind the `ENABLE_ASYNC_PDF=true` env flag**. Fire-and-forget — SQS failures are logged but never block the submit response.
-2. **Lambda generates the PDF.** `lambda-pdf.ts` consumes the SQS message, builds the PDF via `generatePdfBuffer()`, uploads to S3 at key `pdfs/<checklistId>.pdf`, and updates the checklist record with `pdfKey` and `pdfGeneratedAt`.
-3. **Idempotency guard.** Lambda checks `pdfKey` before regenerating; SQS at-least-once redelivery becomes a cheap GetItem instead of a duplicate PDF render. Re-generation is opt-in via `force: true` on the SQS payload (used by an admin "regenerate" tool not yet built).
-4. **Status endpoint serves a presigned URL.** `GET /checklists/:id/pdf/status` returns `{ ready: false, url: null }` while the Lambda is still working, then `{ ready: true, url: <presigned S3 URL> }` once `pdfKey` is set. The presigned URL is valid for 1 hour and lets the browser pull bytes directly from S3 with no round-trip through the API.
-5. **Frontend polls then downloads.** `frontend/src/services/api.ts` `downloadChecklistPdf` polls `/pdf/status` every 2 seconds for up to 30 seconds. When ready, it triggers the download via `<a download>` with the presigned URL — no Authorization header needed because the signature embeds auth. If polling times out (Lambda is slow, queue backed up, async path disabled), it falls through to the synchronous endpoint as a transparent fallback.
+- **Page 1 — Summary:** Title + status, key-value summary block (operator, contributors, start/end times, duration, completed/issues/pending counts), per-machine progress bars, and a Notes & Issues section listing every item with an `issue` set.
+- **Pages 2+ — One per machine:** Machine header with completion ratio, then categories with their tasks. Each task shows status glyph (✓ / ✗ / —), description, `completedBy` + timestamp stamp, and any `issue` text in red italic.
 
-The async path is **functional in local dev** when LocalStack's SQS queue is consumed — historically it was scaffolded but unwired; the wiring is now in place, only the Lambda runtime in LocalStack is not configured locally.
+The renderer pre-measures each item's height and atomically page-breaks before half-rendering — no item ever splits across pages.
 
-## PDF Structure
+## Why client-side
 
-The generated PDF follows a consistent layout:
+Originally the design had a server-side `/pdf` route plus an async path (SQS + Lambda + S3 cache + frontend polling). Every layer of that delivered zero value at this scale and produced real bugs:
 
-- **Page 1 -- Summary:** Operator name, contributors, start/end times, completion statistics, and machine-level progress bars showing percentage complete.
-- **Subsequent pages -- One per machine:** Each machine gets its own page with categories listed as sections containing task items with status indicators, comments, and image references.
+- **API Gateway corrupted PDFs.** The HTTP API, by default, treated the binary Lambda response as UTF-8 text. Every byte ≥ 0x80 became `0xEF 0xBF 0xBD` (the Unicode replacement character). PDFs structurally rendered (page count, layout) but had zero extractable text → users saw blank white pages. Fixable via `serverless-http`'s `binary` option, but the underlying mistake was sending bytes through a transport that wanted text.
+- **Rate-limiter UX.** A protective per-IP limit on `/pdf` returned 429 after 5 PDFs/min, but the frontend silently swallowed the error. Admins clicking Export multiple times saw "nothing happen" instead of "you're rate-limited."
+- **Architecture mismatch with intent.** The user wanted "download as fast as possible." The async path adds a 30s polling window for a cache that never warms (the seed inserts checklists without hitting `submit`, so no SQS message, so no cached PDF, so polling always times out, so the sync fallback runs anyway).
 
-## S3 Storage
+Client-side generation removes all three failure modes. PDF rendering is CPU work that doesn't need shared infrastructure for a small admin tool.
 
-Generated PDFs are stored in the same S3 bucket used for [[Image Handling]] (`checklist-images` in dev). The key follows `pdfs/<checklistId>.pdf`. Presigned URLs (via `getImageUrl()`) provide time-limited download access.
+## What's NOT here anymore
 
-## Access Control
-
-Both PDF endpoints are admin-only, enforced by the `adminOnly` middleware described in [[Roles and Permissions]]. See [[API Endpoints]] for the PDF routes.
+- Server `/pdf` route (was in `backend/src/routes/checklists.ts`)
+- Server `/pdf/status` route
+- `backend/src/lambda-pdf.ts`
+- `backend/src/data/sqs.ts`
+- `backend/src/data/pdf-generator.ts`
+- `pdfkit` dependency
+- `pdfLimiter` middleware
+- SQS `pdf-generation-queue` + DLQ (Terraform)
+- S3 `pdfs` bucket (Terraform)
+- PDF Lambda + IAM role (Terraform)
+- DLQ depth CloudWatch alarm
+- `enable_async_pdf` Terraform variable
+- `pdfKey` / `pdfGeneratedAt` fields on Checklist are still in the type but aren't written by the active codebase. Existing seed records may still have them; harmless.
 
 ## See also
 
-- [[API Endpoints]] -- the PDF-related routes in the Checklists section
-- [[System Architecture]] -- where SQS fits in the Lambda topology
-- [[Image Handling]] -- shared S3 bucket for PDFs and images
-- [[2026-04-30 Lambda Readiness and WS Hardening]] -- devlog entry for the async path wiring
+- [[2026-04-30 First AWS Deployment]] — the deploy that exposed the PDF bugs
+- [[2026-04-30 PDF Simplification]] — devlog for this rewrite
+- [[Frontend Pages]] — ChecklistDetail is the (only) page with the Export PDF button
+- [[System Architecture]] — updated to reflect the simpler topology

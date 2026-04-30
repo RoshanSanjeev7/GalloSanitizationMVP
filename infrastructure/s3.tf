@@ -3,8 +3,8 @@
 #   - frontend-assets  : the built React SPA, served via CloudFront.
 #   - checklist-images : photos uploaded directly from the browser
 #                        via presigned PUT URLs.
-#   - checklist-pdfs   : Lambda-generated PDF exports, served via
-#                        presigned GET URLs from /pdf/status.
+#   - (PDFs bucket removed — PDFs are now streamed from the sync
+#                        /pdf endpoint, not cached.)
 #
 # All buckets are private + SSE-S3. The frontend bucket is fronted by
 # CloudFront (provisioned in cloudfront.tf — TODO) which terminates
@@ -118,43 +118,7 @@ resource "aws_s3_bucket_cors_configuration" "images" {
   }
 }
 
-# ── Checklist PDFs ───────────────────────────────────────────────────
-# Lifecycle rule: drop PDFs after 90 days. Regenerating them is cheap
-# (idempotent Lambda) so we don't pay storage for old exports nobody
-# is downloading.
-resource "aws_s3_bucket" "pdfs" {
-  bucket        = "${local.name_prefix}-pdfs-${local.bucket_suffix}"
-  force_destroy = var.environment != "prod"
-}
-
-resource "aws_s3_bucket_public_access_block" "pdfs" {
-  bucket                  = aws_s3_bucket.pdfs.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "pdfs" {
-  bucket = aws_s3_bucket.pdfs.id
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
-resource "aws_s3_bucket_lifecycle_configuration" "pdfs" {
-  bucket = aws_s3_bucket.pdfs.id
-
-  rule {
-    id     = "expire-old-pdfs"
-    status = "Enabled"
-    # Empty filter = apply rule to every object in the bucket. Required
-    # in aws provider 5.x+ which deprecated the old prefix-less form.
-    filter {}
-    expiration {
-      days = 90
-    }
-  }
-}
+# Note: the `pdfs` S3 bucket and its dependents (public-access-block,
+# encryption, lifecycle) were removed when the async PDF path was
+# decommissioned. PDFs are now generated on demand by the API Lambda
+# and streamed back in the response — no storage layer.
