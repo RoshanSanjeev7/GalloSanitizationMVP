@@ -231,10 +231,10 @@ async function getLines(): Promise<Line[]> {
   return requestWithRetry<Line[]>('/lines');
 }
 
-async function createLine(name: string): Promise<Line> {
+async function createLine(name: string, factoryId?: string): Promise<Line> {
   return request<Line>('/lines', {
     method: 'POST',
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, factoryId }),
   });
 }
 
