@@ -209,6 +209,13 @@ async function createFactory(data: { name: string; location: string }): Promise<
   });
 }
 
+async function updateFactory(id: string, data: { name?: string; location?: string }): Promise<Factory> {
+  return request<Factory>(`/factories/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
 async function deleteFactory(id: string): Promise<void> {
   await request(`/factories/${id}`, { method: 'DELETE' });
 }
@@ -600,6 +607,7 @@ const api = {
   deleteUser,
   getFactories,
   createFactory,
+  updateFactory,
   deleteFactory,
   updateUserFactories,
   getLines,
