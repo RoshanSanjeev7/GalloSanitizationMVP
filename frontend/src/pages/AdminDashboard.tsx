@@ -52,6 +52,7 @@ export default function AdminDashboard() {
   const [notifHasMore, setNotifHasMore] = useState(false);
   const [notifTotal, setNotifTotal] = useState(0);
   const [notifLoadingMore, setNotifLoadingMore] = useState(false);
+  const [notifSort, setNotifSort] = useState<'newest' | 'oldest'>('newest');
   const notifRef = useRef<HTMLDivElement>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   const abortRef = useRef<AbortController | null>(null);
@@ -328,39 +329,72 @@ export default function AdminDashboard() {
                   background: '#fff', borderRadius: 12, boxShadow: '0 8px 32px rgba(0,0,0,.15)',
                   border: '1px solid #e5e5e5', zIndex: 100, maxHeight: 440, overflowY: 'auto',
                 }}>
-                  <div style={{ padding: '14px 16px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontWeight: 600, fontSize: 15 }}>Activity ({notifications.length})</span>
-                    {unviewedCount > 0 && (
+                  <div style={{ padding: '14px 16px', borderBottom: '1px solid #eee' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontWeight: 600, fontSize: 15 }}>Activity ({notifications.length})</span>
+                      {unviewedCount > 0 && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await api.markAllViewed();
+                            // Optimistically update all items as viewed
+                            const now = new Date().toISOString();
+                            const name = user?.name || 'Admin';
+                            setNotifications((prev) =>
+                              prev.map((n) =>
+                                !n.viewedAt
+                                  ? { ...n, viewedAt: now, viewedBy: name }
+                                  : n,
+                              ),
+                            );
+                          }}
+                          style={{
+                            background: 'none', border: 'none', color: 'var(--primary, #5B2333)',
+                            fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '2px 0',
+                          }}
+                        >
+                          Mark all as read
+                        </button>
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 8, fontSize: 11 }}>
+                      <span style={{ color: '#888', alignSelf: 'center' }}>Sort:</span>
                       <button
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          await api.markAllViewed();
-                          // Optimistically update all items as viewed
-                          const now = new Date().toISOString();
-                          const name = user?.name || 'Admin';
-                          setNotifications((prev) =>
-                            prev.map((n) =>
-                              !n.viewedAt
-                                ? { ...n, viewedAt: now, viewedBy: name }
-                                : n,
-                            ),
-                          );
-                        }}
+                        onClick={(e) => { e.stopPropagation(); setNotifSort('newest'); }}
                         style={{
-                          background: 'none', border: 'none', color: 'var(--primary, #5B2333)',
-                          fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: '2px 0',
+                          background: notifSort === 'newest' ? '#5B2333' : '#fff',
+                          color: notifSort === 'newest' ? '#fff' : '#333',
+                          border: '1px solid #ddd', borderRadius: 6,
+                          padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
                         }}
                       >
-                        Mark all as read
+                        Newest
                       </button>
-                    )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setNotifSort('oldest'); }}
+                        style={{
+                          background: notifSort === 'oldest' ? '#5B2333' : '#fff',
+                          color: notifSort === 'oldest' ? '#fff' : '#333',
+                          border: '1px solid #ddd', borderRadius: 6,
+                          padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        }}
+                      >
+                        Oldest
+                      </button>
+                    </div>
                   </div>
                   {notifications.length === 0 && (
                     <div style={{ padding: '20px 16px', color: '#999', fontSize: 13, textAlign: 'center' }}>
                       No recent activity
                     </div>
                   )}
-                  {notifications.map((n) => {
+                  {[...notifications].sort((a, b) => {
+                    // Sort by the date the user actually sees on the row:
+                    // submittedAt for submitted/pending, startTime for in_progress.
+                    const ta = new Date(a.submittedAt || a.startTime).getTime();
+                    const tb = new Date(b.submittedAt || b.startTime).getTime();
+                    return notifSort === 'newest' ? tb - ta : ta - tb;
+                  }).map((n) => {
                     const isNew = !n.viewedAt;
                     return (
                     <div
