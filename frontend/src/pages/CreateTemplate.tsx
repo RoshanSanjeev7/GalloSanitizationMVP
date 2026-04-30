@@ -46,6 +46,15 @@ export default function CreateTemplate() {
   const [creatingLine, setCreatingLine] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Manage-factories modal state. Co-located here (vs. its own page)
+  // because admins almost always manage factories in the same flow as
+  // setting one for a template.
+  const [showFactoryModal, setShowFactoryModal] = useState(false);
+  const [newFactoryName, setNewFactoryName] = useState('');
+  const [newFactoryLocation, setNewFactoryLocation] = useState('');
+  const [creatingFactory, setCreatingFactory] = useState(false);
+  const [deleteFactoryTarget, setDeleteFactoryTarget] = useState<Factory | null>(null);
+  const [factoryError, setFactoryError] = useState('');
 
   useEffect(() => {
     Promise.all([api.getLines(), api.getTemplates({ includeDeleted: 'true' }), api.getFactories()]).then(([lns, tpls, fcts]) => {
@@ -101,6 +110,48 @@ export default function CreateTemplate() {
       setTitle('');
       setMachines([emptyMachine()]);
       setActiveMachine(0);
+    }
+  };
+
+  const handleCreateFactory = async () => {
+    if (!newFactoryName.trim() || !newFactoryLocation.trim()) return;
+    setCreatingFactory(true);
+    setFactoryError('');
+    try {
+      const created = await api.createFactory({ name: newFactoryName.trim(), location: newFactoryLocation.trim() });
+      const refreshed = await api.getFactories();
+      setFactories(refreshed);
+      setNewFactoryName('');
+      setNewFactoryLocation('');
+      // Auto-switch the dropdown to the just-created factory so the
+      // admin can immediately start authoring a template under it.
+      setFactoryFilter(created.id);
+      if (lineId) handleLineSelect('');
+    } catch (err) {
+      setFactoryError((err as Error).message);
+    } finally {
+      setCreatingFactory(false);
+    }
+  };
+
+  const handleDeleteFactory = async () => {
+    if (!deleteFactoryTarget) return;
+    try {
+      await api.deleteFactory(deleteFactoryTarget.id);
+      const refreshed = await api.getFactories();
+      setFactories(refreshed);
+      // If we deleted the currently-selected factory, fall back to the
+      // first remaining one the admin is allowed to see.
+      if (factoryFilter === deleteFactoryTarget.id) {
+        const adminFactories = user?.factoryIds ?? [];
+        const visible = refreshed.filter(f => adminFactories.length === 0 || adminFactories.includes(f.id));
+        setFactoryFilter(visible[0]?.id ?? '');
+        if (lineId) handleLineSelect('');
+      }
+      setDeleteFactoryTarget(null);
+    } catch (err) {
+      setFactoryError((err as Error).message);
+      setDeleteFactoryTarget(null);
     }
   };
 
@@ -332,9 +383,19 @@ export default function CreateTemplate() {
 
         <div className="card" style={{ marginBottom: 24 }}>
           <h3 style={{ fontSize: 15, marginBottom: 16 }}>Select a Line</h3>
-          {allowedFactories.length > 1 && (
-            <div className="form-group">
+          <div className="form-group">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
               <label className="form-label">Factory</label>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                style={{ fontSize: 11, padding: '2px 8px' }}
+                onClick={() => { setFactoryError(''); setShowFactoryModal(true); }}
+              >
+                Manage factories
+              </button>
+            </div>
+            {allowedFactories.length > 1 ? (
               <select
                 className="form-select"
                 value={factoryFilter}
@@ -350,16 +411,16 @@ export default function CreateTemplate() {
                   <option key={f.id} value={f.id}>{f.name}</option>
                 ))}
               </select>
-            </div>
-          )}
-          {allowedFactories.length === 1 && (
-            <div className="form-group">
-              <label className="form-label">Factory</label>
+            ) : allowedFactories.length === 1 ? (
               <div style={{ fontSize: 14, color: 'var(--text-secondary)', padding: '8px 0' }}>
                 {allowedFactories[0].name}
               </div>
-            </div>
-          )}
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '8px 0' }}>
+                No factories yet — click "Manage factories" to add one.
+              </div>
+            )}
+          </div>
           <div className="form-group">
             <label className="form-label">Production Line</label>
             <select
@@ -561,6 +622,103 @@ export default function CreateTemplate() {
           </>
         )}
       </div>
+
+      {showFactoryModal && (
+        <Modal onClose={() => setShowFactoryModal(false)}>
+          <h2 style={{ marginBottom: 16 }}>Manage Factories</h2>
+
+          {factoryError && (
+            <div style={{ padding: '8px 12px', marginBottom: 12, background: 'var(--red-light)', border: '1px solid var(--red-border)', borderRadius: 'var(--radius)', color: 'var(--red)', fontSize: 12 }}>
+              {factoryError}
+            </div>
+          )}
+
+          <div style={{ marginBottom: 20 }}>
+            <h3 style={{ fontSize: 13, marginBottom: 8, color: 'var(--text-secondary)' }}>Add New Factory</h3>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <input
+                className="form-input"
+                placeholder="Name (e.g. Modesto Plant)"
+                value={newFactoryName}
+                onChange={(e) => setNewFactoryName(e.target.value)}
+                style={{ flex: 1, minWidth: 140, fontSize: 13 }}
+              />
+              <input
+                className="form-input"
+                placeholder="Location (e.g. Modesto, CA)"
+                value={newFactoryLocation}
+                onChange={(e) => setNewFactoryLocation(e.target.value)}
+                style={{ flex: 1, minWidth: 140, fontSize: 13 }}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={handleCreateFactory}
+                disabled={!newFactoryName.trim() || !newFactoryLocation.trim() || creatingFactory}
+              >
+                {creatingFactory ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h3 style={{ fontSize: 13, marginBottom: 8, color: 'var(--text-secondary)' }}>Existing Factories</h3>
+            {factories.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: 12 }}>No factories yet.</p>
+            ) : (
+              factories.map((f) => (
+                <div
+                  key={f.id}
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '10px 0',
+                    borderBottom: '1px solid var(--border-light)',
+                  }}
+                >
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{f.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{f.location}</div>
+                  </div>
+                  <button
+                    className="btn btn-red-outline btn-sm"
+                    style={{ fontSize: 11, padding: '4px 10px' }}
+                    onClick={() => setDeleteFactoryTarget(f)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
+            <button className="btn btn-outline btn-sm" onClick={() => setShowFactoryModal(false)}>
+              Done
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {deleteFactoryTarget && (
+        <Modal onClose={() => setDeleteFactoryTarget(null)}>
+          <h2>Delete Factory</h2>
+          <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginBottom: 12 }}>
+            Are you sure you want to delete <strong>{deleteFactoryTarget.name}</strong>?
+          </p>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24 }}>
+            Lines and checklists tied to this factory keep their data but stop being grouped under it.
+          </p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button className="btn btn-outline btn-sm" onClick={() => setDeleteFactoryTarget(null)}>
+              Cancel
+            </button>
+            <button className="btn btn-red-outline btn-sm" onClick={handleDeleteFactory}>
+              Delete
+            </button>
+          </div>
+        </Modal>
+      )}
 
       {showDeleteConfirm && (
         <Modal onClose={() => setShowDeleteConfirm(false)}>
