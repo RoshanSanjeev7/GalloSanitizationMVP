@@ -8,6 +8,10 @@ updated: 2026-04-30
 
 Chronological record of all wiki changes. Newest entries at the top.
 
+## [2026-04-30] deploy | First AWS deployment LIVE
+
+The Terraform stack went live in account `724591801208` (`aws-cse120-capstone-01r`, UC Merced capstone). API Gateway + Lambda + DynamoDB + S3 SPA + SQS + CloudWatch alarms — 41 resources. Verified end-to-end: `/health` responds, admin login returns a valid JWT, authenticated `/api/checklists` paginates the 56 seeded items, all 4 factories listed. SPA hosted on raw S3 website endpoint at `gallo-sanitization-dev-frontend-724591801208.s3-website-us-west-2.amazonaws.com`. AWS Budget set to $50/mo with email at 50% / 100%. Three deploy-time fixes (AWS_REGION reserved, S3 lifecycle filter, render-helpers TS cast) committed in `5a16a3b`. Two operational gotchas documented in [[Production Deployment]] (LOCALSTACK_ENDPOINT="" for seed, scan --select COUNT for verification). Full devlog at [[2026-04-30 First AWS Deployment]]. Real-time WS still off (API Gateway WebSocket not yet provisioned); everything else functional.
+
 ## [2026-04-30] feature | Production Terraform infrastructure
 
 Added `infrastructure/` directory with Terraform IaC for the AWS serverless stack: 8 DynamoDB tables (matching the local-dev schema), 3 S3 buckets (frontend, images, PDFs with 90-day lifecycle), SQS queue + DLQ, 2 Lambdas (api + pdf) on ARM64 with esbuild bundling, API Gateway HTTP API, per-Lambda IAM roles with least privilege, CloudWatch alarms on DLQ depth and Lambda errors. Added [[Production Deployment]] runbook. WebSocket API Gateway, CloudFront, Route 53, and WAF are documented as follow-ups.

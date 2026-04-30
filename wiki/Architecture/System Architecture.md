@@ -50,9 +50,9 @@ A `WebSocketProvider` wraps the entire app, establishing the WebSocket connectio
 
 LocalStack runs in Docker and emulates DynamoDB, S3, and SQS. The `docker-compose.yml` mounts `localstack/init-aws.sh`, which creates all seven DynamoDB tables (six core + `SanitizationRateLimits`) and the S3 bucket on container start. After LocalStack is healthy, `npm run localstack:seed` runs the seed script to populate demo data (users, lines, templates). See [[Local Dev Setup]] for the full procedure.
 
-## Hosting Model (Production Plan)
+## Hosting Model (LIVE as of 2026-04-30)
 
-Target topology — fully serverless, scales to zero between users:
+Deployed to AWS account `724591801208` — see [[2026-04-30 First AWS Deployment]]. Fully serverless, scales to zero between users. Currently live URLs in [[Production Deployment]]:
 
 ```
 Browser → CloudFront → S3 (frontend assets, static)
