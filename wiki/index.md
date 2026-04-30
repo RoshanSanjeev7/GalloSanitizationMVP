@@ -68,6 +68,7 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 - [[2026-04-12 Code Cleanup]] -- Constants, shared utils, type safety, error handling, naming
 - [[2026-04-13 Factory Feature]] -- Multi-facility support with scoped access
 - [[2026-04-30 Lambda Readiness and WS Hardening]] -- app.ts/lambda-api.ts split, DynamoDB rate-limit store, Zod validation + ping/pong + rate limiter on WS, async PDF wiring
+- [[2026-04-30 First AWS Deployment]] -- the stack went live in account 724591801208; 41 resources, end-to-end verified, gotchas documented
 
 ## See also
 
