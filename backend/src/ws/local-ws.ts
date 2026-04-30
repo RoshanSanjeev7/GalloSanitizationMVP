@@ -35,14 +35,16 @@ import { InMemoryRateLimiter, type RateLimiter } from './limiter.js';
 
 // ─── Hardening constants ────────────────────────────────────────────
 // All tunable knobs live here so adjustments don't require hunting
-// through the connection-handling code.
+// through the connection-handling code. Tests override the timing
+// values (ping/pong/rate-limit window) via the constructor options
+// so the test suite doesn't have to wait for real-world durations.
 
 /** Drop the connection after this many INVALID_PAYLOAD frames in a row. */
 const MAX_STRIKES = 3;
 /** How often the server proactively pings each client. */
-const PING_INTERVAL_MS = 15_000;
+const DEFAULT_PING_INTERVAL_MS = 15_000;
 /** If we don't see a pong within this window, the socket is presumed dead. */
-const PONG_TIMEOUT_MS = 30_000;
+const DEFAULT_PONG_TIMEOUT_MS = 30_000;
 /**
  * Hard cap on concurrent open sockets from a single client IP. Normal users
  * have ~2-3 tabs; an attacker opening hundreds gets cut off here long
@@ -107,7 +109,7 @@ interface LocalConnection {
    * message; closes the connection at MAX_STRIKES.
    */
   strikes: number;
-  /** Wall-clock time of the most recent pong; PONG_TIMEOUT_MS without one → terminate. */
+  /** Wall-clock time of the most recent pong; this.pongTimeoutMs without one → terminate. */
   lastPongAt: number;
   /**
    * Recent rate-limit-hit timestamps (ms). Used to enforce the
@@ -122,7 +124,25 @@ interface LocalConnection {
 // (e.g. "local-1", "local-2"). Only meaningful within a single process.
 let nextConnId = 1;
 
+/**
+ * Constructor-time overrides. Production code passes nothing and gets
+ * the safe defaults; tests pass tightened timings so the suite doesn't
+ * have to wait 30 seconds to verify a single ping/pong death scenario.
+ */
+export interface LocalWsBroadcasterOptions {
+  pingIntervalMs?: number;
+  pongTimeoutMs?: number;
+}
+
 export class LocalWsBroadcaster implements WebSocketBroadcaster {
+  private readonly pingIntervalMs: number;
+  private readonly pongTimeoutMs: number;
+
+  constructor(options: LocalWsBroadcasterOptions = {}) {
+    this.pingIntervalMs = options.pingIntervalMs ?? DEFAULT_PING_INTERVAL_MS;
+    this.pongTimeoutMs = options.pongTimeoutMs ?? DEFAULT_PONG_TIMEOUT_MS;
+  }
+
   // Source of truth for live sockets in this process. Maps connectionId -> connection.
   private connections = new Map<string, LocalConnection>();
   // Per-IP set of connectionIds for enforcing MAX_CONNECTIONS_PER_IP. Cheap
@@ -182,13 +202,13 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
     }, 10_000);
 
     // Server-side liveness driver. Two responsibilities:
-    //   1. Reap connections whose last pong is older than PONG_TIMEOUT_MS.
+    //   1. Reap connections whose last pong is older than this.pongTimeoutMs.
     //      This eliminates the previous "ghost user up to 30 minutes"
     //      problem (tab crashed, no clean close).
     //   2. Send a fresh ping to every still-alive connection so the next
     //      tick has fresh pong evidence.
     this.pingInterval = setInterval(() => {
-      const cutoff = Date.now() - PONG_TIMEOUT_MS;
+      const cutoff = Date.now() - this.pongTimeoutMs;
       for (const conn of this.connections.values()) {
         if (conn.lastPongAt < cutoff) {
           // No pong inside the window → the socket is presumed dead.
@@ -201,7 +221,7 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
           conn.ws.ping();
         }
       }
-    }, PING_INTERVAL_MS);
+    }, this.pingIntervalMs);
 
     // SIGTERM is what container orchestrators (Fargate, Kubernetes, even
     // local `kill`) send before shutting a process down. Use it to give
@@ -333,7 +353,7 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
       tokenExp,
       strikes: 0,
       // Treat the new connection as "just ponged" so the next ping cycle
-      // gives it a full PONG_TIMEOUT_MS to respond before being reaped.
+      // gives it a full this.pongTimeoutMs to respond before being reaped.
       lastPongAt: Date.now(),
       rateLimitHits: [],
     };
