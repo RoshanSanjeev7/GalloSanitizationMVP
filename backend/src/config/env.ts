@@ -30,5 +30,6 @@ export const config = {
     connections: process.env.DYNAMODB_TABLE_CONNECTIONS || 'SanitizationConnections',
     auditLog: process.env.DYNAMODB_TABLE_AUDIT_LOG || 'SanitizationAuditLog',
     factories: process.env.DYNAMODB_TABLE_FACTORIES || 'SanitizationFactories',
+    rateLimits: process.env.DYNAMODB_TABLE_RATE_LIMITS || 'SanitizationRateLimits',
   },
 };

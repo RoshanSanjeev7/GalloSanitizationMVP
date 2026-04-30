@@ -148,6 +148,19 @@ awslocal dynamodb create-table \
   --key-schema AttributeName=id,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST
 
+# Rate limit counters. Each row is one key (e.g. "ip:1.2.3.4" or
+# "user:u123:login") in one window. The `ttl` attribute lets DynamoDB
+# auto-evict expired counters so the table stays small even at scale.
+awslocal dynamodb create-table \
+  --table-name SanitizationRateLimits \
+  --attribute-definitions AttributeName=pk,AttributeType=S \
+  --key-schema AttributeName=pk,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST
+
+awslocal dynamodb update-time-to-live \
+  --table-name SanitizationRateLimits \
+  --time-to-live-specification "Enabled=true, AttributeName=ttl" 2>/dev/null || true
+
 echo "Creating S3 bucket..."
 awslocal s3 mb s3://checklist-images
 

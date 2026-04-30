@@ -1,0 +1,129 @@
+.panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  max-height: 60vh;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+.title {
+  font-weight: 600;
+  color: #94a3b8;
+  margin-right: 4px;
+  white-space: nowrap;
+}
+
+.filter {
+  flex: 1;
+  min-width: 0;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font: inherit;
+  outline: none;
+}
+
+.filter:focus {
+  border-color: #60a5fa;
+}
+
+.btn {
+  background: #334155;
+  color: #e2e8f0;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.btn:hover {
+  background: #475569;
+}
+
+.log {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.empty {
+  padding: 16px;
+  color: #64748b;
+  text-align: center;
+}
+
+.row {
+  border-bottom: 1px solid #1e293b;
+}
+
+.row[data-dir='in'] .arrow { color: #34d399; }
+.row[data-dir='out'] .arrow { color: #fbbf24; }
+
+.rowHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  background: transparent;
+  color: inherit;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.rowHead:hover {
+  background: #1e293b;
+}
+
+.arrow {
+  font-weight: 700;
+  width: 10px;
+  flex-shrink: 0;
+}
+
+.time {
+  color: #64748b;
+  flex-shrink: 0;
+}
+
+.type {
+  color: #c7d2fe;
+  font-weight: 600;
+}
+
+.body {
+  margin: 0;
+  padding: 6px 12px 10px 26px;
+  background: #020617;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border-top: 1px solid #1e293b;
+  font-size: 10.5px;
+  line-height: 1.45;
+}

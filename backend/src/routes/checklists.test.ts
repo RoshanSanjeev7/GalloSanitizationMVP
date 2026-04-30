@@ -50,6 +50,8 @@ vi.mock('../data/sqs.js', () => ({
 vi.mock('../data/s3.js', () => ({
   uploadImage: vi.fn().mockResolvedValue('https://s3.example.com/image.jpg'),
   getSignedImageUrl: vi.fn().mockResolvedValue('https://s3.example.com/signed.jpg'),
+  // Used by /pdf/status to mint a presigned download URL for cached PDFs.
+  getImageUrl: vi.fn().mockResolvedValue('https://s3.example.com/pdf-presigned.pdf'),
 }));
 
 import { app } from '../index.js';

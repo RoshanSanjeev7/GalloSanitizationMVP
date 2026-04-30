@@ -504,16 +504,75 @@ async function getAuditLogs(params: Record<string, string> = {}): Promise<AuditR
   return requestWithRetry<AuditResponse>(endpoint);
 }
 
-async function downloadChecklistPdf(id: string): Promise<void> {
+/**
+ * Trigger the browser to download a checklist PDF.
+ *
+ * The download happens in two phases when the async path is enabled:
+ *   1. Poll `/pdf/status` for up to ~30 seconds (every 2s) until the
+ *      Lambda-generated PDF appears in S3. The status endpoint returns a
+ *      short-lived presigned URL when ready.
+ *   2. Hand the presigned URL to an `<a download>` so the browser pulls
+ *      the bytes straight from S3 — no proxying through the API.
+ *
+ * If polling times out (Lambda is slow, queue backed up, async path
+ * disabled in this env), fall back to the synchronous `/pdf` endpoint
+ * which builds the PDF on demand. Older clients and pre-rollout
+ * checklists keep working that way.
+ *
+ * `onStatus` is an optional UX hook so callers can show a "Generating
+ * PDF…" toast and dismiss it once the download fires.
+ */
+async function downloadChecklistPdf(
+  id: string,
+  onStatus?: (status: 'generating' | 'ready' | 'fallback') => void,
+): Promise<void> {
   const token = getToken();
-  const res = await fetch(`${API_BASE}/checklists/${id}/pdf`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
+  // Phase 1: status polling. Bail out fast if the PDF is already cached
+  // (typical case for any checklist submitted more than a few seconds ago).
+  const POLL_INTERVAL_MS = 2000;
+  const POLL_TIMEOUT_MS = 30_000;
+  const deadline = Date.now() + POLL_TIMEOUT_MS;
+  let presignedUrl: string | null = null;
+
+  while (Date.now() < deadline) {
+    const statusRes = await fetch(`${API_BASE}/checklists/${id}/pdf/status`, { headers });
+    if (statusRes.ok) {
+      const { ready, url } = (await statusRes.json()) as { ready: boolean; url: string | null };
+      if (ready && url) {
+        presignedUrl = url;
+        break;
+      }
+    } else if (statusRes.status === 404) {
+      // Status route may not exist on older backends; fall through to sync path.
+      break;
+    }
+    onStatus?.('generating');
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+  }
+
+  if (presignedUrl) {
+    onStatus?.('ready');
+    // Direct presigned-URL download — no Authorization header needed (the
+    // signature embeds the auth) and no proxy through our API.
+    const a = document.createElement('a');
+    a.href = presignedUrl;
+    a.download = `checklist-${id.slice(0, 8)}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+
+  // Phase 2: synchronous fallback. Async path either timed out or isn't
+  // enabled in this environment; have the API build the PDF on demand
+  // and stream it back as a blob.
+  onStatus?.('fallback');
+  const res = await fetch(`${API_BASE}/checklists/${id}/pdf`, { headers });
   if (!res.ok) {
     throw new Error('Failed to download PDF');
   }
-
   const blob = await res.blob();
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');

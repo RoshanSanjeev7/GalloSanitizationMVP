@@ -18,6 +18,8 @@ import {
 import { authMiddleware, adminOnly, type AuthRequest } from '../middleware/auth.js';
 import type { Checklist, ChecklistMachine, Activity } from '../types/index.js';
 import { logAudit } from '../data/audit.js';
+import { sendPdfGenerationMessage } from '../data/sqs.js';
+import { getImageUrl } from '../data/s3.js';
 import { getBroadcaster } from '../utils/broadcast.js';
 import {
   PAGINATION_MAX,
@@ -434,6 +436,21 @@ router.post('/:id/submit', async (req: AuthRequest, res) => {
     res.json(checklist);
     // Fire-and-forget: audit/broadcast failures must not block the HTTP response
     logAudit({ userId: req.userId!, userName: checklist.operatorName, userRole: req.userRole!, action: 'checklist_submitted', targetType: 'checklist', targetId: checklist.id, detail: `Submitted ${checklist.lineName} checklist` }).catch(() => {});
+
+    // Async PDF generation: drop a message in SQS so a Lambda can build
+    // the PDF off the request thread. Behind ENABLE_ASYNC_PDF so we can
+    // ship the wiring without committing to async-by-default until the
+    // Lambda is deployed and observed in staging.
+    //
+    // Fire-and-forget on purpose — the queue publish must NOT block the
+    // submit response. If SQS is down, the admin can still hit the sync
+    // /pdf endpoint; we just log and move on.
+    if (process.env.ENABLE_ASYNC_PDF === 'true') {
+      sendPdfGenerationMessage(checklist.id).catch((err) => {
+        console.warn(`[checklists/submit] sendPdfGenerationMessage failed for ${checklist.id}:`, err);
+      });
+    }
+
     const bc = getBroadcaster(req);
     if (bc) {
       // Fire-and-forget
@@ -558,14 +575,24 @@ router.delete('/:id', adminOnly, async (req: AuthRequest, res) => {
   }
 });
 
-// PDF status — check if a cached PDF is available
+// PDF status — check if a cached PDF is available, and if so return a
+// short-lived presigned download URL so the frontend can fetch the bytes
+// directly from S3 without round-tripping through the API.
 router.get('/:id/pdf/status', adminOnly, async (req, res) => {
   const checklist = await getChecklist(req.params.id as string);
   if (!checklist) {
     res.status(404).json({ error: 'Checklist not found' });
     return;
   }
-  res.json({ ready: !!checklist.pdfKey, url: checklist.pdfKey || null });
+  if (!checklist.pdfKey) {
+    res.json({ ready: false, url: null });
+    return;
+  }
+  // The presigned URL is valid for 1 hour (set in getImageUrl). Plenty of
+  // headroom for a click-to-download UX without leaving long-lived links
+  // floating around if a tab is left open.
+  const url = await getImageUrl(checklist.pdfKey);
+  res.json({ ready: true, url });
 });
 
 /**

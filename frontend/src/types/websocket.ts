@@ -72,6 +72,24 @@ export interface NewSubmissionMessage {
   submittedAt: string;
 }
 
+export interface ErrorMessage {
+  type: 'error';
+  message: string;
+  code?:
+    | 'INVALID_JSON'
+    | 'INVALID_PAYLOAD'
+    | 'UNKNOWN_TYPE'
+    | 'RATE_LIMITED'
+    | 'TOKEN_EXPIRED'
+    | 'TOO_MANY_STRIKES';
+  retryAfterMs?: number;
+}
+
+export interface ServerShutdownMessage {
+  type: 'server_shutdown';
+  reconnectAfterMs: number;
+}
+
 export type ServerMessage =
   | ItemUpdateMessage
   | CommentUpdateMessage
@@ -80,4 +98,6 @@ export type ServerMessage =
   | StatusChangeMessage
   | ChecklistDeletedMessage
   | PresenceSummaryMessage
-  | NewSubmissionMessage;
+  | NewSubmissionMessage
+  | ErrorMessage
+  | ServerShutdownMessage;

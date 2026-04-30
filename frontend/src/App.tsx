@@ -7,6 +7,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import OfflineBanner from './components/OfflineBanner';
 import { useWebSocket } from './hooks/useWebSocket';
 import ReconnectBanner from './components/ReconnectBanner';
+import WsDebugPanel from './components/WsDebugPanel';
 import Login from './pages/Login';
 import OperatorDashboard from './pages/OperatorDashboard';
 import ChecklistFill from './pages/ChecklistFill';
@@ -56,6 +57,7 @@ export default function App() {
     <BrowserRouter>
       <WebSocketProvider>
         <OfflineBanner />
+        <WsDebugPanel />
         <ErrorBoundary>
         <Suspense fallback={<Spinner label="Loading..." />}>
           <Routes>
