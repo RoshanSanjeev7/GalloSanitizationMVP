@@ -63,10 +63,17 @@ export function createApp(): express.Express {
 
   const loginLimiter = isProduction
     ? rateLimit({
-        windowMs: 15 * 60 * 1000,
+        windowMs: 5 * 60 * 1000,
         max: 10,
+        // Only count *failed* logins. Successful logins (200 OK) shouldn't
+        // chip away at the bucket — otherwise an admin who logs in/out a
+        // few times during testing locks themselves out, which is the
+        // exact incident this comment is named after. Brute-force
+        // protection still applies because every attempt with a wrong
+        // password hits the bucket.
+        skipSuccessfulRequests: true,
         store: new DynamoDbRateLimitStore(),
-        message: { error: 'Too many login attempts, please try again later' },
+        message: { error: 'Too many failed login attempts, please try again in a few minutes' },
       })
     : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
 
