@@ -150,6 +150,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "pdfs" {
   rule {
     id     = "expire-old-pdfs"
     status = "Enabled"
+    # Empty filter = apply rule to every object in the bucket. Required
+    # in aws provider 5.x+ which deprecated the old prefix-less form.
+    filter {}
     expiration {
       days = 90
     }
