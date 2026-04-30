@@ -26,12 +26,16 @@ resource "aws_s3_bucket" "frontend" {
   force_destroy = var.environment != "prod"
 }
 
+# Permissive public-access block for the frontend bucket ONLY — the SPA
+# needs to be readable by the public web (anonymous GETs from browsers).
+# The images and PDFs buckets stay locked down; they're only reached
+# through presigned URLs we mint server-side.
 resource "aws_s3_bucket_public_access_block" "frontend" {
   bucket                  = aws_s3_bucket.frontend.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
@@ -41,6 +45,39 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
       sse_algorithm = "AES256"
     }
   }
+}
+
+# Static website hosting. `error_document = index.html` is the SPA
+# fallback — every 404 from the React Router falls back to the SPA
+# entry point so client-side routes resolve correctly.
+resource "aws_s3_bucket_website_configuration" "frontend" {
+  bucket = aws_s3_bucket.frontend.id
+
+  index_document {
+    suffix = "index.html"
+  }
+  error_document {
+    key = "index.html"
+  }
+}
+
+# Public read on the frontend bucket. Required for the website endpoint
+# to serve assets to anonymous browsers. Depends_on the public access
+# block — applying the policy before unblocking public access fails
+# with AccessDenied.
+resource "aws_s3_bucket_policy" "frontend_public_read" {
+  bucket = aws_s3_bucket.frontend.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Sid       = "PublicRead"
+      Effect    = "Allow"
+      Principal = "*"
+      Action    = "s3:GetObject"
+      Resource  = "${aws_s3_bucket.frontend.arn}/*"
+    }]
+  })
+  depends_on = [aws_s3_bucket_public_access_block.frontend]
 }
 
 # ── Checklist images ─────────────────────────────────────────────────

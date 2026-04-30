@@ -7,7 +7,7 @@ test.describe('Checklist Lifecycle (create → fill → submit → approve)', ()
     await login(page, OPERATOR);
     await page.click('button:has-text("Add Checklist")');
     await expect(page.locator('h2:has-text("New Checklist")')).toBeVisible();
-    await page.locator('select.form-select').last().selectOption({ label: 'Line 91' });
+    await page.locator('select.form-select').last().selectOption({ label: 'Line 93' });
     await page.locator('button:has-text("Create")').click();
     await expect(page.locator('h2:has-text("New Checklist")')).not.toBeVisible();
     await page.waitForTimeout(500);
@@ -111,7 +111,7 @@ test.describe('Checklist Lifecycle (create → fill → submit → approve)', ()
     // (matching the existing test's pattern — bypasses the
     // completeness check that the UI enforces).
     await operatorPage.click('button:has-text("Add Checklist")');
-    await operatorPage.locator('select.form-select').last().selectOption({ label: 'Line 91' });
+    await operatorPage.locator('select.form-select').last().selectOption({ label: 'Line 93' });
     await operatorPage.locator('button:has-text("Create")').click();
     await operatorPage.waitForTimeout(500);
     await operatorPage.click('button:has-text("In Progress")');

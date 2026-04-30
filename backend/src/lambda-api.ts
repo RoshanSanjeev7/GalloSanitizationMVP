@@ -38,12 +38,19 @@ let bootstrapPromise: Promise<LambdaHandler> | null = null;
 
 async function bootstrap(): Promise<LambdaHandler> {
   const app = createApp();
-  const broadcaster = await createBroadcaster(config.wsMode);
-  // ApiGatewayBroadcaster.init() ignores the server argument and just
-  // configures the AWS client. LocalWsBroadcaster.init() WOULD need a
-  // server, but Lambda mode should never instantiate the local one.
-  broadcaster.init();
-  app.set('broadcaster', broadcaster);
+  // Broadcaster init is best-effort. In WS_MODE=apigw without a configured
+  // APIGW_WS_ENDPOINT (true during the initial deploy before the WebSocket
+  // API Gateway is provisioned), the constructor throws — and that would
+  // make every Lambda cold start fail. Routes already null-check the
+  // broadcaster via getBroadcaster(req), so a missing one degrades to
+  // "no real-time fan-out" cleanly without 500-ing user requests.
+  try {
+    const broadcaster = await createBroadcaster(config.wsMode);
+    broadcaster.init();
+    app.set('broadcaster', broadcaster);
+  } catch (err) {
+    console.warn('[lambda-api] broadcaster unavailable, continuing without WS fan-out:', err);
+  }
   return serverless(app) as LambdaHandler;
 }
 

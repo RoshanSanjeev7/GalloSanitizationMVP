@@ -11,10 +11,25 @@
       "Bash(ls /Users/roshansanjeev/Desktop/Gallo/GalloSanitizationMVP/graphify-out/obsidian/_COMMUNITY_*)",
       "Skill(update-config)",
       "Skill(update-config:*)",
-      "Read(//Users/roshansanjeev/.claude/**)"
+      "Read(//Users/roshansanjeev/.claude/**)",
+      "Bash(killall com.docker.backend)",
+      "Bash(open -a Docker)",
+      "Bash(curl -s http://localhost:4566/_localstack/health)",
+      "Bash(curl -s http://localhost:4000/api/auth/me)",
+      "Bash(curl -s http://localhost:3000)",
+      "Bash(npx playwright *)",
+      "Bash(brew tap *)",
+      "Bash(brew install *)",
+      "Bash(HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1 HOMEBREW_NO_AUTO_UPDATE=1 brew install hashicorp/tap/terraform)",
+      "Bash(curl -fsSL -o /tmp/terraform.zip \"https://releases.hashicorp.com/terraform/1.12.1/terraform_1.12.1_darwin_arm64.zip\")",
+      "Bash(unzip -o /tmp/terraform.zip -d /tmp/terraform-bin)",
+      "Bash(sudo mv *)",
+      "Bash(rm -rf /tmp/terraform.zip /tmp/terraform-bin)",
+      "Bash(terraform --version)"
     ],
     "additionalDirectories": [
       "/Users/roshansanjeev/.claude/hooks"
     ]
-  }
+  },
+  "enableAllProjectMcpServers": true
 }

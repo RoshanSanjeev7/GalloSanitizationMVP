@@ -1,4 +1,10 @@
-const API_BASE = '/api';
+// In dev, leave as '/api' so Vite's proxy forwards to the backend on
+// localhost:4000. In production builds, set VITE_API_BASE at build time
+// to the absolute API Gateway URL — the SPA is served from a different
+// origin (S3 / CloudFront) than the API, so relative paths can't reach it.
+const API_BASE = import.meta.env.VITE_API_BASE
+  ? `${(import.meta.env.VITE_API_BASE as string).replace(/\/$/, '')}/api`
+  : '/api';
 
 function getToken(): string | null {
   return localStorage.getItem('token');
