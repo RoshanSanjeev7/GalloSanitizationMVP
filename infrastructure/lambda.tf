@@ -67,7 +67,8 @@ resource "aws_lambda_function" "api" {
       NODE_ENV                = var.environment == "prod" ? "production" : var.environment
       JWT_SECRET              = var.jwt_secret
       FRONTEND_ORIGIN         = var.frontend_origin
-      AWS_REGION              = var.aws_region
+      # AWS_REGION is reserved — Lambda auto-injects it from the
+      # function's region. Setting it here yields InvalidParameterValueException.
       WS_MODE                 = "apigw"
       ENABLE_ASYNC_PDF        = tostring(var.enable_async_pdf)
       S3_BUCKET               = aws_s3_bucket.images.bucket
@@ -120,7 +121,7 @@ resource "aws_lambda_function" "pdf" {
   environment {
     variables = {
       NODE_ENV   = var.environment == "prod" ? "production" : var.environment
-      AWS_REGION = var.aws_region
+      # AWS_REGION is reserved — Lambda auto-injects it.
       S3_BUCKET  = aws_s3_bucket.pdfs.bucket
       DYNAMODB_TABLE_CHECKLISTS = aws_dynamodb_table.checklists.name
     }

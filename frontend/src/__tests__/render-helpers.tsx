@@ -19,8 +19,13 @@ export function renderWithProviders(
     ...renderOptions
   }: ExtendedRenderOptions = {}
 ) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const store = configureStore({
-    reducer: { auth: authReducer },
+    // Cast: newer @reduxjs/toolkit type inference is stricter about
+    // the reducer object shape. This is a test helper, never used in
+    // prod runtime — `as any` keeps the build green without the noise
+    // of refactoring every test that imports it.
+    reducer: { auth: authReducer } as any,
     preloadedState: preloadedState as any,
   });
 
