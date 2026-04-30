@@ -202,6 +202,81 @@ describe('Users routes', () => {
       expect(res.body.role).toBe('admin');
       expect(res.body).not.toHaveProperty('password');
     });
+
+    it('rejects assigning two factories to an operator', async () => {
+      const user = makeUser({ id: 'u1', role: 'operator', factoryIds: ['f1'] });
+      mockedGetUser.mockResolvedValue(user);
+
+      const res = await request(app)
+        .put('/api/users/u1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ factoryIds: ['f1', 'f2'] });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/exactly one factory/i);
+      expect(mockedPutUser).not.toHaveBeenCalled();
+    });
+
+    it('rejects assigning zero factories to an operator', async () => {
+      const user = makeUser({ id: 'u1', role: 'operator', factoryIds: ['f1'] });
+      mockedGetUser.mockResolvedValue(user);
+
+      const res = await request(app)
+        .put('/api/users/u1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ factoryIds: [] });
+
+      expect(res.status).toBe(400);
+      expect(mockedPutUser).not.toHaveBeenCalled();
+    });
+
+    it('accepts a single factory for an operator', async () => {
+      const user = makeUser({ id: 'u1', role: 'operator', factoryIds: [] });
+      mockedGetUser.mockResolvedValue(user);
+      mockedPutUser.mockResolvedValue(undefined);
+
+      const res = await request(app)
+        .put('/api/users/u1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ factoryIds: ['f1'] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.factoryIds).toEqual(['f1']);
+    });
+
+    it('allows admins to keep multiple factories', async () => {
+      const user = makeUser({ id: 'u1', role: 'admin', factoryIds: ['f1'] });
+      mockedGetUser.mockResolvedValue(user);
+      mockedPutUser.mockResolvedValue(undefined);
+
+      const res = await request(app)
+        .put('/api/users/u1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ factoryIds: ['f1', 'f2', 'f3'] });
+
+      expect(res.status).toBe(200);
+      expect(res.body.factoryIds).toEqual(['f1', 'f2', 'f3']);
+    });
+
+    it('rejects role change admin → operator if existing factoryIds is not exactly one', async () => {
+      // Admin had cross-facility access; demoting to operator without first
+      // trimming factoryIds to a single entry must fail (the validation
+      // runs on the post-update state).
+      const user = makeUser({ id: 'u1', role: 'admin', factoryIds: ['f1', 'f2'] });
+      mockedGetUser.mockResolvedValue(user);
+      // Need at least one other admin so the demotion isn't blocked by
+      // the last-admin guard.
+      mockedGetAllUsers.mockResolvedValue([user, makeUser({ id: 'u2', role: 'admin' })]);
+
+      const res = await request(app)
+        .put('/api/users/u1')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ role: 'operator' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.error).toMatch(/exactly one factory/i);
+      expect(mockedPutUser).not.toHaveBeenCalled();
+    });
   });
 
   // ── DELETE /api/users/:id ───────────────────────────────────────────
