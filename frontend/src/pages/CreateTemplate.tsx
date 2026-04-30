@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import api, { type Line, type Template, type MachineTemplate, type Factory } from '../services/api';
+import type { RootState } from '../store';
 import Modal from '../components/Modal';
 import Spinner from '../components/Spinner';
 import { TEMPLATE_RETENTION_DAYS } from '../config/constants';
@@ -27,6 +29,7 @@ const emptyMachine = (): MachineState => ({
 
 export default function CreateTemplate() {
   const navigate = useNavigate();
+  const user = useSelector((st: RootState) => st.auth.user);
   const [factories, setFactories] = useState<Factory[]>([]);
   const [factoryFilter, setFactoryFilter] = useState('');
   const [lines, setLines] = useState<Line[]>([]);
@@ -49,9 +52,25 @@ export default function CreateTemplate() {
       setLines(lns);
       setTemplates(tpls);
       setFactories(fcts);
+      // Autofill factory selector with the admin's primary factory.
+      // Admins are scoped to their assigned factories; if they have
+      // multiple, default to the first and let them switch.
+      if (!factoryFilter) {
+        const adminFactories = user?.factoryIds ?? [];
+        const visible = fcts.filter(f => adminFactories.length === 0 || adminFactories.includes(f.id));
+        if (visible.length > 0) setFactoryFilter(visible[0].id);
+      }
       setInitialLoading(false);
     });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  // Factories the current admin is allowed to author templates for.
+  // Admins with no assignment see all (legacy behavior); otherwise
+  // filtered to their assigned set.
+  const allowedFactories = (user?.factoryIds && user.factoryIds.length > 0)
+    ? factories.filter(f => user.factoryIds!.includes(f.id))
+    : factories;
 
   const handleLineSelect = (newLineId: string) => {
     setLineId(newLineId);
@@ -89,7 +108,10 @@ export default function CreateTemplate() {
     if (!newLineName.trim()) return;
     setCreatingLine(true);
     try {
-      const newLine = await api.createLine(newLineName.trim());
+      // Stamp the new line with the currently-selected factory so any
+      // checklist created from this template inherits the right scope.
+      // Without this, the line would be unscoped and visible to no one.
+      const newLine = await api.createLine(newLineName.trim(), factoryFilter || undefined);
       setLines(prev => [...prev, newLine]);
       setNewLineName('');
       setShowNewLine(false);
@@ -310,6 +332,34 @@ export default function CreateTemplate() {
 
         <div className="card" style={{ marginBottom: 24 }}>
           <h3 style={{ fontSize: 15, marginBottom: 16 }}>Select a Line</h3>
+          {allowedFactories.length > 1 && (
+            <div className="form-group">
+              <label className="form-label">Factory</label>
+              <select
+                className="form-select"
+                value={factoryFilter}
+                onChange={(e) => {
+                  setFactoryFilter(e.target.value);
+                  // Clear line selection when factory changes — the
+                  // currently-picked line probably belongs to a
+                  // different factory and the dropdown won't show it.
+                  if (lineId) handleLineSelect('');
+                }}
+              >
+                {allowedFactories.map((f) => (
+                  <option key={f.id} value={f.id}>{f.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {allowedFactories.length === 1 && (
+            <div className="form-group">
+              <label className="form-label">Factory</label>
+              <div style={{ fontSize: 14, color: 'var(--text-secondary)', padding: '8px 0' }}>
+                {allowedFactories[0].name}
+              </div>
+            </div>
+          )}
           <div className="form-group">
             <label className="form-label">Production Line</label>
             <select
