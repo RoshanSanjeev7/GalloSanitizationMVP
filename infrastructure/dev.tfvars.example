@@ -1,0 +1,22 @@
+# Copy this to dev.tfvars (or staging.tfvars / prod.tfvars) and edit.
+# The real file is gitignored — never commit JWT secrets.
+
+environment    = "dev"
+aws_region     = "us-west-2"
+project_name   = "gallo-sanitization"
+
+# Frontend domain. Must match what the actual SPA is served from —
+# CORS reflects this verbatim.
+frontend_origin = "http://localhost:3000"
+
+# JWT signing secret. Generate with `openssl rand -hex 32`.
+# Pass via TF_VAR_jwt_secret in CI rather than committing here.
+# jwt_secret = "..."
+
+# Provisioned concurrency. 0 for dev (scales to zero), 2+ for prod
+# (eliminates cold-start latency during business hours).
+lambda_api_provisioned_concurrency = 0
+
+# Async PDF flag. Should normally be true so submissions don't block
+# on PDFKit; false only if you want to compare with the legacy sync path.
+enable_async_pdf = true

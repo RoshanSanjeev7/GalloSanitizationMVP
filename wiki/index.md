@@ -59,6 +59,7 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 - [[Running Tests]] -- Vitest unit + Playwright E2E
 - [[Troubleshooting]] -- Common issues and fixes
 - [[Environment Variables]] -- Complete config reference
+- [[Production Deployment]] -- Terraform IaC for the AWS serverless stack
 
 ## Dev Log
 
