@@ -24,3 +24,35 @@ export function checklistRow(page: Page, lineName?: string) {
   }
   return page.locator('div:has(> strong:has-text("Line"))').first();
 }
+
+/**
+ * Hook into a page's outgoing/incoming WebSocket frames and return a
+ * mutable array that grows over the test's lifetime.
+ *
+ * Use with `expect.poll(() => frames.find(f => f.type === 'X'))` to wait
+ * for a specific message without timing dependencies. Frames that don't
+ * parse as JSON are silently dropped — pings/pongs are framework-level
+ * and never appear here.
+ *
+ * Must be called BEFORE the page navigates anywhere that opens a
+ * WebSocket; the listener attaches to the next websocket created on
+ * the page.
+ */
+export type CapturedFrame = { dir: 'in' | 'out'; payload: Record<string, unknown> };
+
+export function captureWsFrames(page: Page): CapturedFrame[] {
+  const frames: CapturedFrame[] = [];
+  page.on('websocket', (ws) => {
+    ws.on('framereceived', ({ payload }) => {
+      try {
+        frames.push({ dir: 'in', payload: JSON.parse(payload.toString()) });
+      } catch { /* non-JSON frame, e.g. binary */ }
+    });
+    ws.on('framesent', ({ payload }) => {
+      try {
+        frames.push({ dir: 'out', payload: JSON.parse(payload.toString()) });
+      } catch { /* non-JSON frame */ }
+    });
+  });
+  return frames;
+}
