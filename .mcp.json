@@ -3,6 +3,14 @@
     "playwright": {
       "command": "npx",
       "args": ["@playwright/mcp@latest"]
+    },
+    "aws-api": {
+      "command": "uvx",
+      "args": ["awslabs.aws-api-mcp-server@latest"],
+      "env": {
+        "AWS_PROFILE": "gallo-cap",
+        "AWS_REGION": "us-west-2"
+      }
     }
   }
 }

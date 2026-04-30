@@ -13,6 +13,11 @@ output "frontend_bucket" {
   value       = aws_s3_bucket.frontend.bucket
 }
 
+output "frontend_website_url" {
+  description = "Public URL of the SPA (S3 static website endpoint). Set this as `frontend_origin` in dev.tfvars after the first apply, then re-apply so CORS lines up."
+  value       = "http://${aws_s3_bucket_website_configuration.frontend.website_endpoint}"
+}
+
 output "images_bucket" {
   description = "S3 bucket for checklist images (presigned-URL upload target)."
   value       = aws_s3_bucket.images.bucket
@@ -41,4 +46,41 @@ output "api_lambda_function_name" {
 output "pdf_lambda_function_name" {
   description = "PDF Lambda function name — useful for deployment scripts."
   value       = aws_lambda_function.pdf.function_name
+}
+
+# ─── DynamoDB table names ────────────────────────────────────────────
+# Surfaced individually so the seed script and any post-deploy data
+# loaders can pull them via `terraform output -raw <name>` without
+# needing to know the project_name + environment naming convention.
+
+output "users_table_name" {
+  value = aws_dynamodb_table.users.name
+}
+
+output "lines_table_name" {
+  value = aws_dynamodb_table.lines.name
+}
+
+output "templates_table_name" {
+  value = aws_dynamodb_table.templates.name
+}
+
+output "checklists_table_name" {
+  value = aws_dynamodb_table.checklists.name
+}
+
+output "connections_table_name" {
+  value = aws_dynamodb_table.connections.name
+}
+
+output "audit_log_table_name" {
+  value = aws_dynamodb_table.audit_log.name
+}
+
+output "factories_table_name" {
+  value = aws_dynamodb_table.factories.name
+}
+
+output "rate_limits_table_name" {
+  value = aws_dynamodb_table.rate_limits.name
 }
