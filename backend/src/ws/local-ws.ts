@@ -149,9 +149,9 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
   // to maintain incrementally; keeps the IP cap O(1) on connect.
   private connectionsByIp = new Map<string, Set<string>>();
   private wss: WebSocketServer | null = null;
-  // Timer handle for the periodic presence broadcast (so it can be cleared on shutdown).
-  private presenceInterval: ReturnType<typeof setInterval> | null = null;
   // Periodic ping driver — checks pong freshness and emits new pings.
+  // Note: there is no presence-broadcast interval. Presence updates are
+  // event-driven (see init() comment for rationale).
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   // Origin allowlist computed once at startup; rejects WS upgrades from
   // any other origin in `verifyClient` before we even authenticate.
@@ -195,11 +195,15 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
       this.handleConnection(ws, req);
     });
 
-    // Push a presence summary to dashboard subscribers every 10s so their
-    // "who is working on what" UI stays fresh even if no events fire.
-    this.presenceInterval = setInterval(() => {
-      this.broadcastPresenceSummary().catch(() => {});
-    }, 10_000);
+    // Presence is broadcast event-driven, not polled — see the message
+    // handlers below for `subscribe`, `unsubscribe`, `machine_change`,
+    // and the `close` listener. The previous 10-second `setInterval`
+    // was removed in the delta-presence migration: it pushed identical
+    // presence summaries to every dashboard viewer regardless of
+    // change, costing ~600 outbound messages/min at 100 admins for
+    // zero benefit. Critically, a `setInterval` cannot run on Lambda
+    // (no persistent process), so the polled model was incompatible
+    // with the production hosting target anyway.
 
     // Server-side liveness driver. Two responsibilities:
     //   1. Reap connections whose last pong is older than this.pongTimeoutMs.
@@ -242,9 +246,7 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
 
-    if (this.presenceInterval) clearInterval(this.presenceInterval);
     if (this.pingInterval) clearInterval(this.pingInterval);
-    this.presenceInterval = null;
     this.pingInterval = null;
 
     const notice = JSON.stringify({
@@ -557,10 +559,16 @@ export class LocalWsBroadcaster implements WebSocketBroadcaster {
       }
       case 'machine_change': {
         // User is editing a different machine within the same checklist.
-        // Only the per-checklist presence needs a refresh here.
+        // The per-checklist presence message reflects the new machine
+        // assignment; the dashboard summary also includes per-user
+        // machine, so it needs the same refresh.
+        // (Pre-delta-presence this was implicit via the 10-second
+        // setInterval — now that the interval is gone, every membership
+        // mutation broadcasts explicitly.)
         conn.activeMachine = msg.machineIdx;
         await updateConnectionMachine(connectionId, msg.machineIdx);
         await this.broadcastPresence(msg.checklistId);
+        await this.broadcastPresenceSummary();
         break;
       }
       case 'subscribe_dashboard': {
