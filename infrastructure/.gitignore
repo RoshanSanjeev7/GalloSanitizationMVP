@@ -1,0 +1,18 @@
+# Terraform state and lock files. State should live in a remote
+# backend (S3 + DynamoDB lock) for production; the .gitignore here
+# protects against accidentally committing local state during initial
+# bootstrap.
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfstate.*.backup
+
+# Bundled Lambda zip artifacts produced by `archive_file` and the
+# build-lambdas.sh script. Both are reproducible from source.
+.artifacts/
+
+# Per-environment secrets and overrides. Commit *.tfvars.example, not
+# the real ones — the real ones go in secret management.
+*.tfvars
+!*.tfvars.example

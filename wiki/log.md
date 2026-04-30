@@ -8,6 +8,10 @@ updated: 2026-04-30
 
 Chronological record of all wiki changes. Newest entries at the top.
 
+## [2026-04-30] feature | Production Terraform infrastructure
+
+Added `infrastructure/` directory with Terraform IaC for the AWS serverless stack: 8 DynamoDB tables (matching the local-dev schema), 3 S3 buckets (frontend, images, PDFs with 90-day lifecycle), SQS queue + DLQ, 2 Lambdas (api + pdf) on ARM64 with esbuild bundling, API Gateway HTTP API, per-Lambda IAM roles with least privilege, CloudWatch alarms on DLQ depth and Lambda errors. Added [[Production Deployment]] runbook. WebSocket API Gateway, CloudFront, Route 53, and WAF are documented as follow-ups.
+
 ## [2026-04-30] feature | Lambda readiness + WS hardening
 
 Added [[2026-04-30 Lambda Readiness and WS Hardening]] devlog entry. Updated [[WebSocket System]] with validation, ping/pong, JWT recheck, origin allowlist, per-IP cap, rate limiter, graceful shutdown, and `WsDebugPanel` sections. Updated [[Rate Limiting]] with the DynamoDB-backed Store and the WS rate limiter pointer. Updated [[PDF Export]] — async path is now wired (SQS publish + Lambda idempotency + presigned-URL status endpoint + frontend status-poll). Updated [[System Architecture]] with the `app.ts` / `lambda-api.ts` split and the production Lambda topology. Added `SanitizationRateLimits` to [[DynamoDB Tables]] (now 7 tables). [[Known Limitations]]: closed in-memory rate limiter, presence ghost users, no WS message validation, no per-WS rate limiting; partially mitigated single-process WebSocket.
