@@ -90,9 +90,18 @@ export default function RoleAssignment() {
 
   const handleToggleFactory = async (user: UserPublic, factoryId: string) => {
     const current = user.factoryIds || [];
-    const updated = current.includes(factoryId)
-      ? current.filter((id) => id !== factoryId)
-      : [...current, factoryId];
+    // Operators belong to exactly one factory; clicking a factory replaces
+    // the assignment instead of toggling. Clicking the currently-assigned
+    // factory is a no-op (we never want zero-factory operators).
+    let updated: string[];
+    if (user.role === 'operator') {
+      if (current.length === 1 && current[0] === factoryId) return;
+      updated = [factoryId];
+    } else {
+      updated = current.includes(factoryId)
+        ? current.filter((id) => id !== factoryId)
+        : [...current, factoryId];
+    }
     try {
       await api.updateUserFactories(user.id, updated);
       await loadUsers();
@@ -164,16 +173,20 @@ export default function RoleAssignment() {
           </div>
           {factories.length > 0 && (
             <div className="form-group">
-              <label className="form-label">Factory Assignment</label>
+              <label className="form-label">
+                Factory Assignment{role === 'operator' ? ' (operators belong to exactly one)' : ''}
+              </label>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                 {factories.map((f) => (
                   <label key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 13, cursor: 'pointer' }}>
                     <input
-                      type="checkbox"
+                      type={role === 'operator' ? 'radio' : 'checkbox'}
+                      name={role === 'operator' ? 'new-user-factory' : undefined}
                       checked={selectedFactories.includes(f.id)}
-                      onChange={() => setSelectedFactories(prev =>
-                        prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id]
-                      )}
+                      onChange={() => setSelectedFactories(prev => {
+                        if (role === 'operator') return [f.id];
+                        return prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id];
+                      })}
                       style={{ accentColor: 'var(--primary)' }}
                     />
                     {f.name}
@@ -185,7 +198,14 @@ export default function RoleAssignment() {
           <button
             className="btn btn-primary btn-block"
             onClick={handleAdd}
-            disabled={!name || !email || !password || selectedFactories.length === 0 || loading}
+            disabled={
+              !name ||
+              !email ||
+              !password ||
+              selectedFactories.length === 0 ||
+              (role === 'operator' && selectedFactories.length !== 1) ||
+              loading
+            }
           >
             {loading ? 'Adding...' : 'Add User'}
           </button>
@@ -239,7 +259,8 @@ export default function RoleAssignment() {
                         style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, cursor: 'pointer' }}
                       >
                         <input
-                          type="checkbox"
+                          type={u.role === 'operator' ? 'radio' : 'checkbox'}
+                          name={u.role === 'operator' ? `factory-${u.id}` : undefined}
                           checked={assigned}
                           onChange={() => handleToggleFactory(u, f.id)}
                           style={{ accentColor: 'var(--primary)' }}

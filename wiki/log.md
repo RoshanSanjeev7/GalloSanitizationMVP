@@ -8,6 +8,10 @@ updated: 2026-04-30
 
 Chronological record of all wiki changes. Newest entries at the top.
 
+## [2026-04-30] feature | Operators constrained to a single factory
+
+Operators must now belong to exactly one factory; admins can still span multiple. Backend `PUT /api/users/:id` rejects with HTTP 400 if the post-update state has `role==='operator'` and `factoryIds.length !== 1`. Validation also catches admin→operator demotions when the existing factoryIds is multi (admin must trim first). Frontend RoleAssignment renders the factory selector as radios for operators (single-select, replace-on-click) and checkboxes for admins. Seed data adjusted: Gabriel Sanchez → Modesto only, Marcus Rivera → Fresno only. The "operators see all in-progress at their factory" half of the request was already shipped — `GET /api/checklists` only post-filters by the user's `factoryIds`, never by `operatorId`, and there's no ownership guard on PUT items / submit. Updated [[Factories]]. 5 new tests in `users.test.ts` (suite at 238/238).
+
 ## [2026-04-30] simplify | PDF moved client-side; server stack ripped out
 
 After the first AWS deploy surfaced two PDF problems — blank downloads (API Gateway corrupting binary bytes as UTF-8) and silent spam-click failures (rate limiter returning 429s the UI swallowed) — moved PDF generation entirely into the browser via jsPDF. Deleted: `/pdf` route + handler (~250 lines), `/pdf/status` route, `lambda-pdf.ts`, `sqs.ts`, `pdf-generator.ts`, `pdfkit` dep, `pdfLimiter`, SQS queue + DLQ, PDF Lambda, IAM role, S3 PDFs bucket, DLQ alarm, `enable_async_pdf` variable, `.afm` font-copy step. Lambda zip dropped 2.4 MB → 1.4 MB. Added `frontend/src/utils/pdf.ts` (jsPDF-based generator that mirrors the previous layout exactly). Net: zero server CPU on PDF, no rate limiting needed, sub-100ms generation. See [[2026-04-30 PDF Simplification]] for the full story.

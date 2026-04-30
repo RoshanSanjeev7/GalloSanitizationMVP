@@ -77,6 +77,16 @@ router.put('/:id', adminOnly, async (req: AuthRequest, res) => {
 
   if (role) user.role = role;
   if (Array.isArray(factoryIds)) user.factoryIds = factoryIds;
+
+  // Operators belong to exactly one factory. Admins can span multiple
+  // for cross-facility oversight. Enforce on the post-update state so a
+  // role-change + factory-update in the same request is validated as a
+  // single transition.
+  if (user.role === 'operator' && (user.factoryIds?.length ?? 0) !== 1) {
+    res.status(400).json({ error: 'Operators must be assigned to exactly one factory' });
+    return;
+  }
+
   await putUser(user);
 
   const { password: _, ...userPublic } = user;

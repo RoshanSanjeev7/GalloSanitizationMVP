@@ -662,7 +662,7 @@ export async function seedIfEmpty(): Promise<void> {
     email: 'gsanchez@gallo.com',
     password: 'operator123',
     role: 'operator',
-    factoryIds: [factoryModesto.id, factoryLivingston.id],
+    factoryIds: [factoryModesto.id],
   };
 
   const operator2: User = {
@@ -671,7 +671,7 @@ export async function seedIfEmpty(): Promise<void> {
     email: 'mrivera@gallo.com',
     password: 'operator123',
     role: 'operator',
-    factoryIds: [factoryModesto.id, factoryFresno.id],
+    factoryIds: [factoryFresno.id],
   };
 
   await putSafe(() => putUser(admin));

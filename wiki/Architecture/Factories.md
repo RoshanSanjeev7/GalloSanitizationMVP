@@ -36,9 +36,11 @@ Each factory contains production lines. Each line has one or more templates. Eac
 
 ## How Factory Scoping Works
 
-**Operators** are assigned to factories via a `factoryIds` array on their user record (see [[DynamoDB Tables]]). When an operator queries checklists, the backend filters results to only include checklists from lines belonging to their assigned factories. Operators do not choose their factory -- admins assign them via the [[Roles and Permissions]] page.
+**Operators** belong to **exactly one factory**. The user record still uses `factoryIds: string[]` (kept as an array for schema parity with admins) but the backend rejects any operator PUT whose final `factoryIds.length !== 1` with HTTP 400 (`backend/src/routes/users.ts`). The RoleAssignment page renders factory choices as **radio buttons** for operators — clicking a different factory replaces the assignment. The list endpoint then filters checklists by the operator's single factory; an operator sees every in_progress / submitted / etc. checklist any peer at that factory has created (no per-operator scoping). Operators do not choose their factory — admins assign it.
 
-**Admins** are also scoped to their assigned factories -- the backend filters checklists and lines by the admin's `factoryIds`, just like operators. There is no "All Factories" option. Factory assignment is managed on the RoleAssignment page. When creating a new user, at least one factory must be assigned.
+**Admins** can be assigned to **multiple factories** for cross-facility oversight. Same `factoryIds` array, same filter behavior (intersection with the checklist's `factoryId`), but the RoleAssignment page renders factory choices as **checkboxes** for admins. There is no "All Factories" option.
+
+**Role transitions:** demoting admin → operator is rejected unless the user is updated to exactly one factory in the same flow (the validation runs on the post-update state).
 
 ## Data Flow
 
