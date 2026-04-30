@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ADMIN, OPERATOR, login } from './helpers';
+import { ADMIN, OPERATOR, login, captureWsFrames } from './helpers';
 
 test.describe('Checklist Lifecycle (create → fill → submit → approve)', () => {
   test('full operator → admin workflow', async ({ page }) => {
@@ -69,5 +69,99 @@ test.describe('Checklist Lifecycle (create → fill → submit → approve)', ()
 
     await page.click('button:has-text("Deny")');
     await page.waitForURL('/admin');
+  });
+
+  /**
+   * End-to-end verification that the WebSocket fan-out works for the two
+   * key cross-user notifications:
+   *   - Operator submit → admin's dashboard receives `new_submission`.
+   *   - Admin approve   → operator's open page receives `status_change`.
+   *
+   * Both contexts run concurrently so the WS frame capture is purely
+   * passive — we don't need to refresh either page to see the events.
+   * This is the integration test that the unit + integration tests in
+   * backend/src/ws/__tests__/ can't cover (they don't exercise the
+   * frontend client or the full HTTP-to-WebSocket fan-out path).
+   */
+  test('WebSocket events fire end-to-end on submit and approve', async ({ browser }) => {
+    const operatorCtx = await browser.newContext();
+    const adminCtx = await browser.newContext();
+    const operatorPage = await operatorCtx.newPage();
+    const adminPage = await adminCtx.newPage();
+
+    // Attach frame capture BEFORE login — the WebSocket connects right
+    // after login completes, and we need the listener in place before
+    // the upgrade handshake to catch the `connected` frame and
+    // anything that fires before our first assertion.
+    const operatorFrames = captureWsFrames(operatorPage);
+    const adminFrames = captureWsFrames(adminPage);
+
+    await login(operatorPage, OPERATOR);
+    await login(adminPage, ADMIN);
+
+    // Admin lands on /admin and subscribes to the dashboard channel as
+    // part of the page mount. Wait for the `connected` frame so we know
+    // the socket is up before triggering the cross-context event.
+    await expect.poll(
+      () => adminFrames.some((f) => f.dir === 'in' && f.payload.type === 'connected'),
+      { timeout: 5000 },
+    ).toBe(true);
+
+    // Operator creates a fresh checklist and submits it via the API
+    // (matching the existing test's pattern — bypasses the
+    // completeness check that the UI enforces).
+    await operatorPage.click('button:has-text("Add Checklist")');
+    await operatorPage.locator('select.form-select').last().selectOption({ label: 'Line 91' });
+    await operatorPage.locator('button:has-text("Create")').click();
+    await operatorPage.waitForTimeout(500);
+    await operatorPage.click('button:has-text("In Progress")');
+    await operatorPage.locator('text=Line').first().click();
+    await operatorPage.waitForURL(/\/checklist\/.*\/fill/);
+    const checklistUrl = operatorPage.url();
+    const checklistId = checklistUrl.match(/\/checklist\/([^/]+)\//)?.[1];
+    expect(checklistId).toBeTruthy();
+
+    const operatorToken = await operatorPage.evaluate(() => localStorage.getItem('token'));
+    await operatorPage.request.post(
+      `http://localhost:4000/api/checklists/${checklistId}/submit`,
+      { headers: { Authorization: `Bearer ${operatorToken}` } },
+    );
+
+    // Admin's WS should receive a `new_submission` frame referencing
+    // this checklist. Polling because the frame arrives async after
+    // the HTTP response.
+    await expect.poll(
+      () => adminFrames.find(
+        (f) => f.dir === 'in'
+          && f.payload.type === 'new_submission'
+          && f.payload.checklistId === checklistId,
+      ),
+      { timeout: 5000, message: 'Admin should receive new_submission via WS after operator submits' },
+    ).toBeDefined();
+
+    // Now the admin approves the checklist (also via API — the UI
+    // approval flow is covered by the workflow test above; here we
+    // just need to trigger the status transition).
+    const adminToken = await adminPage.evaluate(() => localStorage.getItem('token'));
+    await adminPage.request.post(
+      `http://localhost:4000/api/checklists/${checklistId}/approve`,
+      { headers: { Authorization: `Bearer ${adminToken}` } },
+    );
+
+    // The operator's open page should observe a `status_change` frame.
+    // It's still on the /fill page so it has an active subscription
+    // to this checklist's channel.
+    await expect.poll(
+      () => operatorFrames.find(
+        (f) => f.dir === 'in'
+          && f.payload.type === 'status_change'
+          && f.payload.checklistId === checklistId
+          && f.payload.status === 'approved',
+      ),
+      { timeout: 5000, message: 'Operator should receive status_change via WS after admin approves' },
+    ).toBeDefined();
+
+    await operatorCtx.close();
+    await adminCtx.close();
   });
 });

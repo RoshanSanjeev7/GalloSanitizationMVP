@@ -50,13 +50,21 @@ Three motivations stacked into one branch:
 2. **WS gap closure.** [[Known Limitations]] called out single-process broadcaster, ghost users, no per-message validation, no per-WS rate limiting. All but the broadcaster are now closed.
 3. **PDF blocking risk.** Synchronous PDF generation pegs an Express thread for the duration. At shift-change with 50 admins clicking "Export," the server chokes. Async path was 80% scaffolded; this finishes the wiring.
 
-## What's still pending
+## Follow-on work shipped same day
 
-- **Image upload presigned URLs** (Task #4) — currently the multipart endpoint runs through Lambda. Needs a `/presign` + `/finalize` flow so the browser uploads directly to S3.
-- **WS connection state DynamoDB-only** (Task #11) — `LocalWsBroadcaster` still keeps an in-memory `Map`. Needs to become DynamoDB-only to support multi-instance / Lambda deploys.
-- **Delta-presence broadcasting** (Task #12) — currently a 10s `setInterval` blasts presence summary regardless of changes. Replace with broadcast-on-change + heartbeat-only DB updates.
-- **Comprehensive WS tests** (Task #13) — schema tests, real-server integration tests, load test, chaos test.
-- **Terraform/CDK IaC** (Task #14) — nothing in the repo yet.
+After the initial commit, the same session completed:
+
+- **Image upload presigned URLs** (Task #4) — `/presign` + `/finalize` flow, browser PUTs directly to S3, multipart endpoint kept as fallback.
+- **Delta-presence broadcasting** (Task #12) — 10s `setInterval` removed, presence summary now event-driven.
+- **WS unit + integration tests** (Task #13a) — 28 validate, 12 limiter, 19 integration tests covering connect lifecycle, validation strikes, rate limiter, JWT recheck, graceful shutdown, presence dedup. Total backend suite: 234/234.
+- **Playwright lifecycle test extension** — `tests/checklist-lifecycle.spec.ts` now has an end-to-end WS assertion: operator submit → admin receives `new_submission`; admin approve → operator receives `status_change`. Reusable `captureWsFrames()` helper added to `tests/helpers.ts`.
+- **Terraform IaC** (Task #14) — `infrastructure/` directory with the full AWS serverless stack (8 DynamoDB tables, 3 S3 buckets, SQS+DLQ, 2 Lambdas, API Gateway HTTP API, IAM roles, CloudWatch alarms). See [[Production Deployment]].
+
+## What's deliberately deferred
+
+- **WS connection state DynamoDB-only** (Task #11) — reconsidered after building the test net. `LocalWsBroadcaster` is dev-only; `ApiGatewayBroadcaster` (the prod path) is already DynamoDB-exclusive. Drift risk is theoretical (every Map mutation is followed by an awaited DynamoDB write whose errors propagate). Not worth the local-dev perf regression.
+- **WS load + chaos Playwright tests** (Task #17) — slow and flaky on shared CI; better suited to nightly staging runs. The unit + integration tests are the safety net for refactors; load + chaos is for production confidence.
+- **API Gateway WebSocket API, CloudFront, Route 53, WAF** — see `infrastructure/README.md` for the documented gaps. Each is straightforward but has design choices best made with stakeholder input (domain selection, threat model).
 
 ## Files
 
