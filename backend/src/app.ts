@@ -55,7 +55,7 @@ export function createApp(): express.Express {
       max: 100,
       standardHeaders: true,
       legacyHeaders: false,
-      store: new DynamoDbRateLimitStore(),
+      store: new DynamoDbRateLimitStore('global'),
       message: { error: 'Too many requests, please try again later' },
     });
     app.use(globalLimiter);
@@ -64,15 +64,13 @@ export function createApp(): express.Express {
   const loginLimiter = isProduction
     ? rateLimit({
         windowMs: 5 * 60 * 1000,
-        max: 10,
-        // Only count *failed* logins. Successful logins (200 OK) shouldn't
-        // chip away at the bucket — otherwise an admin who logs in/out a
-        // few times during testing locks themselves out, which is the
-        // exact incident this comment is named after. Brute-force
-        // protection still applies because every attempt with a wrong
-        // password hits the bucket.
+        max: 30,
+        // Only count *failed* logins (skip 2xx). Each limiter uses its
+        // own DDB prefix so its bucket is independent of the global and
+        // checklist-create buckets — without that, hits on unrelated
+        // routes would chip away at the login limit.
         skipSuccessfulRequests: true,
-        store: new DynamoDbRateLimitStore(),
+        store: new DynamoDbRateLimitStore('login'),
         message: { error: 'Too many failed login attempts, please try again in a few minutes' },
       })
     : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();
@@ -81,7 +79,7 @@ export function createApp(): express.Express {
     ? rateLimit({
         windowMs: 60 * 1000,
         max: 5,
-        store: new DynamoDbRateLimitStore(),
+        store: new DynamoDbRateLimitStore('checklist-create'),
         message: { error: 'Too many checklists created, please slow down' },
       })
     : (_req: express.Request, _res: express.Response, next: express.NextFunction) => next();

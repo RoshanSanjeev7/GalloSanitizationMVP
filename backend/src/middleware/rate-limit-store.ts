@@ -38,6 +38,15 @@ const client = new DynamoDBClient({
 export class DynamoDbRateLimitStore implements Store {
   private windowMs = 60_000;
 
+  /**
+   * Prefix lets multiple limiters share the same DDB table without
+   * colliding. Without it, the global / login / checklist-create
+   * limiters all key on the same IP and share one count — so a login
+   * attempt would be blocked by hits accumulated from unrelated routes,
+   * with whichever limiter has the smallest `max` deciding the lockout.
+   */
+  constructor(private prefix: string = 'rl') {}
+
   /** express-rate-limit calls this once with the middleware's options. */
   init(options: Options): void {
     this.windowMs = options.windowMs;
@@ -45,7 +54,7 @@ export class DynamoDbRateLimitStore implements Store {
 
   async increment(key: string): Promise<IncrementResponse> {
     const now = Date.now();
-    const pk = `rl:${key}`;
+    const pk = `${this.prefix}:${key}`;
 
     try {
       // Path 1: row exists AND window hasn't rolled over yet → atomic bump.
@@ -89,7 +98,7 @@ export class DynamoDbRateLimitStore implements Store {
   }
 
   async decrement(key: string): Promise<void> {
-    const pk = `rl:${key}`;
+    const pk = `${this.prefix}:${key}`;
     try {
       await client.send(
         new UpdateItemCommand({
@@ -112,7 +121,7 @@ export class DynamoDbRateLimitStore implements Store {
   }
 
   async resetKey(key: string): Promise<void> {
-    const pk = `rl:${key}`;
+    const pk = `${this.prefix}:${key}`;
     await client.send(
       new DeleteItemCommand({
         TableName: config.tables.rateLimits,
