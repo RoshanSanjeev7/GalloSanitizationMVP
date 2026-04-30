@@ -51,7 +51,16 @@ async function bootstrap(): Promise<LambdaHandler> {
   } catch (err) {
     console.warn('[lambda-api] broadcaster unavailable, continuing without WS fan-out:', err);
   }
-  return serverless(app) as LambdaHandler;
+  // `binary` tells serverless-http which response Content-Types to
+  // return as base64-encoded with isBase64Encoded=true. Without this,
+  // API Gateway HTTP API treats the Lambda response body as UTF-8
+  // text — which corrupts binary streams (every non-UTF-8 byte
+  // becomes U+FFFD, encoded as EF BF BD). PDFKit's binary marker
+  // bytes get mangled, content streams break, and the PDF opens to
+  // empty pages. Image responses get corrupted the same way.
+  return serverless(app, {
+    binary: ['application/pdf', 'application/octet-stream', 'image/*'],
+  }) as LambdaHandler;
 }
 
 export async function handler(event: object, context: object): Promise<object> {

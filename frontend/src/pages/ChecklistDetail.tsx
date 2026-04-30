@@ -9,6 +9,8 @@ import cl from '../styles/checklist.module.css';
 import s from './ChecklistDetail.module.css';
 import sr from '../styles/sidebar.module.css';
 import Spinner from '../components/Spinner';
+import MachineSelector from '../components/MachineSelector';
+import { downloadChecklistPdf } from '../utils/pdf';
 
 export default function ChecklistDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +19,11 @@ export default function ChecklistDetail() {
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [activeMachine, setActiveMachine] = useState(0);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // While a PDF export is in flight, disable the button + change its
+  // label so the user has feedback that the click was received.
+  // Generation typically completes in ~1s but a slow cold start can
+  // push it to 2-3s, which is long enough to feel broken without UI.
+  const [pdfLoading, setPdfLoading] = useState(false);
 
   useEffect(() => {
     if (id) api.getChecklist(id).then(setChecklist);
@@ -90,8 +97,28 @@ export default function ChecklistDetail() {
             &larr; Back
           </button>
           {user?.role === 'admin' && (
-            <button className="btn btn-green btn-sm" onClick={() => id && api.downloadChecklistPdf(id)}>
-              Export PDF
+            <button
+              className="btn btn-green btn-sm"
+              disabled={pdfLoading}
+              onClick={() => {
+                // Client-side PDF generation. Synchronous on the JS
+                // event loop but cheap enough (<100ms typical) to feel
+                // instant. The setTimeout(0) yields one frame so the
+                // disabled+label state actually renders before the
+                // PDF render briefly pegs the main thread on a large
+                // checklist.
+                if (!checklist || pdfLoading) return;
+                setPdfLoading(true);
+                setTimeout(() => {
+                  try {
+                    downloadChecklistPdf(checklist);
+                  } finally {
+                    setPdfLoading(false);
+                  }
+                }, 0);
+              }}
+            >
+              {pdfLoading ? 'Generating…' : 'Export PDF'}
             </button>
           )}
         </div>
@@ -109,18 +136,18 @@ export default function ChecklistDetail() {
         </p>
 
         <div className="no-print">
-          <select
-            className="form-select"
-            value={activeMachine}
-            onChange={(e) => setActiveMachine(Number(e.target.value))}
-            style={{ marginBottom: 16 }}
-          >
-            {checklist.machines.map((m, idx) => (
-              <option key={idx} value={idx}>
-                {m.name}
-              </option>
-            ))}
-          </select>
+          {/* Button-style selector matches what operators see in
+              ChecklistFill and admins see in SubmissionReview. The
+              wrapping margin matches the same pattern used there so
+              spacing is consistent across pages. */}
+          <div style={{ marginBottom: 16 }}>
+            <MachineSelector
+              machines={checklist.machines}
+              activeMachine={activeMachine}
+              onSelect={setActiveMachine}
+              scrollToTop
+            />
+          </div>
 
           <div className={sr.reviewLayout}>
             <div>

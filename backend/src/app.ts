@@ -38,11 +38,16 @@ export function createApp(): express.Express {
   app.use(express.json({ limit: '1mb' }));
 
   // ─── RATE LIMITING ─────────────────────────────────────────────────
-  // Skipped in dev/test to keep E2E tests fast; only on in production.
-  // Each limiter uses its OWN DynamoDB store instance so the windowMs
-  // passed to the store via init() matches the one declared on the
-  // limiter (a shared store would mix windows from different limiters).
-  const isProduction = process.env.NODE_ENV === 'production';
+  // Active whenever this process runs inside AWS Lambda (every deployed
+  // environment) — regardless of NODE_ENV label. Skipped only for local
+  // `npm run dev` and unit/E2E tests so they don't trip on rapid-fire
+  // requests. AWS Lambda always sets `AWS_LAMBDA_FUNCTION_NAME`; nothing
+  // local does. Each limiter uses its OWN DynamoDB store instance so
+  // the windowMs passed to the store via init() matches the one
+  // declared on the limiter (a shared store would mix windows from
+  // different limiters).
+  const isLambda = !!process.env.AWS_LAMBDA_FUNCTION_NAME;
+  const isProduction = isLambda || process.env.NODE_ENV === 'production';
 
   if (isProduction) {
     const globalLimiter = rateLimit({

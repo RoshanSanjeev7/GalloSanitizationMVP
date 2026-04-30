@@ -69,6 +69,7 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 - [[2026-04-13 Factory Feature]] -- Multi-facility support with scoped access
 - [[2026-04-30 Lambda Readiness and WS Hardening]] -- app.ts/lambda-api.ts split, DynamoDB rate-limit store, Zod validation + ping/pong + rate limiter on WS, async PDF wiring
 - [[2026-04-30 First AWS Deployment]] -- the stack went live in account 724591801208; 41 resources, end-to-end verified, gotchas documented
+- [[2026-04-30 PDF Simplification]] -- PDF generation moved client-side via jsPDF; deleted server-side route, SQS, PDF Lambda, S3 cache, rate limiter
 
 ## See also
 

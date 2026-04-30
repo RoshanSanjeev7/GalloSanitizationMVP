@@ -16,7 +16,3 @@ frontend_origin = "http://localhost:3000"
 # Provisioned concurrency. 0 for dev (scales to zero), 2+ for prod
 # (eliminates cold-start latency during business hours).
 lambda_api_provisioned_concurrency = 0
-
-# Async PDF flag. Should normally be true so submissions don't block
-# on PDFKit; false only if you want to compare with the legacy sync path.
-enable_async_pdf = true
