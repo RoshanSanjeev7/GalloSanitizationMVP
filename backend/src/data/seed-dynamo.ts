@@ -681,7 +681,7 @@ export async function seedIfEmpty(): Promise<void> {
   /* ---- Lines ---- */
   const line91: Line = { id: uuid(), name: 'Line 91', factoryId: factoryModesto.id };
   const line92: Line = { id: uuid(), name: 'Line 92', factoryId: factoryModesto.id };
-  const line93: Line = { id: uuid(), name: 'Line 93', factoryId: factoryLivingston.id };
+  const line93: Line = { id: uuid(), name: 'Line 93', factoryId: factoryModesto.id };
 
   await putSafe(() => putLine(line91));
   await putSafe(() => putLine(line92));
