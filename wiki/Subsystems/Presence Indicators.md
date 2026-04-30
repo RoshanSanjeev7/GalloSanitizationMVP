@@ -1,7 +1,7 @@
 ---
 tags: [subsystem]
 created: 2026-04-10
-updated: 2026-04-13
+updated: 2026-04-30
 ---
 
 # Presence Indicators
@@ -12,7 +12,7 @@ Presence indicators show which users are currently viewing or editing a checklis
 
 ### AdminDashboard rows
 
-Each checklist row on the admin dashboard shows overlapping avatar circles for users currently editing that checklist. This uses the `presence_summary` WebSocket message, broadcast every 10 seconds. The `PresenceAvatars` component renders overlapping circles with user initials and a tooltip showing full names.
+Each checklist row on the admin dashboard shows overlapping avatar circles for users currently editing that checklist. This uses the `presence_summary` WebSocket message, **broadcast event-driven on every membership change** (subscribe, unsubscribe, machine_change, disconnect) — see [[2026-04-30 Lambda Readiness and WS Hardening]] for the migration from the previous 10-second polled model. The `PresenceAvatars` component renders overlapping circles with user initials and a tooltip showing full names.
 
 ### ChecklistFill header
 
@@ -36,10 +36,16 @@ When an admin opens a submitted checklist, a sidebar section shows "Currently Vi
 
 ## Staleness
 
-The Connections table has a TTL field set to 30 minutes from the last activity. If a browser crashes without a clean disconnect, the user appears as a ghost for up to 30 minutes. The 60-second heartbeat keeps the TTL refreshed for active users. A production improvement would add server-side ping/pong detection. See [[Known Limitations]].
+Two layers of dead-connection detection:
+
+1. **Server-side ping/pong** (primary) — every 15 seconds the server pings each connection and terminates any without a pong inside 30 seconds. Sub-30s cleanup of crashed tabs. See [[WebSocket System]] for the timing knobs.
+2. **DynamoDB TTL** (backstop) — `SanitizationConnections` records have a 30-minute TTL refreshed by the 60-second client heartbeat. Catches catastrophic failures (process crash) where the ping/pong reaper didn't get to run.
+
+The previous 30-minute "ghost user" window was closed in [[2026-04-30 Lambda Readiness and WS Hardening]].
 
 ## See also
 
 - [[WebSocket System]] -- the underlying transport for presence data
 - [[Frontend Pages]] -- where presence indicators are rendered
 - [[DynamoDB Tables]] -- the Connections table that tracks who is where
+- [[2026-04-30 Lambda Readiness and WS Hardening]] -- ping/pong + delta-presence migration

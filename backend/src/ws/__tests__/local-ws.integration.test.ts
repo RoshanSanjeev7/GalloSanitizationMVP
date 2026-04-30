@@ -58,12 +58,15 @@ import { LocalWsBroadcaster } from '../local-ws.js';
 
 const JWT_SECRET = 'integration-test-secret';
 
-/** Sign a JWT that looks like what `routes/auth.ts` produces. */
-function signToken(opts: { userId: string; role: string; expiresIn?: string | number } = { userId: 'u-1', role: 'operator' }): string {
+/**
+ * Sign a JWT that looks like what `routes/auth.ts` produces.
+ * `expiresIn` accepts a number-of-seconds for fine-grained test control.
+ */
+function signToken(opts: { userId: string; role: string; expiresIn?: number } = { userId: 'u-1', role: 'operator' }): string {
   return jwt.sign(
     { userId: opts.userId, role: opts.role },
     JWT_SECRET,
-    { expiresIn: opts.expiresIn ?? '1h' },
+    { expiresIn: opts.expiresIn ?? 3600 },
   );
 }
 
