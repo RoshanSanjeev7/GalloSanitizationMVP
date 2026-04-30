@@ -18,6 +18,8 @@ export default function RoleAssignment() {
   const [selectedFactories, setSelectedFactories] = useState<string[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<UserPublic | null>(null);
   const [roleChangeTarget, setRoleChangeTarget] = useState<{ user: UserPublic; newRole: string } | null>(null);
+  const [filterRole, setFilterRole] = useState<'all' | 'operator' | 'admin'>('all');
+  const [filterFactory, setFilterFactory] = useState<string>('all');
 
   useEffect(() => {
     loadUsers();
@@ -213,7 +215,46 @@ export default function RoleAssignment() {
 
         <div className="card" style={{ maxWidth: 500, margin: '0 auto' }}>
           <h3 style={{ fontSize: 15, marginBottom: 12 }}>Current Users</h3>
-          {users.map((u) => (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+            <select
+              className="form-input"
+              value={filterRole}
+              onChange={(e) => setFilterRole(e.target.value as 'all' | 'operator' | 'admin')}
+              style={{ flex: 1, minWidth: 120, fontSize: 13, padding: '6px 8px' }}
+            >
+              <option value="all">All roles</option>
+              <option value="operator">Operators</option>
+              <option value="admin">Admins</option>
+            </select>
+            <select
+              className="form-input"
+              value={filterFactory}
+              onChange={(e) => setFilterFactory(e.target.value)}
+              style={{ flex: 1, minWidth: 120, fontSize: 13, padding: '6px 8px' }}
+            >
+              <option value="all">All factories</option>
+              <option value="none">No factory</option>
+              {factories.map((f) => (
+                <option key={f.id} value={f.id}>{f.name}</option>
+              ))}
+            </select>
+          </div>
+          {(() => {
+            const filtered = users.filter((u) => {
+              if (filterRole !== 'all' && u.role !== filterRole) return false;
+              if (filterFactory === 'all') return true;
+              const ids = u.factoryIds || [];
+              if (filterFactory === 'none') return ids.length === 0;
+              return ids.includes(filterFactory);
+            });
+            if (filtered.length === 0) {
+              return (
+                <p style={{ fontSize: 13, color: 'var(--text-secondary)', textAlign: 'center', padding: '12px 0' }}>
+                  No users match these filters.
+                </p>
+              );
+            }
+            return filtered.map((u) => (
             <div key={u.id} className={s.userRow} style={{ flexDirection: 'column', alignItems: 'stretch', gap: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div className={s.userInfo}>
@@ -272,7 +313,8 @@ export default function RoleAssignment() {
                 </div>
               )}
             </div>
-          ))}
+            ));
+          })()}
         </div>
       </div>
 
