@@ -4,10 +4,32 @@ dist
 *.pyc
 __pycache__
 *.db
-.env
 data.json
 backend/venv
 backend/instance
 playwright-report/
 test-results/
 .superpowers/
+
+# Local environment / secrets — NEVER commit
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env
+frontend/.env.*
+infrastructure/*.tfvars
+!infrastructure/dev.tfvars.example
+infrastructure/.artifacts/
+*.pem
+*.key
+.terraform/
+.terraform.lock.hcl
+
+# Test-harness output (TestSprite, Playwright, etc.) — has logged
+# secrets in the past; force the dir out of every future commit
+testsprite_tests/
+*.log
+
+# Build artifacts that shouldn't be tracked
+backend/dist/
