@@ -41,17 +41,11 @@ vi.mock('../data/dynamo.js', () => ({
   docClient: {},
 }));
 
-// Mock SQS module
-vi.mock('../data/sqs.js', () => ({
-  sendPdfGenerationMessage: vi.fn().mockResolvedValue(undefined),
-}));
-
 // Mock S3 module used by the images route (also mounted under /api/checklists)
 vi.mock('../data/s3.js', () => ({
   uploadImage: vi.fn().mockResolvedValue('https://s3.example.com/image.jpg'),
   getSignedImageUrl: vi.fn().mockResolvedValue('https://s3.example.com/signed.jpg'),
-  // Used by /pdf/status to mint a presigned download URL for cached PDFs.
-  getImageUrl: vi.fn().mockResolvedValue('https://s3.example.com/pdf-presigned.pdf'),
+  getImageUrl: vi.fn().mockResolvedValue('https://s3.example.com/signed.jpg'),
 }));
 
 import { app } from '../index.js';

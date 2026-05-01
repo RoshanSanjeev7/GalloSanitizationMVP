@@ -40,10 +40,6 @@ vi.mock('../data/dynamo.js', () => ({
   docClient: {},
 }));
 
-vi.mock('../data/sqs.js', () => ({
-  sendPdfGenerationMessage: vi.fn().mockResolvedValue(undefined),
-}));
-
 vi.mock('../data/s3.js', () => ({
   uploadImage: vi.fn().mockResolvedValue('https://s3.example.com/image.jpg'),
   getSignedImageUrl: vi.fn().mockResolvedValue('https://s3.example.com/signed.jpg'),

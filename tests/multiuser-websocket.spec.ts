@@ -236,6 +236,136 @@ test.describe('Multi-User WebSocket Tests', () => {
 
     await ctx.close();
   });
+
+  // ── Real-time propagation tests ──────────────────────────────────
+  // These assert the WebSocket actually delivers presence + content
+  // updates to peers, not just that the page loads. They exist
+  // because the existing tests above never verify that one operator's
+  // changes appear in the other operator's view without refresh —
+  // exactly the user complaint that drove the API Gateway WebSocket
+  // provisioning.
+
+  test('two operators on the same checklist see each other in the presence indicator within 2s', async ({ browser }) => {
+    const ctx1 = await browser.newContext();
+    const ctx2 = await browser.newContext();
+    const page1 = await ctx1.newPage();
+    const page2 = await ctx2.newPage();
+
+    await login(page1, OPERATOR1);
+    await page1.click('button:has-text("In Progress")');
+    await page1.locator('span:has-text("Line 9")').first().click();
+    await page1.waitForURL(/\/checklist\/.*\/fill/);
+    const checklistUrl = page1.url();
+
+    await login(page2, OPERATOR2);
+    await page2.goto(checklistUrl);
+    await page2.waitForURL(/\/checklist\/.*\/fill/);
+
+    // Each side should see the OTHER user appear within 2s. The
+    // PresenceAvatars component renders avatars with title={u.name}
+    // (not the local user, only peers).
+    await expect(page1.locator('[title="Marcus Rivera"]')).toBeVisible({ timeout: 2000 });
+    await expect(page2.locator('[title="Gabriel Sanchez"]')).toBeVisible({ timeout: 2000 });
+
+    await ctx1.close();
+    await ctx2.close();
+  });
+
+  test('checking an item on one client propagates to the peer within 2s', async ({ browser }) => {
+    const ctx1 = await browser.newContext();
+    const ctx2 = await browser.newContext();
+    const page1 = await ctx1.newPage();
+    const page2 = await ctx2.newPage();
+
+    await login(page1, OPERATOR1);
+    await page1.click('button:has-text("In Progress")');
+    await page1.locator('span:has-text("Line 9")').first().click();
+    await page1.waitForURL(/\/checklist\/.*\/fill/);
+    const checklistUrl = page1.url();
+
+    await login(page2, OPERATOR2);
+    await page2.goto(checklistUrl);
+    await page2.waitForURL(/\/checklist\/.*\/fill/);
+    // Wait for both clients' WS subscribe to land before mutating.
+    await page1.waitForTimeout(1500);
+
+    // Page 1 marks the first item as done. The "completedBy" stamp
+    // is the most reliable propagation signal because the renderer
+    // only emits it when the broadcast lands (the local optimistic
+    // update would say "Gabriel Sanchez", the peer view says it
+    // received from "Gabriel Sanchez").
+    await page1.locator('[title="Mark as done"]').first().click();
+
+    // Page 2 should show Gabriel's name as the completer of an item
+    // within 2s, without any refresh.
+    await expect(page2.locator('text=Gabriel Sanchez').first()).toBeVisible({ timeout: 2000 });
+
+    await ctx1.close();
+    await ctx2.close();
+  });
+
+  test('a peer disconnecting is reflected in the remaining client within 5s', async ({ browser }) => {
+    const ctx1 = await browser.newContext();
+    const ctx2 = await browser.newContext();
+    const page1 = await ctx1.newPage();
+    const page2 = await ctx2.newPage();
+
+    await login(page1, OPERATOR1);
+    await page1.click('button:has-text("In Progress")');
+    await page1.locator('span:has-text("Line 9")').first().click();
+    await page1.waitForURL(/\/checklist\/.*\/fill/);
+    const checklistUrl = page1.url();
+
+    await login(page2, OPERATOR2);
+    await page2.goto(checklistUrl);
+    await page2.waitForURL(/\/checklist\/.*\/fill/);
+
+    // Confirm Marcus shows up first…
+    await expect(page1.locator('[title="Marcus Rivera"]')).toBeVisible({ timeout: 3000 });
+
+    // …then close ctx2 entirely so the WS drops cleanly.
+    await ctx2.close();
+
+    // Marcus should disappear from page1's presence within 5s.
+    // (Local-ws broadcasts presence-leave on close synchronously;
+    // production lambda-ws does the same now via the disconnect fix.)
+    await expect(page1.locator('[title="Marcus Rivera"]')).not.toBeVisible({ timeout: 5000 });
+
+    await ctx1.close();
+  });
+
+  test('a comment added by one client appears in the peer view within 2s', async ({ browser }) => {
+    const ctx1 = await browser.newContext();
+    const ctx2 = await browser.newContext();
+    const page1 = await ctx1.newPage();
+    const page2 = await ctx2.newPage();
+
+    await login(page1, OPERATOR1);
+    await page1.click('button:has-text("In Progress")');
+    await page1.locator('span:has-text("Line 9")').first().click();
+    await page1.waitForURL(/\/checklist\/.*\/fill/);
+    const checklistUrl = page1.url();
+
+    await login(page2, OPERATOR2);
+    await page2.goto(checklistUrl);
+    await page2.waitForURL(/\/checklist\/.*\/fill/);
+    await page1.waitForTimeout(1500);
+
+    // Open the issue/comment editor on the first item from page1 by
+    // clicking "Mark with issue", typing into the textarea, blurring.
+    await page1.locator('[title="Mark with issue"]').first().click();
+    const commentBox = page1.locator('textarea').first();
+    const COMMENT = `WS-test ${Date.now()}`;
+    await commentBox.fill(COMMENT);
+    // Click outside to trigger save
+    await page1.locator('h2').first().click();
+
+    // Page 2 should show the comment text within 2s.
+    await expect(page2.locator(`text=${COMMENT}`)).toBeVisible({ timeout: 2500 });
+
+    await ctx1.close();
+    await ctx2.close();
+  });
 });
 
 // Helper to get a valid line ID

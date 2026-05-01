@@ -1,6 +1,7 @@
 import {
   PutCommand,
   DeleteCommand,
+  GetCommand,
   QueryCommand,
   UpdateCommand,
   ScanCommand,
@@ -31,6 +32,19 @@ export async function deleteConnection(connectionId: string): Promise<void> {
   await docClient.send(
     new DeleteCommand({ TableName: TABLE, Key: { connectionId } }),
   );
+}
+
+/**
+ * Read a single connection record by its connectionId. Used at $disconnect
+ * time so the WS Lambda can find which checklist the connection was watching
+ * and broadcast a presence-leave to the remaining peers — without this the
+ * leave is invisible until any peer fires the next message.
+ */
+export async function getConnection(connectionId: string): Promise<ConnectionRecord | null> {
+  const result = await docClient.send(
+    new GetCommand({ TableName: TABLE, Key: { connectionId } }),
+  );
+  return (result.Item as ConnectionRecord | undefined) ?? null;
 }
 
 export async function updateConnectionSubscription(
