@@ -29,6 +29,7 @@ import { getUser } from './data/dynamo.js';
 import {
   putConnection,
   deleteConnection,
+  getConnection,
   updateConnectionSubscription,
   updateConnectionMachine,
   touchConnection,
@@ -167,32 +168,19 @@ async function handleDisconnect(event: WsEvent): Promise<WsResult> {
   const domainName = event.requestContext.domainName;
   const stage = event.requestContext.stage;
 
-  // We need to know which checklist the connection was on so we can
-  // broadcast presence-leave. DynamoDB get-by-PK is cheap.
-  // (Connection record already exists from $connect; if it doesn't the
-  // delete is a no-op.)
-  let checklistId: string | null = null;
-  try {
-    // Reading from connection table by PK isn't exposed as a helper —
-    // we'll just trust the GSI scan in fan-out to skip the missing one.
-    // For a more elegant fix we'd add a `getConnection` helper, but the
-    // presence broadcast already runs against fresh GSI results.
-  } catch {
-    // ignore
-  }
-
+  // Read the connection BEFORE deleting so we know which checklist's
+  // peers need a presence-leave broadcast. Without this, peers would
+  // only see the user vanish on the next subscribe/machine_change/etc.
+  // from any peer — a real lag in the presence indicator.
+  const conn = await getConnection(connectionId).catch(() => null);
   await deleteConnection(connectionId).catch(() => {});
 
-  // Fan out an updated presence frame to whoever's still on this
-  // checklist. We don't know which checklist this conn was watching
-  // without an extra read, so refresh ALL presence-bearing checklists
-  // is wasteful; defer that and accept eventual consistency on
-  // presence-leave (the next subscribe / machine_change / heartbeat
-  // from any peer will redrive).
-  if (domainName && stage) {
-    const _client = getMgmtClient(domainName, stage);
-    void _client; // explicit no-op to keep the import path optimized
-    if (checklistId) await broadcastPresence(_client, checklistId).catch(() => {});
+  if (domainName && stage && conn?.checklistId) {
+    const client = getMgmtClient(domainName, stage);
+    // broadcastPresence queries the GSI fresh — by this point the
+    // disconnected conn is already removed, so the fan-out reaches
+    // exactly the remaining subscribers.
+    await broadcastPresence(client, conn.checklistId).catch(() => {});
   }
 
   return { statusCode: 200 };

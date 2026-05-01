@@ -51,10 +51,6 @@ vi.mock('../data/s3.js', () => ({
   getSignedImageUrl: vi.fn().mockResolvedValue('https://presigned-url.example.com/signed.jpg'),
 }));
 
-vi.mock('../data/sqs.js', () => ({
-  sendPdfGenerationMessage: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { app } from '../index.js';
 import { getChecklist, putChecklist, appendChecklistImages, removeChecklistImage } from '../data/dynamo.js';
 import { uploadImage, getImageUrl, deleteImage } from '../data/s3.js';

@@ -48,10 +48,6 @@ vi.mock('../data/s3.js', () => ({
   getSignedImageUrl: vi.fn().mockResolvedValue('https://example.com/signed.jpg'),
 }));
 
-vi.mock('../data/sqs.js', () => ({
-  sendPdfGenerationMessage: vi.fn().mockResolvedValue(undefined),
-}));
-
 import { getAllUsers, getUserByEmail, putUser, getUser, deleteUser, createUserWithEmailLock, deleteUserWithEmailLock } from '../data/dynamo.js';
 import { app } from '../index.js';
 
