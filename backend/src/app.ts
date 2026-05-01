@@ -33,6 +33,14 @@ import factoryRoutes from './routes/factories.js';
 export function createApp(): express.Express {
   const app = express();
 
+  // API Gateway sets X-Forwarded-For with the real client IP.
+  // Without `trust proxy`, Express ignores the header and
+  // express-rate-limit throws ERR_ERL_UNEXPECTED_X_FORWARDED_FOR on
+  // every request — a production-only bug surfaced by the deployed
+  // CloudWatch error scan. Trust the first hop (API Gateway is the
+  // sole proxy in front of this Lambda).
+  app.set('trust proxy', 1);
+
   app.use(cors({ origin: config.frontendOrigin, credentials: true }));
   app.use(compression());
   app.use(express.json({ limit: '1mb' }));

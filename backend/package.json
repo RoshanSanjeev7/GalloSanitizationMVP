@@ -8,6 +8,7 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
+    "test:deployed": "vitest run -c vitest.deployed.config.ts",
     "seed:dynamo": "tsx src/data/seed-dynamo.ts"
   },
   "dependencies": {
