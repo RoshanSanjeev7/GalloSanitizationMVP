@@ -8,6 +8,11 @@ output "api_gateway_url" {
   value       = aws_apigatewayv2_api.http.api_endpoint
 }
 
+output "ws_gateway_url" {
+  description = "WebSocket URL — set as VITE_WS_URL in the frontend build."
+  value       = "wss://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
+}
+
 output "frontend_bucket" {
   description = "S3 bucket name to upload the built React SPA into."
   value       = aws_s3_bucket.frontend.bucket

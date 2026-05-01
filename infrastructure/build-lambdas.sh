@@ -24,8 +24,8 @@ BACKEND_DIR="$(cd "$SCRIPT_DIR/../backend" && pwd)"
 DIST_DIR="$BACKEND_DIR/dist"
 
 echo "==> Cleaning old artifacts"
-rm -rf "$DIST_DIR/lambda-api"
-mkdir -p "$DIST_DIR/lambda-api"
+rm -rf "$DIST_DIR/lambda-api" "$DIST_DIR/lambda-ws"
+mkdir -p "$DIST_DIR/lambda-api" "$DIST_DIR/lambda-ws"
 
 # `--external:@aws-sdk/*` keeps the AWS SDK out of our bundle — Lambda's
 # Node.js 22.x runtime ships with @aws-sdk v3 already, so bundling it
@@ -61,5 +61,11 @@ npx --prefix "$BACKEND_DIR" esbuild "$BACKEND_DIR/src/lambda-api.ts" \
 # the browser), so PDFKit is no longer a dependency and the font
 # copy step is gone too.
 
-echo "==> Done. Artifact size:"
+echo "==> Building lambda-ws"
+npx --prefix "$BACKEND_DIR" esbuild "$BACKEND_DIR/src/lambda-ws.ts" \
+  --outfile="$DIST_DIR/lambda-ws/index.mjs" \
+  "${COMMON_FLAGS[@]}"
+
+echo "==> Done. Artifact sizes:"
 du -h "$DIST_DIR/lambda-api/index.mjs"
+du -h "$DIST_DIR/lambda-ws/index.mjs"
