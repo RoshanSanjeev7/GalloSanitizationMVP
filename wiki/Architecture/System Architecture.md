@@ -1,7 +1,7 @@
 ---
 tags: [architecture]
 created: 2026-04-09
-updated: 2026-04-30
+updated: 2026-05-01
 ---
 
 # System Architecture
@@ -60,10 +60,12 @@ Browser → S3 website (frontend assets, static)
                     ↘ API Gateway HTTP API → Lambda (lambda-api.ts wrapping Express)
                                               ↓
                                    DynamoDB · S3 (images) · CloudWatch
-                    ↘ (planned) API Gateway WebSocket → Lambda (per-route message handlers)
+                    ↘ API Gateway WebSocket → Lambda (lambda-ws.ts; $connect/$disconnect/$default)
                                                          ↓
                                               DynamoDB SanitizationConnections
 ```
+
+**WebSocket is now live in production** (provisioned 2026-05-01). The API Lambda fans real-time updates back to subscribed clients via API Gateway's Management API (`PostToConnection`); permission granted by `aws_iam_role_policy.lambda_api_ws_post`. WS endpoint: `wss://<api-id>.execute-api.us-west-2.amazonaws.com/prod`. See [[WebSocket System]] for the full event-by-event handler design.
 
 PDF generation runs in the browser; no PDF Lambda, no SQS queue, no S3 cache.
 

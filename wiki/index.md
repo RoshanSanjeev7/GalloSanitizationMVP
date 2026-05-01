@@ -1,7 +1,7 @@
 ---
 tags: [meta]
 created: 2026-04-09
-updated: 2026-04-30
+updated: 2026-05-01
 ---
 
 > [!IMPORTANT] Agent Greeting — read first
@@ -40,6 +40,7 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 - [[DynamoDB Access Patterns]] -- GSI usage, query priority, and access patterns for all 6 tables
 - [[Error Handling]] -- HTTP error codes, backend/frontend error patterns, failure modes
 - [[Frontend Hooks]] -- All 6 custom React hooks: WebSocket, sync, presence, images, offline, toasts
+- [[Testing Strategy]] -- Four-layer test approach: unit/integration, E2E, deployed-AWS smoke, deploy verification
 
 ## Decisions
 
@@ -70,6 +71,7 @@ Content catalog for the Gallo Sanitization MVP wiki. Every page is listed with a
 - [[2026-04-30 Lambda Readiness and WS Hardening]] -- app.ts/lambda-api.ts split, DynamoDB rate-limit store, Zod validation + ping/pong + rate limiter on WS, async PDF wiring
 - [[2026-04-30 First AWS Deployment]] -- the stack went live in account 724591801208; 41 resources, end-to-end verified, gotchas documented
 - [[2026-04-30 PDF Simplification]] -- PDF generation moved client-side via jsPDF; deleted server-side route, SQS, PDF Lambda, S3 cache, rate limiter
+- [[2026-05-01 Testing Overhaul]] -- Production WebSocket provisioned + four-layer test strategy; two real bugs surfaced and fixed by the new tests
 
 ## See also
 

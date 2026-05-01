@@ -1,12 +1,16 @@
 ---
 tags: [meta]
 created: 2026-04-09
-updated: 2026-04-30
+updated: 2026-05-01
 ---
 
 # Log
 
 Chronological record of all wiki changes. Newest entries at the top.
+
+## [2026-05-01] test+infra | Production WebSocket + four-layer testing strategy
+
+Three large pieces shipped in one session. (1) API Gateway WebSocket provisioned in production: `lambda-ws.ts` handler + `infrastructure/websocket.tf` (12 resources) + IAM permissions for the API Lambda to PostToConnection. Real-time presence + item updates now work against the deployed `wss://...amazonaws.com/prod` URL — the half-finished bit from the first AWS deploy is now done. (2) Comprehensive testing overhaul: pruned 5 obsolete tests (SQS mocks + scalability-pdf.spec.ts), added 29 new unit tests covering `lambda-ws`, `lambda-api`, and `apigw-ws`, added 4 real-time E2E assertions, added a deployed-AWS smoke suite (15 tests against real Lambda + API Gateway + DynamoDB + CloudWatch via `npm run test:deployed`, ~$0.01/run), added `infrastructure/verify.sh` for post-deploy drift detection. (3) Two production bugs surfaced and fixed by the new tests: the `lambda-ws` `$disconnect` deferred presence-leave (peers vanished only on next event from anyone), and an `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` flood from a missing Express `trust proxy` setting (caught by the deployed CloudWatch error scan on its first run). New page [[Testing Strategy]]; new devlog [[2026-05-01 Testing Overhaul]]; updated [[WebSocket System]], [[Rate Limiting]], [[System Architecture]], [[Known Limitations]] (closed 3 items, added 6 new ones spanning lambda-ws hardening, deployed load testing, automated rollback, CI pipeline, CloudFront/HTTPS, alarms, dependency updates).
 
 ## [2026-04-30] feature | Operators constrained to a single factory
 
