@@ -71,9 +71,9 @@ resource "aws_lambda_function" "api" {
       DYNAMODB_TABLE_AUDIT_LOG   = aws_dynamodb_table.audit_log.name
       DYNAMODB_TABLE_FACTORIES   = aws_dynamodb_table.factories.name
       DYNAMODB_TABLE_RATE_LIMITS = aws_dynamodb_table.rate_limits.name
-      # APIGW_WS_ENDPOINT is wired up once the WebSocket API is
-      # provisioned in a follow-up commit. Until then, Express WS
-      # broadcasts will log warnings and no-op.
+      # ApiGatewayBroadcaster posts back to WebSocket clients via this
+      # Management API endpoint. URL shape: https://<api-id>.execute-api.<region>.amazonaws.com/<stage>
+      APIGW_WS_ENDPOINT = "https://${aws_apigatewayv2_api.ws.id}.execute-api.${var.aws_region}.amazonaws.com/${aws_apigatewayv2_stage.ws.name}"
     }
   }
 }
