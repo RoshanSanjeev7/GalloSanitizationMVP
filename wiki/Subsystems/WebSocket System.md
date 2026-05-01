@@ -1,21 +1,45 @@
 ---
 tags: [subsystem]
 created: 2026-04-10
-updated: 2026-04-30
+updated: 2026-05-01
 ---
 
 # WebSocket System
 
-The WebSocket layer enables real-time sync between operators editing the same checklist, presence indicators on dashboards, and toast notifications for admins.
+The WebSocket layer enables real-time sync between operators editing the same checklist, presence indicators on dashboards, and toast notifications for admins. **As of 2026-05-01 the production WebSocket path is fully wired** — API Gateway WebSocket + a dedicated `lambda-ws.ts` handler — so two operators on the same checklist see each other's changes in <1s in the live AWS deployment.
 
 ## Adapter Pattern
 
 The backend defines a `WebSocketBroadcaster` interface in `backend/src/ws/broadcaster.ts`. Two implementations exist:
 
-- **`LocalWsBroadcaster`** -- Uses the `ws` npm package to run a WebSocket server on the same HTTP server as Express. Connections are tracked in an in-memory `Map` and also persisted to DynamoDB for consistency. Used in development.
-- **`ApiGatewayBroadcaster`** -- Posts messages to AWS API Gateway Management API. Connections are tracked only in DynamoDB. Used in production.
+- **`LocalWsBroadcaster`** -- Uses the `ws` npm package to run a WebSocket server on the same HTTP server as Express. Connections are tracked in an in-memory `Map` and also persisted to DynamoDB for consistency. Used in development (`WS_MODE=local`).
+- **`ApiGatewayBroadcaster`** -- Posts messages back to clients via AWS API Gateway Management API. Connections are tracked only in DynamoDB (`SanitizationConnections` table + `checklistId-index` GSI). Used in production (`WS_MODE=apigw`).
 
 `createBroadcaster(config.wsMode)` selects the implementation based on the `WS_MODE` environment variable. See [[WebSocket Adapter Pattern]] for why this design exists.
+
+## Production topology (API Gateway WebSocket)
+
+Provisioned in `infrastructure/websocket.tf`:
+
+```
+Browser ──wss──► API Gateway WebSocket API ──► Lambda (lambda-ws.ts)
+   ▲                                              │
+   │                                              ▼
+   └── PostToConnection ◄── DynamoDB Connections (GSI: checklistId-index)
+                              ▲
+                              │
+              ApiGatewayBroadcaster (called from HTTP route handlers
+              when a checklist mutates — fans out item_update,
+              comment_update, status_change, etc.)
+```
+
+API Gateway invokes `lambda-ws.ts` once per WebSocket *event* (not per connection):
+
+- **`$connect`** — JWT verified from `?token=...`, user looked up, connection record written to DDB
+- **`$disconnect`** — connection record read (to know which checklist), deleted; presence-leave broadcast to remaining peers
+- **`$default`** — message body validated via the same Zod schemas as local-ws; dispatches to `subscribe` / `unsubscribe` / `machine_change` / `heartbeat`
+
+Critical detail: the API Lambda (HTTP routes) and the WS Lambda are SEPARATE functions. The API Lambda needs `execute-api:ManageConnections` IAM permission on the WS API to fan messages back from HTTP route handlers — granted via `aws_iam_role_policy.lambda_api_ws_post` in `infrastructure/websocket.tf`. The `APIGW_WS_ENDPOINT` env var on the API Lambda is the management URL; without it, broadcasts log a warning and no-op.
 
 ## Connection Lifecycle
 
@@ -109,10 +133,40 @@ Route handlers retrieve the broadcaster with `req.app.get('broadcaster')`. All b
 
 `WsDebugPanel` (`frontend/src/components/WsDebugPanel.tsx`) is a floating dev panel that taps `wsClient.onFrame` and shows every WebSocket frame in either direction with timestamp, type, and an expandable JSON body. Toggle with `Cmd+Shift+W` or visit any page with `?debug=ws`. State persists via `localStorage`. Useful for verifying the validation, rate-limiter, and shutdown behavior live in the browser.
 
+## Lambda-mode caveats (intentional gaps vs. local-ws)
+
+`lambda-ws.ts` is deliberately thinner than `local-ws.ts` because API Gateway WebSocket has a different runtime model — every event is a fresh, request-scoped Lambda invocation, not a sustained socket. As a result:
+
+- **No per-connection rate limiting.** Each `$default` invocation is independent; there's no in-process bucket to track. API Gateway has its own throttling (1000 burst / 500 sustained per stage) but per-user limiting on inbound messages isn't implemented yet.
+- **No JWT recheck on privileged messages.** API Gateway closes idle connections after 10 minutes regardless, so the practical exposure window for a stolen token mid-session is bounded — but a token that expires mid-session won't be detected on the WS side.
+- **No strikes counter.** Three garbage frames in a row don't auto-disconnect; the client gets `INVALID_*` error frames and stays connected. (API Gateway's idle timeout is the backstop.)
+- **No origin allowlist.** API Gateway WebSocket doesn't surface the `Origin` header to the integration in a clean way; rely on JWT auth to gate access.
+- **No ping/pong from the server.** API Gateway handles connection liveness — its 10-min idle timeout reaps dead clients automatically.
+
+These were judged acceptable for MVP given that API Gateway provides the bulk of what the local-ws hardening was protecting against. If abuse surfaces, the rate-limiter port (DDB-backed) would be the highest-priority addition.
+
+## Disconnect-presence fix (2026-05-01)
+
+Earlier, `lambda-ws.ts` `$disconnect` deferred presence-leave broadcasts to "the next event from any peer." That meant operators could see a teammate's avatar persist for tens of seconds — sometimes minutes — after they'd actually left, until something else triggered a presence broadcast.
+
+The fix: `$disconnect` now reads the connection record before deleting it (via the new `getConnection(connectionId)` helper in `data/connections.ts`), then broadcasts `presence` to whoever's still on the same `checklistId`. The broadcast queries the GSI fresh, so the disconnected conn is already gone from the result.
+
+Covered by:
+- `backend/src/__tests__/lambda-ws.test.ts` — unit test asserts presence-leave fires when leaver was on a checklist; skips when leaver was on the dashboard
+- `tests/deployed/ws-api.test.ts` — real WSS test asserts the presence frame fires within 5s of a peer's close, against the production endpoint
+
+## Testing
+
+See [[Testing Strategy]]. Three layers cover this subsystem:
+1. **Unit** — `local-ws.integration.test.ts`, `local-ws.test.ts`, `validate.test.ts`, `limiter.test.ts`, `connections.test.ts`, `load-chaos.test.ts`, `apigw-ws.test.ts`, `lambda-ws.test.ts` (~80 tests across the WS layer)
+2. **E2E (localhost)** — `tests/multiuser-websocket.spec.ts` opens two browser contexts and asserts presence appears, item-checks propagate, peer-disconnect is reflected, comments propagate within seconds
+3. **Deployed AWS** — `tests/deployed/ws-api.test.ts` uses real `ws` clients against `wss://...amazonaws.com/prod` to verify the lambda-ws handler, presence fan-out, and disconnect-leave end-to-end. Run via `npm run test:deployed`.
+
 ## See also
 
 - [[Presence Indicators]] -- what the WebSocket presence data powers in the UI
 - [[Auto-Save and Conflict Resolution]] -- how saves and WebSocket deltas interact
 - [[DynamoDB Tables]] -- the Connections table tracking active WebSocket connections
 - [[Frontend Hooks]] -- `useWebSocket`, `useChecklistSync`, `usePresenceSummary` hooks
+- [[Testing Strategy]] -- the three-layer test approach for WS + the rest of the stack
 - [[2026-04-30 Lambda Readiness and WS Hardening]] -- devlog entry for the validation, rate limiter, ping/pong, and graceful shutdown additions
